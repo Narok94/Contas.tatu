@@ -1,0 +1,6 @@
+{
+  "name": "Organização Financeira",
+  "description": "Aplicativo de organização financeira pessoal e doméstica para controle mensal de contas, cartões e parcelamentos do casal.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
