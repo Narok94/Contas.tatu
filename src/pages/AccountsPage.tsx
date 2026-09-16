@@ -1,21 +1,18 @@
+import '../accounts.css';
 import React, { useState, useMemo } from 'react';
 import {
-  Plus,
-  Filter,
   CheckCircle2,
   Circle,
   Layers,
   CreditCard as CardIcon,
   Repeat,
   FileText,
-  Sparkles,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { UnifiedMonthlyAccount } from '../types/finance';
 import { AccountCard } from '../components/AccountCard';
 import { CreditCardAccountCard, CardInternalItem } from '../components/CreditCardAccountCard';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { AccountModal } from '../components/AccountModal';
 import { CardPurchaseModal } from '../components/CardPurchaseModal';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
 
@@ -30,11 +27,7 @@ export const AccountsPage: React.FC = () => {
     toggleAccountStatus,
     deleteAccount,
     deleteCardItem,
-    isAccountModalOpen,
-    editingAccount,
-    openCreateAccountModal,
     openEditAccountModal,
-    closeAccountModal,
   } = useFinance();
 
   // Bloco 1 - Filtro de Status
@@ -58,7 +51,7 @@ export const AccountsPage: React.FC = () => {
     description: string;
   } | null>(null);
 
-  // Filtragem combinada
+  // Filter creates a new array; stable sorting changes presentation only.
   const filteredAccounts = useMemo(() => {
     return monthlyAccounts.filter((acc) => {
       // Bloco 1: Status
@@ -70,7 +63,7 @@ export const AccountsPage: React.FC = () => {
         return false;
       }
       return true;
-    });
+    }).sort((a, b) => Number(a.status === 'pago') - Number(b.status === 'pago'));
   }, [monthlyAccounts, statusFilter, typeFilter]);
 
   // Contadores para o resumo e badges
@@ -101,132 +94,35 @@ export const AccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="accounts-page max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
-      {/* Top Bar: Title, Context, Action */}
-      <div className="accounts-heading flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-        <div>
-          <div className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500 tracking-wide">
-            <span>Contas e despesas</span>
-            <span>•</span>
-            <span>{monthlyAccounts.length} {monthlyAccounts.length === 1 ? 'item no mês' : 'itens no mês'}</span>
-          </div>
-          <h2 className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 capitalize mt-0.5">
-            Contas de {formatMonthYear(currentMonth)}
-          </h2>
+    <div className="accounts-page">
+      <header className="accounts-heading">
+        <h2>Contas <span>· {formatMonthYear(currentMonth)}</span></h2>
+        <span>{monthlyAccounts.length} {monthlyAccounts.length === 1 ? 'conta no mês' : 'contas no mês'}</span>
+      </header>
+
+      <section className="accounts-summary" aria-label="Resumo financeiro do mês">
+        <div className="accounts-total">
+          <span><Layers size={15} />Total previsto</span>
+          <strong>{formatBRL(financialSummary.totalExpected)}</strong>
+          <small>{monthlyAccounts.length} contas no mês</small>
         </div>
-
-        <button
-          id="btn-new-account"
-          type="button"
-          onClick={openCreateAccountModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-strong text-white text-xs font-semibold rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 self-start sm:self-auto active:scale-[0.98]"
-        >
-          <Plus className="w-4 h-4" />
-          <span>Nova Conta</span>
-        </button>
-      </div>
-
-      {/* Financial Summary Bar: Total previsto, Pendente, Pago integrado */}
-      <div className="summary-grid">
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-          {/* Total Previsto */}
-          <div className="summary-card summary-total p-4 sm:p-5 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
-                <span className="inline-flex items-center gap-2"><Layers className="summary-icon" aria-hidden="true" />Total Previsto</span>
-              </span>
-              <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">
-                {monthlyAccounts.length} {monthlyAccounts.length === 1 ? 'conta' : 'contas'}
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 pt-0.5">
-              {formatBRL(financialSummary.totalExpected)}
-            </div>
-            <span className="text-xs text-stone-500 block">
-              Previsão de despesas deste mês
-            </span>
-          </div>
-
-          {/* Pendente */}
-          <div
-            className={`summary-card summary-pending p-4 sm:p-5 space-y-1.5 transition-colors ${
-              pendingCount > 0 ? 'pending-emphasis' : ''
-            }`}
-          >
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
-                <span className="inline-flex items-center gap-2"><Circle className="summary-icon" aria-hidden="true" />Ainda Pendente</span>
-              </span>
-              <span className="text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200/70">
-                {pendingCount} a pagar
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-950 pt-0.5">
-              {formatBRL(financialSummary.totalPending)}
-            </div>
-            {financialSummary.previousPendingCardsTotal > 0 ? (
-              <span className="text-xs font-semibold text-amber-900 block">
-                + {formatBRL(financialSummary.previousPendingCardsTotal)} em faturas anteriores
-              </span>
-            ) : (
-              <span className="text-xs text-stone-500 block">
-                {pendingCount === 0 ? 'Tudo quitado para este mês' : 'Aguardando pagamento'}
-              </span>
-            )}
-          </div>
-
-          {/* Já Pago */}
-          <div className="summary-card summary-paid p-4 sm:p-5 space-y-1.5">
-            <div className="flex items-center justify-between">
-              <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
-                <span className="inline-flex items-center gap-2"><CheckCircle2 className="summary-icon" aria-hidden="true" />Total Pago</span>
-              </span>
-              <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200/80">
-                {paidCount} quitadas
-              </span>
-            </div>
-            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-900 pt-0.5">
-              {formatBRL(financialSummary.totalPaid)}
-            </div>
-            {/* Barra de progresso */}
-            <div className="pt-1">
-              <div className="w-full bg-stone-200/70 rounded-full h-1.5 overflow-hidden">
-                <div
-                  className="bg-emerald-600 h-1.5 rounded-full transition-all duration-500"
-                  style={{
-                    width: `${
-                      financialSummary.totalExpected > 0
-                        ? Math.min(
-                            100,
-                            Math.round(
-                              (financialSummary.totalPaid / financialSummary.totalExpected) * 100
-                            )
-                          )
-                        : 0
-                    }%`,
-                  }}
-                />
-              </div>
-              <div className="flex justify-between items-center text-[10px] text-stone-400 mt-1">
-                <span>
-                  {financialSummary.totalExpected > 0
-                    ? `${Math.round(
-                        (financialSummary.totalPaid / financialSummary.totalExpected) * 100
-                      )}% concluído`
-                    : '0%'}
-                </span>
-                <span className="text-emerald-800 font-semibold">{paidCount} de {monthlyAccounts.length}</span>
-              </div>
-            </div>
-          </div>
+        <div className="accounts-pending">
+          <span><Circle size={15} />Ainda pendente</span>
+          <strong>{formatBRL(financialSummary.totalPending)}</strong>
+          <small>{pendingCount} a pagar{financialSummary.previousPendingCardsTotal > 0 && <> · + {formatBRL(financialSummary.previousPendingCardsTotal)} em faturas anteriores</>}</small>
         </div>
-      </div>
+        <div className="accounts-paid">
+          <span><CheckCircle2 size={15} />Total pago</span>
+          <strong>{formatBRL(financialSummary.totalPaid)}</strong>
+          <small>{paidCount} quitadas</small>
+        </div>
+      </section>
 
       {/* Control Filters Bar - Bloco 1 (Status) + Bloco 2 (Tipo de Conta) */}
-      <div className="bg-white p-3.5 rounded-2xl border border-line shadow-xs space-y-2.5">
+      <div className="accounts-filters">
         {/* Bloco 1: Status */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider w-16 shrink-0">
+        <div className="accounts-filter-group">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider shrink-0">
             Status:
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -276,12 +172,9 @@ export const AccountsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* Separator */}
-        <div className="border-t border-line" />
-
         {/* Bloco 2: Tipo de Conta */}
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider w-16 shrink-0">
+        <div className="accounts-filter-group">
+          <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider shrink-0">
             Tipo:
           </span>
           <div className="flex flex-wrap items-center gap-1.5">
@@ -376,7 +269,7 @@ export const AccountsPage: React.FC = () => {
           </p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 items-start">
+        <div className="accounts-grid">
           {filteredAccounts.map((account) => {
             if (account.type === 'credit_card') {
               return (

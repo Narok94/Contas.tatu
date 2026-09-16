@@ -1,0 +1,30 @@
+/* Operational page: a compact context strip leaves the cards in focus. */
+.accounts-page { max-width: 1440px; margin-inline: auto; padding: 8px 24px 24px; display: grid; gap: 14px; }
+.accounts-page .accounts-heading { display: flex; align-items: baseline; justify-content: space-between; flex-wrap: wrap; gap: 8px 16px; padding: 0; background: none; }
+.accounts-heading h2 { font-size: 21px; font-weight: 750; letter-spacing: -.5px; }
+.accounts-heading h2 span { font-size: 15px; font-weight: 500; color: var(--color-stone-600); letter-spacing: 0; }
+.accounts-heading > span { font-size: 11px; color: var(--color-stone-500); }
+.accounts-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.accounts-summary > div { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 4px 10px; padding: 12px 14px; border-radius: 14px; }
+.accounts-summary > div > span { display: flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 650; }
+.accounts-summary strong { font-size: 20px; font-weight: 750; letter-spacing: -.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.accounts-summary small { grid-column: 1 / -1; font-size: 10px; line-height: 1.4; color: var(--color-stone-600); }
+.accounts-total { background: var(--color-info-soft); color: var(--color-info); }
+.accounts-pending { background: var(--color-expense-soft); color: var(--color-expense); }
+.accounts-paid { background: var(--color-success-soft); color: var(--color-success); }
+.accounts-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 10px 12px; background: white; border: 1px solid var(--color-line); border-radius: 14px; }
+.accounts-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.accounts-filter-group button { padding: 5px 9px; }
+.accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.accounts-grid .account-tile > div:last-child { flex-wrap: wrap; }
+@media (min-width: 1024px) and (max-width: 1399px) {
+  .accounts-summary > div { grid-template-columns: 1fr; gap: 2px; padding-block: 9px; }
+}
+@media (max-width: 1023px) {
+  .accounts-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .accounts-summary > div { grid-template-columns: 1fr; }
+}
+@media (max-width: 599px) {
+  .accounts-page { padding-inline: 16px; }
+  .accounts-grid, .accounts-summary { grid-template-columns: 1fr; }
+}

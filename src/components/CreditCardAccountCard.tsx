@@ -2,7 +2,7 @@ import { categoryDisplayColor } from '../utils/categoryPalette';
 import React, { useState } from 'react';
 import {
   CreditCard as CardIcon,
-  CheckCircle2,
+  Undo2, CheckCircle2,
   Circle,
   Plus,
   Trash2,
@@ -341,10 +341,10 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
             type="button"
             onClick={() => onToggleStatus(account)}
             title="Clique para reabrir fatura se necessário"
-            className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold text-emerald-800 bg-emerald-100/70 hover:bg-emerald-200/80 transition-colors cursor-pointer"
+            className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-brand text-xs font-semibold text-brand-strong bg-white hover:bg-teal-soft shadow-xs transition-colors cursor-pointer"
           >
-            <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-            <span>✓ Fatura Paga</span>
+            <Undo2 className="w-3.5 h-3.5" />
+            <span>Marcar como pendente</span>
           </button>
         ) : (
           <button
