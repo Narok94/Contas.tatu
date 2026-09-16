@@ -1,6 +1,6 @@
 import React from 'react';
-import waving from '../assets/tatu/tatu-acenando.png.png';
-import laptop from '../assets/tatu/tatu-laptop.png.png';
+import waving from '../assets/tatu/tatu-acenando.png';
+import laptop from '../assets/tatu/tatu-laptop.png';
 
 const illustrations = { waving, laptop };
 /** Official, unmodified artwork; decorative alongside the interface text. */

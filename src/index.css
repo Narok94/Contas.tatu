@@ -165,3 +165,76 @@
     .hero-mascot { width: 100%; margin: 0; }
   }
 }
+
+/* Dense desktop composition. Panels remain natural-height and fully accessible. */
+@media (min-width: 1024px) {
+  .app-toolbar { min-height: 62px; padding: 10px 22px; }
+  .app-sidebar { padding: 22px 16px 16px; }
+  .nav-caption { margin-top: 28px; }
+  .app-nav button { min-height: 42px; padding: 11px 14px; }
+  .sidebar-note { padding: 14px; border-radius: 20px; }
+  .sidebar-note p { font-size: 14px; line-height: 1.45; margin-top: 6px; }
+  .note-mascot { width: 76px; height: 76px; margin: 8px auto; border-radius: 18px; }
+  .sidebar-footer { margin-top: 12px; }
+  .dashboard-page { max-width: none; padding: 8px 20px 14px; }
+  .dashboard-page > :not(:last-child) { margin-bottom: 12px; }
+  .dashboard-page .welcome-banner { min-height: 0; grid-template-columns: minmax(0, 1fr) 185px; gap: 20px; padding: 18px 26px; border-radius: 22px; }
+  .dashboard-page .welcome-banner h2 { font-size: 27px; line-height: 1.15; margin: 8px 0; letter-spacing: -.7px; max-width: none; }
+  .dashboard-page .welcome-banner p { font-size: 11px; line-height: 1.5; max-width: none; }
+  .dashboard-page .welcome-actions { flex-direction: row; align-items: center; gap: 24px; margin-top: 12px; }
+  .dashboard-page .hero-progress { width: 250px; }
+  .dashboard-page .hero-progress-label { font-size: 10px; margin-bottom: 5px; }
+  .dashboard-page .hero-cta { padding: 10px 16px; gap: 16px; }
+  .dashboard-page .hero-portrait { width: 140px; }
+  .dashboard-page .hero-art-caption { padding: 5px 12px; font-size: 8px; margin-top: -13px; }
+  .dashboard-page .hero-orbit-blue { width: 65px; height: 65px; left: 5px; top: 0; }
+  .dashboard-page .hero-orbit-coral { width: 30px; height: 30px; bottom: 32px; right: 10px; }
+  .dashboard-page .welcome-banner::before { width: 250px; height: 250px; right: -60px; }
+  .dashboard-page .editorial-note { padding: 0 2px; }
+  .dashboard-page .editorial-note p { font-size: 10px; }
+  .dashboard-page .summary-grid > div { gap: 12px; }
+  .dashboard-page .summary-card { padding: 12px 16px; border-radius: 18px; }
+  .dashboard-page .summary-card > :not(:last-child) { margin-bottom: 3px; }
+  .dashboard-page .summary-card > div:nth-child(2) { font-size: 24px; padding-top: 0; line-height: 1.2; }
+  .dashboard-page .summary-card > div:last-child { font-size: 10px; padding-top: 1px; }
+  .dashboard-page .summary-icon { width: 24px; height: 24px; padding: 4px; }
+  .dashboard-panels { grid-template-columns: minmax(0, 1.3fr) minmax(0, 1fr) minmax(0, 1fr); gap: 12px; align-items: stretch; }
+  .dashboard-panels > div { grid-column: auto; padding: 14px; min-width: 0; }
+  .dashboard-panels > div > :not(:last-child) { margin-bottom: 9px; }
+  .dashboard-panels h3 { font-size: 13px; line-height: 1.35; }
+  .dashboard-panels h3 + p { font-size: 10px; line-height: 1.4; }
+  .pending-panel { order: 0; }
+  .categories-panel { order: 1; }
+  .installments-panel { order: 2; }
+  .pending-panel > div:first-child { gap: 6px; align-items: flex-start; }
+  .pending-panel > div:first-child > span { font-size: 9px; padding: 3px 5px; white-space: nowrap; }
+  .pending-list { padding-top: 0; }
+  .pending-list > :not(:last-child) { margin-bottom: 5px; }
+  .pending-list > div { padding: 7px; gap: 6px; }
+  .pending-list > div > div:first-child { gap: 7px; }
+  .pending-list .text-sm { font-size: 11px; }
+  .pending-list .text-xs { font-size: 11px; }
+  .pending-list .text-\[11px\] { font-size: 9px; gap: 3px; }
+  .category-list { grid-template-columns: minmax(0, 1fr); gap: 9px; padding-top: 0; }
+  .category-list .text-xs { font-size: 11px; }
+  .category-list > div > :not(:last-child) { margin-bottom: 4px; }
+  .category-list .h-1\.5 { height: 4px; }
+  .installments-panel > div:first-child > div:last-child { margin-top: 10px; }
+  .installments-panel > div:first-child > div:last-child > div { padding: 8px; gap: 5px; }
+  .installments-panel > div:last-child { margin-top: 8px; padding-top: 8px; font-size: 10px; }
+  .app-shell:has(.dashboard-page) .app-main { padding-bottom: 0; }
+  .app-shell:has(.dashboard-page) .app-footer { padding-block: 9px; font-size: 10px; }
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .dashboard-panels { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .categories-panel { grid-column: 1 / -1; }
+}
+@media (min-width: 1024px) {
+  .dashboard-page > :not(:last-child) { margin-bottom: 10px; }
+  .dashboard-page .hero-portrait { width: 120px; }
+  .dashboard-page .summary-card { padding-block: 10px; }
+  .pending-list > div { padding-block: 5px; }
+  .pending-list > :not(:last-child) { margin-bottom: 4px; }
+  .dashboard-panels > div { padding-block: 12px; }
+  .category-list { gap: 7px; }
+}

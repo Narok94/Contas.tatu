@@ -228,9 +228,9 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* 3. Duas Colunas: Contas Pendentes do Mês & Parcelamentos Próximos do Fim */}
-      <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
+      <div className="dashboard-panels grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Coluna Esquerda: Contas Pendentes do Mês (7 colunas) */}
-        <div className="lg:col-span-7 bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="pending-panel lg:col-span-7 bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
@@ -258,7 +258,7 @@ export const DashboardPage: React.FC = () => {
               </p>
             </div>
           ) : (
-            <div className="space-y-2 pt-1">
+            <div className="pending-list space-y-2 pt-1">
               {pendingAccounts.slice(0, 5).map((acc) => (
                 <div
                   key={acc.id}
@@ -409,10 +409,9 @@ export const DashboardPage: React.FC = () => {
             </div>
           )}
         </div>
-      </div>
 
       {/* 4. Distribuição Visual Simples dos Principais Gastos (Sem excesso de gráficos) */}
-      <div className="bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+      <div className="categories-panel bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div>
           <h3 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
             Distribuição dos gastos por categoria
@@ -427,7 +426,7 @@ export const DashboardPage: React.FC = () => {
             Nenhuma despesa categorizada neste mês.
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3.5 pt-1">
+          <div className="category-list grid grid-cols-1 md:grid-cols-2 gap-x-8 gap-y-3.5 pt-1">
             {financialSummary.categoryBreakdown.map((cat) => (
               <div key={cat.categoryId} className="space-y-1.5">
                 <div className="flex items-center justify-between text-xs">
@@ -463,6 +462,7 @@ export const DashboardPage: React.FC = () => {
             ))}
           </div>
         )}
+      </div>
       </div>
     </div>
   );
