@@ -53,13 +53,15 @@ export const DashboardPage: React.FC = () => {
               ))}
             </div>
           )}
-          <p className="desk-panel-foot">{pendingAccounts.length > 5 ? `Exibindo 5 de ${pendingAccounts.length} contas em aberto. A lista completa está em Contas.` : `${pendingAccounts.length} contas em aberto em ${formatMonthYear(currentMonth)}.`}</p>
+          <p className="desk-panel-foot">{pendingAccounts.length > 5 ? `Exibindo 5 de ${pendingAccounts.length} contas em aberto. A lista completa está em Contas.` : `${pendingAccounts.length} contas em aberto em ${formatMonthYear(currentMonth)}. A lista completa está em Contas.`}</p>
         </section>
 
         <section className="desk-panel desk-progress" aria-labelledby="desk-progress-title">
           <header><div><h3 id="desk-progress-title">Progresso do mês</h3><p>Seu caminho até um mês organizado.</p></div><CheckCircle2 size={20} /></header>
+          <div className="desk-progress-summary">
           <div className="desk-progress-main"><strong>{paidPercent}<span>%</span></strong><div><h4>{paidCount} de {summary.totalCount} contas pagas</h4><p>do valor previsto já pago</p></div></div>
           <div className="desk-track desk-track-large" role="progressbar" aria-label="Progresso do mês em valor pago" aria-valuemin={0} aria-valuemax={100} aria-valuenow={paidPercent}><div style={{ width: `${paidPercent}%` }} /></div>
+          </div>
           <dl className="desk-counts"><div><dt>Pagas</dt><dd>{paidCount}</dd></div><div><dt>Pendentes</dt><dd>{summary.pendingCount}</dd></div><div><dt>Total</dt><dd>{summary.totalCount}</dd></div></dl>
           <div className="desk-positive"><span>UM PASSO DE CADA VEZ</span><p>Pequenas escolhas fazem grande diferença.</p></div>
         </section>
