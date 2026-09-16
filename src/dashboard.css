@@ -38,7 +38,7 @@
 .desk-panel header p { font-size: 11px; line-height: 1.4; color: var(--color-stone-500); margin-top: 3px; }
 .desk-link { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; font-weight: 650; color: var(--color-brand); white-space: nowrap; padding: 4px 0; cursor: pointer; }
 .desk-link:hover { text-decoration: underline; }
-.desk-account-list { display: grid; gap: clamp(5px, calc(2dvh - 10px), 11px); flex: 1; }
+.desk-account-list { width: 100%; max-width: 560px; margin-inline: auto; display: grid; gap: clamp(5px, calc(2dvh - 10px), 11px); flex: 1; }
 .desk-account-row { display: grid; grid-template-columns: 30px minmax(0, 1fr) auto auto; gap: 10px; align-items: center; padding: clamp(4px, calc(2dvh - 10px), 12px) 10px; border-radius: 12px; background: var(--color-surface-soft); }
 .desk-account-icon { width: 30px; height: 30px; display: grid; place-items: center; border-radius: 10px; }
 .desk-account-name { min-width: 0; overflow-wrap: anywhere; }
@@ -69,7 +69,7 @@
 .desk-empty p { font-size: 12px; }
 @media (min-width: 1024px) {
   .desk-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .desk-workspace { grid-template-columns: minmax(0, 1.65fr) minmax(0, 1fr); }
+  .desk-workspace { grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr); }
   .app-shell:has(.desktop-dashboard) { min-height: 100dvh; }
   .app-shell:has(.desktop-dashboard) .app-toolbar { height: clamp(54px, 7dvh, 76px); min-height: 54px; padding-block: 8px; }
   .app-shell:has(.desktop-dashboard) .app-main { display: flex; padding: 0; }
