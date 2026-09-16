@@ -1,3 +1,5 @@
+import { categoryDisplayColor } from '../utils/categoryPalette';
+import { TatuIllustration } from '../components/TatuIllustration';
 import React, { useState, useMemo } from 'react';
 import {
   CheckCircle2,
@@ -58,18 +60,18 @@ export const DashboardPage: React.FC = () => {
   }, [endingInstallments]);
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 sm:py-8 space-y-6">
+    <div className="dashboard-page max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8 space-y-6">
       {/* 1. Header do Dashboard: Acolhedor, Pessoal e Humano */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2 border-b border-[#E7E2D8]">
-        <div>
-          <div className="text-xs sm:text-sm font-semibold text-[#9E432A] flex items-center gap-1.5 mb-1">
-            <span>Olá!</span>
-            <span>👋</span>
+      <section className="welcome-banner" aria-labelledby="welcome-title">
+        <div className="welcome-copy">
+          <div className="text-xs sm:text-sm font-semibold text-brand flex items-center gap-1.5 mb-1">
+            <span>OLÁ, QUE BOM TER VOCÊ POR AQUI.</span>
+
           </div>
 
-          <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900">
+          <h2 id="welcome-title" className="font-bold text-stone-900">
             {financialSummary.pendingCount === 0
-              ? 'Tudo pago por aqui 🎉'
+              ? 'Tudo pago por aqui'
               : paidPercent >= 90
               ? 'O mês está quase concluído'
               : financialSummary.pendingCount === 1
@@ -87,44 +89,50 @@ export const DashboardPage: React.FC = () => {
               </span>
             )}
           </p>
-        </div>
-
-        <div className="flex items-center gap-2.5 sm:gap-3 self-start sm:self-auto">
-          {/* Mini Destaque de Progresso do Mês */}
-          <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white border border-[#E2DDD3] shadow-xs">
-            <span className="w-2 h-2 rounded-full bg-emerald-500" />
-            <span className="text-xs font-bold text-stone-800">
-              {paidPercent}% concluído
-            </span>
+        <div className="welcome-actions">
+          <div className="hero-progress">
+            <div className="hero-progress-label"><span>Seu mês, passo a passo</span><strong>{paidPercent}% concluído</strong></div>
+            <div className="hero-progress-track" role="progressbar" aria-label="Progresso de pagamento do mês" aria-valuemin={0} aria-valuemax={100} aria-valuenow={paidPercent}>
+              <div className="hero-progress-fill" style={{ width: `${paidPercent}%` }} />
+            </div>
           </div>
 
           <button
             id="btn-goto-accounts"
             type="button"
             onClick={() => setActiveTab('accounts')}
-            className="inline-flex items-center gap-2 px-4 py-2 bg-white hover:bg-[#FAF8F5] text-stone-800 text-xs font-semibold rounded-xl border border-[#E2DDD3] shadow-xs hover:shadow-sm transition-all cursor-pointer hover:border-[#CBC4B5]"
+            className="hero-cta"
           >
             <span>Ver contas</span>
-            <ArrowRight className="w-3.5 h-3.5 text-[#9E432A]" />
+            <ArrowRight className="w-3.5 h-3.5" />
           </button>
         </div>
-      </div>
+        </div>
+        <div className="hero-art" aria-hidden="true">
+          <span className="hero-orbit hero-orbit-blue" />
+          <span className="hero-orbit hero-orbit-coral" />
+          <div className="hero-portrait"><TatuIllustration className="hero-mascot" /></div>
+          <span className="hero-art-caption">Cada conta em seu lugar.<br /><strong>Mais leveza no seu dia.</strong></span>
+        </div>
+      </section>
+
+      <div className="editorial-note"><span>SEU MÊS EM PERSPECTIVA</span><p>Um mês organizado é um futuro mais leve.</p></div>
 
       {/* 2. Resumo Financeiro: Três indicadores integrados em uma única área horizontal */}
-      <div className="bg-white border border-[#E2DDD3] rounded-2xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#EAE5DC]">
+      <div className="summary-grid">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Bloco 1: TOTAL PREVISTO */}
-          <div className="p-5 sm:p-6 space-y-2">
+          <div className="summary-card summary-total p-5 sm:p-6 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
-                Total Previsto
+                <span className="inline-flex items-center gap-2"><Layers className="summary-icon" aria-hidden="true" />Total Previsto</span>
               </span>
               <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">
                 {financialSummary.totalCount} {financialSummary.totalCount === 1 ? 'conta' : 'contas'}
               </span>
             </div>
 
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-stone-900 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 pt-0.5">
               {formatBRL(financialSummary.totalExpected)}
             </div>
 
@@ -146,12 +154,12 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Bloco 2: AINDA PENDENTE */}
-          <div className={`p-5 sm:p-6 space-y-2 transition-colors ${
-            financialSummary.totalPending > 0 ? 'bg-[#FDFCF9]' : ''
+          <div className={`summary-card summary-pending p-5 sm:p-6 space-y-2 transition-colors ${
+            financialSummary.totalPending > 0 ? 'pending-emphasis' : ''
           }`}>
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
-                Ainda Pendente
+                <span className="inline-flex items-center gap-2"><Circle className="summary-icon" aria-hidden="true" />Ainda Pendente</span>
               </span>
               {financialSummary.pendingCount > 0 ? (
                 <span className="text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200/70">
@@ -164,7 +172,7 @@ export const DashboardPage: React.FC = () => {
               )}
             </div>
 
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-amber-950 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-950 pt-0.5">
               {formatBRL(financialSummary.totalPending)}
             </div>
 
@@ -185,17 +193,17 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {/* Bloco 3: TOTAL PAGO */}
-          <div className="p-5 sm:p-6 space-y-2 bg-[#F8FAF8]">
+          <div className="summary-card summary-paid p-5 sm:p-6 space-y-2">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
-                Total Pago
+                <span className="inline-flex items-center gap-2"><CheckCircle2 className="summary-icon" aria-hidden="true" />Total Pago</span>
               </span>
               <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200/80">
                 {paidPercent}% concluído
               </span>
             </div>
 
-            <div className="text-3xl sm:text-4xl font-extrabold tracking-tight text-emerald-900 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-900 pt-0.5">
               {formatBRL(financialSummary.totalPaid)}
             </div>
 
@@ -222,7 +230,7 @@ export const DashboardPage: React.FC = () => {
       {/* 3. Duas Colunas: Contas Pendentes do Mês & Parcelamentos Próximos do Fim */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         {/* Coluna Esquerda: Contas Pendentes do Mês (7 colunas) */}
-        <div className="lg:col-span-7 bg-white border border-[#E2DDD3] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+        <div className="lg:col-span-7 bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
           <div className="flex items-center justify-between">
             <div>
               <h3 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
@@ -240,7 +248,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {pendingAccounts.length === 0 ? (
-            <div className="py-10 text-center space-y-2 border border-dashed border-[#E2DDD3] rounded-xl bg-[#FAF8F5]/60">
+            <div className="py-10 text-center space-y-2 border border-dashed border-line rounded-xl bg-surface-soft/60">
               <CheckCircle2 className="w-7 h-7 text-emerald-600 mx-auto" />
               <div className="text-sm font-semibold text-stone-800">
                 Tudo em dia para este mês!
@@ -254,7 +262,7 @@ export const DashboardPage: React.FC = () => {
               {pendingAccounts.slice(0, 5).map((acc) => (
                 <div
                   key={acc.id}
-                  className="p-3 bg-[#FAF8F5]/70 hover:bg-[#F5F2EB] rounded-xl border border-[#EBE6DD] flex items-center justify-between gap-3 transition-colors text-xs"
+                  className="p-3 bg-surface-soft/70 hover:bg-surface-muted rounded-xl border border-line flex items-center justify-between gap-3 transition-colors text-xs"
                 >
                   <div className="flex items-center gap-3 min-w-0">
                     <button
@@ -273,7 +281,7 @@ export const DashboardPage: React.FC = () => {
                         {acc.category && (
                           <span
                             className="w-1.5 h-1.5 rounded-full shrink-0"
-                            style={{ backgroundColor: acc.category.color }}
+                            style={{ backgroundColor: categoryDisplayColor(acc.category.color) }}
                           />
                         )}
                         <span>{acc.category?.name || 'Geral'}</span>
@@ -304,7 +312,7 @@ export const DashboardPage: React.FC = () => {
                   <button
                     type="button"
                     onClick={() => setActiveTab('accounts')}
-                    className="text-xs text-[#9E432A] hover:text-[#7F321E] font-semibold hover:underline cursor-pointer"
+                    className="text-xs text-brand hover:text-brand-strong font-semibold hover:underline cursor-pointer"
                   >
                     Ver mais {pendingAccounts.length - 5} contas pendentes na lista →
                   </button>
@@ -315,10 +323,10 @@ export const DashboardPage: React.FC = () => {
         </div>
 
         {/* Coluna Direita: Parcelamentos Próximos do Fim (5 colunas) */}
-        <div className="lg:col-span-5 bg-white border border-[#E2DDD3] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 flex flex-col justify-between">
+        <div className="installments-panel lg:col-span-5 bg-lilac-soft border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4 flex flex-col justify-between">
           <div>
             <div className="flex items-center gap-2.5">
-              <div className="p-2 rounded-xl bg-[#9E432A]/10 text-[#9E432A]">
+              <div className="p-2 rounded-xl bg-brand/10 text-brand">
                 <Layers className="w-4 h-4" />
               </div>
               <div>
@@ -333,14 +341,14 @@ export const DashboardPage: React.FC = () => {
 
             <div className="mt-3.5 space-y-2">
               {endingInstallments.length === 0 ? (
-                <div className="py-8 text-center text-xs text-stone-400 border border-dashed border-[#E2DDD3] rounded-xl bg-[#FAF8F5]/50">
+                <div className="py-8 text-center text-xs text-stone-400 border border-dashed border-line rounded-xl bg-surface-soft/50">
                   Nenhum parcelamento terminando nos próximos meses.
                 </div>
               ) : (
                 displayedInstallments.map((inst) => (
                   <div
                     key={inst.purchaseId}
-                    className="p-3 rounded-xl border border-[#EBE6DD] bg-[#FAF8F5]/70 flex items-center justify-between gap-3 text-xs hover:bg-[#F5F2EB] transition-colors"
+                    className="p-3 rounded-xl border border-line bg-surface-soft/70 flex items-center justify-between gap-3 text-xs hover:bg-surface-muted transition-colors"
                   >
                     <div className="min-w-0">
                       <div className="font-semibold text-stone-900 truncate">
@@ -363,7 +371,7 @@ export const DashboardPage: React.FC = () => {
                       <div className="font-bold text-stone-900">
                         {formatBRL(inst.amount)}
                       </div>
-                      <div className="text-[10px] text-[#9E432A] font-semibold">
+                      <div className="text-[10px] text-brand font-semibold">
                         {inst.remaining === 1 ? 'Última parcela' : `Faltam ${inst.remaining}`}
                       </div>
                     </div>
@@ -375,7 +383,7 @@ export const DashboardPage: React.FC = () => {
                 <button
                   type="button"
                   onClick={() => setShowAllEnding(!showAllEnding)}
-                  className="w-full py-1.5 text-xs text-stone-600 hover:text-[#9E432A] font-medium flex items-center justify-center gap-1 cursor-pointer transition-colors"
+                  className="w-full py-1.5 text-xs text-stone-600 hover:text-brand font-medium flex items-center justify-center gap-1 cursor-pointer transition-colors"
                 >
                   <span>
                     {showAllEnding
@@ -393,7 +401,7 @@ export const DashboardPage: React.FC = () => {
           </div>
 
           {endingInstallments.length > 0 && monthlyReliefAmount > 0 && (
-            <div className="pt-3 border-t border-[#EBE6DD] text-[11px] text-stone-500 flex items-center gap-2 mt-3">
+            <div className="pt-3 border-t border-line text-[11px] text-stone-500 flex items-center gap-2 mt-3">
               <PiggyBank className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>
                 Ao quitarem estes itens, <strong className="text-stone-800 font-semibold">{formatBRL(monthlyReliefAmount)}</strong> ficarão livres no orçamento mensal.
@@ -404,7 +412,7 @@ export const DashboardPage: React.FC = () => {
       </div>
 
       {/* 4. Distribuição Visual Simples dos Principais Gastos (Sem excesso de gráficos) */}
-      <div className="bg-white border border-[#E2DDD3] rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
+      <div className="bg-white border border-line rounded-2xl p-5 sm:p-6 shadow-sm space-y-4">
         <div>
           <h3 className="text-sm sm:text-base font-bold text-stone-900 tracking-tight">
             Distribuição dos gastos por categoria
@@ -426,7 +434,7 @@ export const DashboardPage: React.FC = () => {
                   <div className="flex items-center gap-2">
                     <span
                       className="w-2.5 h-2.5 rounded-full shrink-0 shadow-2xs"
-                      style={{ backgroundColor: cat.categoryColor }}
+                      style={{ backgroundColor: categoryDisplayColor(cat.categoryColor) }}
                     />
                     <span className="font-medium text-stone-800">
                       {cat.categoryName}
@@ -442,12 +450,12 @@ export const DashboardPage: React.FC = () => {
                   </div>
                 </div>
                 {/* Linha de progresso fina e discreta */}
-                <div className="w-full bg-[#EFECE5] rounded-full h-1.5 overflow-hidden">
+                <div className="w-full bg-surface-muted rounded-full h-1.5 overflow-hidden">
                   <div
                     className="h-1.5 rounded-full transition-all duration-300"
                     style={{
                       width: `${cat.percentage}%`,
-                      backgroundColor: cat.categoryColor,
+                      backgroundColor: categoryDisplayColor(cat.categoryColor),
                     }}
                   />
                 </div>

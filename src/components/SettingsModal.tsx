@@ -1,3 +1,4 @@
+import { categoryDisplayColor } from '../utils/categoryPalette';
 import React, { useState } from 'react';
 import { X, Plus, Edit2, Trash2, Tag, RefreshCw, Check } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -9,18 +10,7 @@ interface SettingsModalProps {
   onClose: () => void;
 }
 
-const COLOR_PRESETS = [
-  '#2563eb', // blue
-  '#059669', // emerald
-  '#db2777', // pink
-  '#7c3aed', // purple
-  '#d97706', // amber
-  '#dc2626', // red
-  '#0891b2', // cyan
-  '#475569', // slate
-  '#16a34a', // green
-  '#ea580c', // orange
-];
+import { COLOR_PRESETS } from '../utils/categoryPalette';
 
 export const SettingsModal: React.FC<SettingsModalProps> = ({
   isOpen,
@@ -107,17 +97,17 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     <>
       <div
         id="settings-modal-overlay"
-        className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4"
+        className="fixed inset-0 z-50 flex items-center justify-center bg-brand/40 backdrop-blur-xs p-4"
       >
         <div
           id="settings-modal-box"
           role="dialog"
           aria-modal="true"
-          className="bg-white border border-stone-200 rounded-xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
+          className="tatu-dialog bg-white border border-line rounded-3xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 flex flex-col max-h-[85vh]"
         >
           {/* Header */}
           <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
-            <div className="flex items-center gap-2.5">
+            <div className="flex items-center gap-2.5 min-w-0">
               <div className="p-2 rounded-lg bg-stone-100 text-stone-700">
                 <Tag className="w-4 h-4" />
               </div>
@@ -132,6 +122,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
             <button
               type="button"
+              aria-label="Fechar configurações"
               onClick={onClose}
               className="text-stone-400 hover:text-stone-600 p-1 rounded-md transition-colors cursor-pointer"
             >
@@ -142,7 +133,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
           <div className="p-6 overflow-y-auto space-y-6">
             {/* Seção de Categorias */}
             <div>
-              <div className="flex items-center justify-between mb-3">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-3">
                 <div>
                   <h3 className="text-sm font-semibold text-stone-900">
                     Categorias / Tags
@@ -155,7 +146,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   <button
                     type="button"
                     onClick={handleStartCreate}
-                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-stone-900 hover:bg-stone-800 text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
+                    className="inline-flex items-center gap-1 px-3 py-1.5 bg-brand hover:bg-brand-strong text-white rounded-lg text-xs font-semibold shadow-xs transition-colors cursor-pointer"
                   >
                     <Plus className="w-3.5 h-3.5" />
                     Nova Categoria
@@ -183,7 +174,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       value={name}
                       onChange={(e) => setName(e.target.value)}
                       placeholder="Ex: Casa, Mercado, Manoela, Antônio, Lazer"
-                      className="w-full px-3 py-1.5 text-sm border border-stone-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      className="w-full px-3 py-1.5 text-sm border border-stone-200 rounded-md bg-white focus:outline-none focus:ring-2 focus:ring-brand"
                     />
                   </div>
 
@@ -219,7 +210,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     </button>
                     <button
                       type="submit"
-                      className="px-4 py-1.5 text-xs font-semibold text-white bg-stone-900 hover:bg-stone-800 rounded-md shadow-xs transition-colors cursor-pointer"
+                      className="px-4 py-1.5 text-xs font-semibold text-white bg-brand hover:bg-brand-strong rounded-md shadow-xs transition-colors cursor-pointer"
                     >
                       {editingCategory ? 'Salvar' : 'Criar Categoria'}
                     </button>
@@ -234,22 +225,22 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                     key={cat.id}
                     className="flex items-center justify-between px-3.5 py-2.5 rounded-lg border border-stone-200/80 bg-white hover:bg-stone-50/50 transition-colors"
                   >
-                    <div className="flex items-center gap-2.5">
+                    <div className="flex items-center gap-2.5 min-w-0">
                       <span
                         className="w-3 h-3 rounded-full shrink-0"
-                        style={{ backgroundColor: cat.color }}
+                        style={{ backgroundColor: categoryDisplayColor(cat.color) }}
                       />
-                      <span className="text-sm font-medium text-stone-800">
+                      <span className="text-sm font-medium text-stone-800 truncate">
                         {cat.name}
                       </span>
                       {cat.description && (
-                        <span className="text-xs text-stone-400 font-normal truncate max-w-[180px]">
+                        <span className="hidden sm:inline text-xs text-stone-500 font-normal truncate max-w-[140px]">
                           ({cat.description})
                         </span>
                       )}
                     </div>
 
-                    <div className="flex items-center gap-1">
+                    <div className="flex items-center gap-1 shrink-0">
                       <button
                         type="button"
                         onClick={() => handleStartEdit(cat)}
@@ -274,7 +265,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
 
             {/* Separador e Opção de Resetar Demonstração */}
             <div className="pt-4 border-t border-stone-200">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-semibold text-stone-700">
                     Dados de Demonstração

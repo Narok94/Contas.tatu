@@ -17,12 +17,12 @@ const AppContent: React.FC = () => {
   } = useFinance();
 
   return (
-    <div className="min-h-screen bg-[#F4F1EA] text-stone-900 flex flex-col font-sans selection:bg-[#9E432A]/20">
+    <div className="app-shell min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20">
       {/* Top Header */}
       <Header />
 
       {/* Main Content Area */}
-      <main className="flex-1 pb-16">
+      <main className="app-main flex-1 pb-10">
         {activeTab === 'dashboard' ? <DashboardPage /> : <AccountsPage />}
       </main>
 
@@ -40,9 +40,9 @@ const AppContent: React.FC = () => {
       />
 
       {/* Minimal Footer */}
-      <footer className="border-t border-[#E2DDD3] bg-[#FAF8F5]/80 py-6 text-center text-xs text-stone-500">
+      <footer className="app-footer border-t border-line bg-surface-soft/80 py-6 text-center text-xs text-stone-500">
         <div className="max-w-7xl mx-auto px-6 flex flex-col sm:flex-row items-center justify-between gap-2">
-          <span className="font-medium text-stone-700">Controle Financeiro Mensal do Casal</span>
+          <span className="font-medium text-stone-700">Contas Tatu · Cada conta em seu lugar</span>
           <span className="text-stone-400">
             Focado em clareza, previsibilidade e conferência mensal
           </span>

@@ -1,3 +1,4 @@
+import { categoryDisplayColor } from '../utils/categoryPalette';
 import React from 'react';
 import { CheckCircle2, Circle, Edit3, Trash2, Repeat, Layers, Plus } from 'lucide-react';
 import { UnifiedMonthlyAccount } from '../types/finance';
@@ -50,12 +51,12 @@ export const AccountCard: React.FC<AccountCardProps> = ({
   return (
     <div
       id={`account-card-${account.id}`}
-      className={`group relative rounded-2xl border transition-all duration-200 self-start h-fit shadow-xs hover:shadow-sm ${
+      className={`account-tile group relative rounded-2xl border transition-all duration-200 self-start h-fit shadow-xs hover:shadow-sm ${
         isPaid
-          ? 'bg-[#FAFCFA] border-[#E2DDD3] border-l-4 border-l-emerald-500'
+          ? 'bg-success-soft border-line border-l-2 border-l-emerald-500'
           : isZeroValueRecurring
           ? 'bg-white border-amber-300 border-l-4 border-l-amber-400'
-          : 'bg-white border-[#E2DDD3] border-l-4 border-l-amber-500 hover:border-[#CBC4B5]'
+          : 'bg-white border-line border-l-4 border-l-amber-500 hover:border-line-strong'
       }`}
     >
       <div className="p-3.5 sm:p-4">
@@ -64,11 +65,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {/* Ícone linear minimalista da categoria ou tipo */}
             <div
-              className="w-6 h-6 rounded-md flex items-center justify-center shrink-0"
+              className="category-chip w-8 h-8 rounded-lg flex items-center justify-center shrink-0"
               style={{
-                backgroundColor: account.category ? `${account.category.color}15` : '#F4F1EA',
-                color: account.category ? account.category.color : '#78716C',
-              }}
+                '--category-color': categoryDisplayColor(account.category?.color || 'var(--color-brand)'),
+              } as React.CSSProperties}
               title={account.category?.name || account.type}
             >
               {getCategoryOrTypeIcon(account.category?.name, account.type, 'w-3.5 h-3.5')}
@@ -78,11 +78,10 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
             {account.category && (
               <span
-                className="inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate max-w-[120px]"
+                className="category-chip inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate max-w-[120px]"
                 style={{
-                  backgroundColor: `${account.category.color}12`,
-                  color: account.category.color,
-                }}
+                  '--category-color': categoryDisplayColor(account.category.color),
+                } as React.CSSProperties}
               >
                 {account.category.name}
               </span>
@@ -134,7 +133,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             <div>
               <div className="flex items-baseline gap-1.5">
                 <span
-                  className={`text-xl sm:text-2xl font-extrabold tracking-tight ${
+                  className={`text-xl sm:text-2xl font-bold tracking-tight ${
                     isPaid ? 'text-stone-800' : 'text-stone-900'
                   }`}
                 >
@@ -189,7 +188,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         className={`px-3.5 py-2 border-t rounded-b-2xl flex items-center justify-between gap-2 ${
           isPaid
             ? 'bg-emerald-50/40 border-emerald-100/80'
-            : 'bg-[#FAF8F5] border-[#EAE5DC]'
+            : 'bg-surface-soft border-line'
         }`}
       >
         {/* Toggle Status Action */}
@@ -209,7 +208,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             id={`btn-toggle-${account.id}`}
             type="button"
             onClick={() => onToggleStatus(account)}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-[#9E432A] hover:bg-[#88361F] text-white shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand hover:bg-brand-strong text-white shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Marcar como pago</span>

@@ -101,9 +101,9 @@ export const AccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-6 space-y-5">
+    <div className="accounts-page max-w-7xl mx-auto px-4 sm:px-6 py-6 space-y-5">
       {/* Top Bar: Title, Context, Action */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#E7E2D8] pb-4">
+      <div className="accounts-heading flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
           <div className="inline-flex items-center gap-2 text-xs font-semibold text-stone-500 tracking-wide">
             <span>Contas e despesas</span>
@@ -119,7 +119,7 @@ export const AccountsPage: React.FC = () => {
           id="btn-new-account"
           type="button"
           onClick={openCreateAccountModal}
-          className="inline-flex items-center gap-2 px-4 py-2.5 bg-[#9E432A] hover:bg-[#88361F] text-white text-xs font-semibold rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 self-start sm:self-auto active:scale-[0.98]"
+          className="inline-flex items-center gap-2 px-4 py-2.5 bg-brand hover:bg-brand-strong text-white text-xs font-semibold rounded-xl shadow-2xs hover:shadow-xs transition-all cursor-pointer shrink-0 self-start sm:self-auto active:scale-[0.98]"
         >
           <Plus className="w-4 h-4" />
           <span>Nova Conta</span>
@@ -127,19 +127,19 @@ export const AccountsPage: React.FC = () => {
       </div>
 
       {/* Financial Summary Bar: Total previsto, Pendente, Pago integrado */}
-      <div className="bg-white border border-[#E2DDD3] rounded-2xl shadow-sm overflow-hidden">
-        <div className="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[#EAE5DC]">
+      <div className="summary-grid">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
           {/* Total Previsto */}
-          <div className="p-4 sm:p-5 space-y-1.5">
+          <div className="summary-card summary-total p-4 sm:p-5 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider">
-                Total Previsto
+                <span className="inline-flex items-center gap-2"><Layers className="summary-icon" aria-hidden="true" />Total Previsto</span>
               </span>
               <span className="text-[11px] font-semibold text-stone-600 bg-stone-100 px-2 py-0.5 rounded-full">
                 {monthlyAccounts.length} {monthlyAccounts.length === 1 ? 'conta' : 'contas'}
               </span>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-stone-900 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-stone-900 pt-0.5">
               {formatBRL(financialSummary.totalExpected)}
             </div>
             <span className="text-xs text-stone-500 block">
@@ -149,19 +149,19 @@ export const AccountsPage: React.FC = () => {
 
           {/* Pendente */}
           <div
-            className={`p-4 sm:p-5 space-y-1.5 transition-colors ${
-              pendingCount > 0 ? 'bg-[#FDFCF9]' : ''
+            className={`summary-card summary-pending p-4 sm:p-5 space-y-1.5 transition-colors ${
+              pendingCount > 0 ? 'pending-emphasis' : ''
             }`}
           >
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-amber-900 uppercase tracking-wider">
-                Ainda Pendente
+                <span className="inline-flex items-center gap-2"><Circle className="summary-icon" aria-hidden="true" />Ainda Pendente</span>
               </span>
               <span className="text-[11px] font-bold text-amber-800 bg-amber-100/90 px-2 py-0.5 rounded-full border border-amber-200/70">
                 {pendingCount} a pagar
               </span>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-amber-950 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-amber-950 pt-0.5">
               {formatBRL(financialSummary.totalPending)}
             </div>
             {financialSummary.previousPendingCardsTotal > 0 ? (
@@ -176,16 +176,16 @@ export const AccountsPage: React.FC = () => {
           </div>
 
           {/* Já Pago */}
-          <div className="p-4 sm:p-5 space-y-1.5 bg-[#F8FAF8]">
+          <div className="summary-card summary-paid p-4 sm:p-5 space-y-1.5">
             <div className="flex items-center justify-between">
               <span className="text-[11px] font-bold text-emerald-900 uppercase tracking-wider">
-                Total Pago
+                <span className="inline-flex items-center gap-2"><CheckCircle2 className="summary-icon" aria-hidden="true" />Total Pago</span>
               </span>
               <span className="text-[11px] font-bold text-emerald-800 bg-emerald-100/90 px-2 py-0.5 rounded-full border border-emerald-200/80">
                 {paidCount} quitadas
               </span>
             </div>
-            <div className="text-2xl sm:text-3xl font-extrabold tracking-tight text-emerald-900 pt-0.5">
+            <div className="text-2xl sm:text-3xl font-bold tracking-tight text-emerald-900 pt-0.5">
               {formatBRL(financialSummary.totalPaid)}
             </div>
             {/* Barra de progresso */}
@@ -223,7 +223,7 @@ export const AccountsPage: React.FC = () => {
       </div>
 
       {/* Control Filters Bar - Bloco 1 (Status) + Bloco 2 (Tipo de Conta) */}
-      <div className="bg-white p-3.5 rounded-2xl border border-[#E2DDD3] shadow-xs space-y-2.5">
+      <div className="bg-white p-3.5 rounded-2xl border border-line shadow-xs space-y-2.5">
         {/* Bloco 1: Status */}
         <div className="flex flex-wrap items-center gap-2">
           <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider w-16 shrink-0">
@@ -232,12 +232,13 @@ export const AccountsPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               id="filter-status-all"
+              aria-pressed={statusFilter === 'all'}
               type="button"
               onClick={() => setStatusFilter('all')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 statusFilter === 'all'
-                  ? 'bg-[#9E432A] text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
               Todas ({monthlyAccounts.length})
@@ -245,20 +246,22 @@ export const AccountsPage: React.FC = () => {
 
             <button
               id="filter-status-pending"
+              aria-pressed={statusFilter === 'pendente'}
               type="button"
               onClick={() => setStatusFilter('pendente')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 statusFilter === 'pendente'
-                  ? 'bg-amber-600 text-white shadow-2xs'
+                  ? 'bg-amber-700 text-white shadow-2xs'
                   : 'bg-amber-50 text-amber-900 border border-amber-200/80 hover:bg-amber-100/80'
               }`}
             >
-              <Circle className="w-3 h-3 text-amber-600" />
+              <Circle className="w-3 h-3" />
               Pendentes ({pendingCount})
             </button>
 
             <button
               id="filter-status-paid"
+              aria-pressed={statusFilter === 'pago'}
               type="button"
               onClick={() => setStatusFilter('pago')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
@@ -267,14 +270,14 @@ export const AccountsPage: React.FC = () => {
                   : 'bg-emerald-50 text-emerald-900 border border-emerald-200/80 hover:bg-emerald-100/80'
               }`}
             >
-              <CheckCircle2 className="w-3 h-3 text-emerald-600" />
+              <CheckCircle2 className="w-3 h-3" />
               Pagas ({paidCount})
             </button>
           </div>
         </div>
 
         {/* Separator */}
-        <div className="border-t border-[#EAE5DC]" />
+        <div className="border-t border-line" />
 
         {/* Bloco 2: Tipo de Conta */}
         <div className="flex flex-wrap items-center gap-2">
@@ -284,12 +287,13 @@ export const AccountsPage: React.FC = () => {
           <div className="flex flex-wrap items-center gap-1.5">
             <button
               id="filter-type-all"
+              aria-pressed={typeFilter === 'all'}
               type="button"
               onClick={() => setTypeFilter('all')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
                 typeFilter === 'all'
-                  ? 'bg-stone-900 text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
               Todos os tipos
@@ -297,57 +301,61 @@ export const AccountsPage: React.FC = () => {
 
             <button
               id="filter-type-simple"
+              aria-pressed={typeFilter === 'simple'}
               type="button"
               onClick={() => setTypeFilter('simple')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 typeFilter === 'simple'
-                  ? 'bg-stone-900 text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
-              <FileText className="w-3 h-3 text-stone-500" />
+              <FileText className="w-3 h-3" />
               Simples ({typeCounts.simple})
             </button>
 
             <button
               id="filter-type-recurring"
+              aria-pressed={typeFilter === 'recurring'}
               type="button"
               onClick={() => setTypeFilter('recurring')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 typeFilter === 'recurring'
-                  ? 'bg-stone-900 text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
-              <Repeat className="w-3 h-3 text-stone-500" />
+              <Repeat className="w-3 h-3" />
               Fixas ({typeCounts.recurring})
             </button>
 
             <button
               id="filter-type-installment"
+              aria-pressed={typeFilter === 'installment'}
               type="button"
               onClick={() => setTypeFilter('installment')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 typeFilter === 'installment'
-                  ? 'bg-stone-900 text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
-              <Layers className="w-3 h-3 text-stone-500" />
+              <Layers className="w-3 h-3" />
               Parceladas ({typeCounts.installment})
             </button>
 
             <button
               id="filter-type-card"
+              aria-pressed={typeFilter === 'credit_card'}
               type="button"
               onClick={() => setTypeFilter('credit_card')}
               className={`px-3 py-1 rounded-xl text-xs font-semibold transition-all cursor-pointer inline-flex items-center gap-1.5 ${
                 typeFilter === 'credit_card'
-                  ? 'bg-[#9E432A] text-white shadow-2xs'
-                  : 'bg-[#FAF8F5] text-stone-700 border border-[#E2DDD3] hover:bg-[#F2EEE7]'
+                  ? 'bg-brand text-white shadow-2xs'
+                  : 'bg-surface-soft text-stone-700 border border-line hover:bg-surface-muted'
               }`}
             >
-              <CardIcon className="w-3 h-3 text-[#9E432A]" />
+              <CardIcon className="w-3 h-3" />
               Cartões ({typeCounts.credit_card})
             </button>
           </div>

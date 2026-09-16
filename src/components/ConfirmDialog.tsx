@@ -29,13 +29,13 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <div
       id="confirm-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-brand/40 backdrop-blur-xs p-4"
     >
       <div
         id="confirm-modal-box"
         role="dialog"
         aria-modal="true"
-        className="bg-white border border-stone-200 rounded-xl shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150"
+        className="tatu-dialog bg-white border border-line rounded-3xl shadow-xl max-w-md w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150"
       >
         <div className="p-6">
           <div className="flex items-start justify-between gap-4">
@@ -89,7 +89,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
             className={`px-4 py-2 text-sm font-semibold rounded-lg transition-colors cursor-pointer text-white ${
               isDestructive
                 ? 'bg-rose-600 hover:bg-rose-700 shadow-xs'
-                : 'bg-stone-900 hover:bg-stone-800 shadow-xs'
+                : 'bg-brand hover:bg-brand-strong shadow-xs'
             }`}
           >
             {confirmLabel}

@@ -170,13 +170,13 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   return (
     <div
       id="account-modal-overlay"
-      className="fixed inset-0 z-50 flex items-center justify-center bg-stone-900/40 backdrop-blur-xs p-4"
+      className="fixed inset-0 z-50 flex items-center justify-center bg-brand/40 backdrop-blur-xs p-4"
     >
       <div
         id="account-modal-box"
         role="dialog"
         aria-modal="true"
-        className="bg-white border border-stone-200 rounded-xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
+        className="tatu-dialog bg-white border border-line rounded-3xl shadow-xl max-w-lg w-full overflow-hidden animate-in fade-in zoom-in-95 duration-150 max-h-[90vh] flex flex-col"
       >
         {/* Modal Header */}
         <div className="px-6 py-4 border-b border-stone-200 flex items-center justify-between">
@@ -213,7 +213,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   onClick={() => setActiveType('simple')}
                   className={`p-2.5 rounded-lg border text-left transition-all cursor-pointer ${
                     activeType === 'simple'
-                      ? 'border-stone-900 bg-stone-900 text-white shadow-xs'
+                      ? 'border-stone-900 bg-brand text-white shadow-xs'
                       : 'border-stone-200 bg-white text-stone-700 hover:bg-stone-50'
                   }`}
                 >
@@ -273,7 +273,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                   ? 'Ex: Sofá retrátil de sala, Notebook Antônio'
                   : 'Ex: Troca de óleo, Consulta médica'
               }
-              className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+              className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
             />
           </div>
 
@@ -298,7 +298,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0,00"
-                className="w-full pl-10 pr-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+                className="w-full pl-10 pr-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
               />
             </div>
             {activeType === 'recurring' && (
@@ -323,7 +323,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                     required
                     value={installmentsCount}
                     onChange={(e) => setInstallmentsCount(e.target.value)}
-                    className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+                    className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
                   />
                 </div>
 
@@ -339,7 +339,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       required
                       value={currentInstallmentNumber}
                       onChange={(e) => setCurrentInstallmentNumber(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
                     />
                   </div>
                 ) : (
@@ -352,7 +352,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                       required
                       value={startMonth}
                       onChange={(e) => setStartMonth(e.target.value)}
-                      className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+                      className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
                     />
                   </div>
                 )}
@@ -376,7 +376,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 <select
                   value={creditCardId}
                   onChange={(e) => setCreditCardId(e.target.value)}
-                  className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+                  className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
                 >
                   <option value="">Parcelamento Avulso (Boleto / Carnê / Financiamento)</option>
                   {creditCards.map((card) => (
@@ -400,7 +400,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             <select
               value={categoryId}
               onChange={(e) => setCategoryId(e.target.value)}
-              className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-stone-900"
+              className="w-full px-3.5 py-2 text-sm border border-stone-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-brand"
             >
               <option value="">Sem categoria</option>
               {categories.map((cat) => (
@@ -423,7 +423,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             <button
               id="btn-save-account-modal"
               type="submit"
-              className="px-5 py-2 text-sm font-semibold text-white bg-[#9E432A] hover:bg-[#88361F] rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.98]"
+              className="px-5 py-2 text-sm font-semibold text-white bg-brand hover:bg-brand-strong rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.98]"
             >
               {editingAccount ? 'Salvar Alterações' : 'Cadastrar Conta'}
             </button>
