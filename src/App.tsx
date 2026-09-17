@@ -5,6 +5,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { AccountsPage } from './pages/AccountsPage';
 import { SettingsModal } from './components/SettingsModal';
 import { AccountModal } from './components/AccountModal';
+import './shell.css';
 
 const AppContent: React.FC = () => {
   const {
@@ -18,7 +19,7 @@ const AppContent: React.FC = () => {
 
   return (
     <div className="app-shell min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20">
-      {/* Top Header */}
+      {/* Persistent sidebar and shared toolbar */}
       <Header />
 
       {/* Main Content Area */}

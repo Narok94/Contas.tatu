@@ -1,0 +1,35 @@
+/* Desktop geometry belongs to the persistent shell, never to the active page. */
+@media (min-width: 1024px) {
+  html { scrollbar-gutter: stable; }
+
+  .app-shell {
+    --shell-sidebar-width: 236px;
+    --shell-gutter: clamp(18px, 1.7vw, 32px);
+    --shell-header-height: clamp(54px, 7dvh, 76px);
+    --shell-footer-height: 34px;
+    min-height: 100dvh;
+    padding-left: var(--shell-sidebar-width);
+  }
+
+  .app-shell .app-sidebar { width: var(--shell-sidebar-width); padding-block: clamp(16px, 2.5dvh, 28px); overflow: visible; }
+  .app-shell .nav-caption { margin-top: clamp(16px, 3dvh, 32px); }
+  .app-shell .sidebar-note { margin-top: auto; }
+  .app-shell .note-mascot { width: clamp(64px, 9dvh, 88px); height: auto; }
+  .app-shell .sidebar-footer { display: block; }
+
+  .app-shell .app-toolbar {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto auto;
+    height: var(--shell-header-height);
+    min-height: var(--shell-header-height);
+    flex-shrink: 0;
+    padding: 8px var(--shell-gutter);
+  }
+  .app-shell .toolbar-title { display: block; min-width: 0; margin-right: 0; }
+  .app-shell .toolbar-title p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+
+  .app-shell .app-main { display: flex; min-width: 0; padding: 8px var(--shell-gutter) 14px; }
+  .app-main > .desktop-dashboard,
+  .app-main > .accounts-page { width: 100%; max-width: none; margin: 0; padding: 0; align-content: start; }
+  .app-shell .app-footer { padding: 8px 0; font-size: 10px; min-height: var(--shell-footer-height); }
+}

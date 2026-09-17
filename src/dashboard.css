@@ -72,14 +72,5 @@
   .desk-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
   .desk-workspace { width: 100%; max-width: 1000px; margin-inline: auto; grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); align-self: start; align-items: start; }
   .desk-panel { padding: clamp(14px, 2dvh, 18px); }
-  .app-shell:has(.desktop-dashboard) { min-height: 100dvh; }
-  .app-shell:has(.desktop-dashboard) .app-toolbar { height: clamp(54px, 7dvh, 76px); min-height: 54px; padding-block: 8px; }
-  .app-shell:has(.desktop-dashboard) .app-main { display: flex; padding: 0; }
-  .desktop-dashboard { width: 100%; min-height: calc(100dvh - clamp(54px, 7dvh, 76px) - 34px); grid-template-rows: auto auto minmax(min-content, 1fr); padding: 8px clamp(18px, 1.7vw, 32px) 14px; }
-  .app-shell:has(.desktop-dashboard) .app-footer { padding: 8px 0; font-size: 10px; min-height: 34px; }
-  .app-shell:has(.desktop-dashboard) .app-sidebar { padding-block: clamp(16px, 2.5dvh, 28px); overflow: visible; }
-  .app-shell:has(.desktop-dashboard) .nav-caption { margin-top: clamp(16px, 3dvh, 32px); }
-  .app-shell:has(.desktop-dashboard) .sidebar-note { margin-top: auto; }
-  .app-shell:has(.desktop-dashboard) .note-mascot { width: clamp(64px, 9dvh, 88px); height: auto; }
-  .app-shell:has(.desktop-dashboard) .sidebar-footer { display: block; }
+  .desktop-dashboard { grid-template-rows: auto auto minmax(min-content, 1fr); }
 }
