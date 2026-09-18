@@ -241,17 +241,55 @@ test('anual soma meses sem duplicar cartões, saldo anterior ou fechamentos arqu
   store.cardExpenses.push({ id: 'old', cardId: 'card', description: 'Compra', amount: 30.30, month: '2026-08', createdAt: '' });
   store.recurringDefinitions.push({ id: 'fixed', name: 'Fixa sem valor', startMonth: month, isActive: true, createdAt: '' });
   store.installmentPurchases.push({ id: 'inst', description: 'Compra parcelada', totalAmount: 60, installmentsCount: 2, startMonth: month, createdAt: '' });
-  assert.equal(computeAnnualHistory(2026, store).total, 120.60);
+  assert.equal(computeAnnualHistory(2026, store).total, 0);
   assert.equal(computeAnnualHistory(2026, store).months[0].total, 0);
   assert.equal(computeAnnualHistory(2026, store).months[0].closed, false);
   assert.equal(computeAnnualHistory(2025, store).total, 0);
   for (const a of computeMonthlyAccounts(month, store)) store = recordPayment(store, month, a.id, a.type, 'pago');
   store = closeMonth(store, month);
   store.simpleAccounts[0].value = 99; // A closed month must still use the official snapshot.
-  assert.equal(computeAnnualHistory(2026, store).total, 120.60);
+  assert.equal(computeAnnualHistory(2026, store).total, 40.10);
   store = reopenMonth(store, month);
-  assert.equal(computeAnnualHistory(2026, store).total, 209.50);
+  assert.equal(computeAnnualHistory(2026, store).total, 129);
   store = closeMonth(store, month);
-  assert.equal(computeAnnualHistory(2026, store).total, 209.50);
+  assert.equal(computeAnnualHistory(2026, store).total, 129);
   assert.equal(computeAnnualHistory(2026, store).months.length, 12);
+});
+
+test('anual usa somente pagos em cada mês, incluindo fatura uma vez e sem saldo anterior', async () => {
+  const { computeAnnualHistory } = await import('../src/domain/history');
+  const store = fixture();
+  store.simpleAccounts[0].status = 'pago';
+  store.simpleAccounts.push({ ...store.simpleAccounts[0], id: 'pending', value: 900, status: 'pendente' }, { ...store.simpleAccounts[0], id: 'future', month: '2026-12', value: 800, status: 'pendente' });
+  store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
+  store.cardExpenses.push({ id: 'old', cardId: 'card', description: 'Antiga', amount: 100, month: '2026-08', createdAt: '' }, { id: 'now', cardId: 'card', description: 'Atual', amount: 50, month, createdAt: '' });
+  store.cardMonthlyInvoices.push({ id: 'invoice', cardId: 'card', month, status: 'pago' });
+  const annual = computeAnnualHistory(2026, store);
+  assert.equal(annual.total, 230);
+  assert.deepEqual(annual.months.map(m => m.total), [0, 0, 0, 0, 0, 0, 0, 0, 230, 0, 0, 0]);
+  store.cardMonthlyInvoices.push({ id: 'old-paid', cardId: 'card', month: '2026-08', status: 'pago' });
+  assert.equal(computeAnnualHistory(2026, store).total, 330);
+});
+
+test('parcelamentos ativos usam vigência, parcela atual e término real, inclusive cartão e virada do ano', async () => {
+  const { computeActiveInstallments } = await import('../src/domain/history');
+  const store = fixture();
+  store.creditCards.push({ id: 'card', name: 'Fatura agregadora', createdAt: '' });
+  const purchase = { id: 'sofa', description: 'Sofá', totalAmount: 1500, installmentsCount: 6, startMonth: '2026-05', createdAt: '' };
+  store.installmentPurchases.push(purchase,
+    { ...purchase, id: 'phone', description: 'Celular', totalAmount: 2160, installmentsCount: 12, startMonth: '2026-02', creditCardId: 'card' },
+    { ...purchase, id: 'ended', startMonth: '2025-01' },
+    { ...purchase, id: 'future', startMonth: '2027-01' },
+    { ...purchase, id: 'invalid', installmentsCount: 0, creditCardId: 'card' },
+    { ...purchase, id: 'missing-card', creditCardId: 'missing' });
+  const items = computeActiveInstallments(month, store);
+  assert.deepEqual(items, [
+    { id: 'sofa', name: 'Sofá', current: 5, total: 6, amount: 250, endMonth: '2026-10' },
+    { id: 'phone', name: 'Celular', current: 8, total: 12, amount: 180, endMonth: '2027-01' },
+  ]);
+  assert.equal(computeActiveInstallments('2026-12', store).find(i => i.id === 'phone')?.current, 11);
+  assert.equal(computeActiveInstallments('2027-01', store).find(i => i.id === 'phone')?.current, 12);
+  assert.equal(computeActiveInstallments('2027-02', store).some(i => i.id === 'phone'), false);
+  store.installmentPurchases = applyInstallmentUpdate([purchase], 'sofa', month, { description: 'Sofá', totalAmount: 1800, installmentsCount: 8, currentInstallment: 5 });
+  assert.equal(computeActiveInstallments(month, store)[0].endMonth, '2026-12');
 });

@@ -75,3 +75,9 @@
 .history-month-grid button > span { font-size: 11px; color: var(--color-stone-600); }
 .history-month-grid small { display: block; color: var(--color-success); font-size: 9px; margin-top: 3px; }
 .history-month-grid strong { font-size: 15px; font-variant-numeric: tabular-nums; }
+.history-annual-controls { display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-bottom: 18px; }
+.history-installments > h2 { margin-bottom: 3px; }
+.history-installment-list { max-height: 340px; overflow-y: auto; margin-top: 16px; }
+.history-installment-list small { display: block; margin-top: 5px; }
+.history-installment-end { flex-shrink: 0; color: var(--color-stone-600); font-size: 12px; }
+.history-installment-end strong { color: var(--color-brand-strong); }

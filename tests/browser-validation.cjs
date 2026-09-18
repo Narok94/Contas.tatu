@@ -50,6 +50,20 @@ const key = 'organizacao_financeira_store_v1';
           assert.equal(annualMetrics.overflow, false);
           await page.screenshot({ path: path.join(output, `annual-${width}x${height}.png`), fullPage: true });
           report.viewports.push({ width, height, tab: 'annual', ...annualMetrics });
+          assert.match(await page.locator('.history-year-total > strong').innerText(), /504,90/);
+          const annualValues = await page.locator('.history-month-grid strong').allTextContents();
+          assert.match(annualValues[8], /504,90/);
+          for (const value of annualValues.slice(9)) assert.match(value, /0,00/);
+          await page.getByRole('button', { name: 'Parcelamentos', exact: true }).click();
+          await page.getByRole('heading', { name: 'Parcelamentos ativos' }).waitFor();
+          assert.ok(await page.locator('.history-installment-list .history-row').count() > 0);
+          assert.equal(await page.locator('.history-installment-list').getByText('Cartão Nubank Casal', { exact: true }).count(), 0);
+          const installmentMetrics = await page.evaluate(() => ({ overflow: document.documentElement.scrollWidth > innerWidth, height: document.documentElement.scrollHeight }));
+          assert.equal(installmentMetrics.overflow, false);
+          assert.ok(installmentMetrics.height <= height, 'Installment consultation made page taller than viewport');
+          await page.screenshot({ path: path.join(output, `installments-${width}x${height}.png`), fullPage: true });
+          report.viewports.push({ width, height, tab: 'installments', ...installmentMetrics });
+          await page.getByRole('button', { name: 'Gastos', exact: true }).click();
           await page.getByRole('button', { name: 'Mensal', exact: true }).click();
         }
       }
