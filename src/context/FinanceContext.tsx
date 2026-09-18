@@ -1,4 +1,4 @@
-import { assertMonthOpen, assertFinancialMutation, closeMonth, recordPayment } from '../domain/monthOperations';
+import { assertMonthOpen, assertFinancialMutation, closeMonth, reopenMonth, recordPayment } from '../domain/monthOperations';
 import React, { createContext, useContext, useState, useMemo, useRef } from 'react';
 import {
   applyInstallmentUpdate,
@@ -121,6 +121,7 @@ interface FinanceContextType {
   cancelPayment: () => void;
   confirmPayment: (amount: number) => boolean;
   closeCurrentMonth: () => boolean;
+  reopenCurrentMonth: () => boolean;
   operationError: string;
   clearOperationError: () => void;
   // Utilitários
@@ -171,6 +172,20 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     return success;
   };
   const closeCurrentMonth = () => commit(previous => closeMonth(previous, currentMonth));
+  // Only this explicit command may remove a current closure; it archives it first.
+  const reopenCurrentMonth = () => {
+    try {
+      const next = reopenMonth(storeRef.current, currentMonth);
+      saveFinanceStore(next);
+      storeRef.current = next;
+      setStoreState(next);
+      setOperationError('');
+      return true;
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : 'Não foi possível reabrir o mês.');
+      return false;
+    }
+  };
 
   const openCreateAccountModal = () => {
     if (storeRef.current.closedMonths?.[currentMonth]) { setOperationError('Este mês está fechado. Novos lançamentos estão bloqueados.'); return; }
@@ -614,7 +629,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Resetar dados para o padrão
   const resetData = () => {
-    if (Object.keys(storeRef.current.closedMonths ?? {}).length) {
+    if (Object.keys(storeRef.current.closedMonths ?? {}).length || Object.keys(storeRef.current.closedMonthHistory ?? {}).length) {
       setOperationError('Há meses fechados. A restauração de demonstração está bloqueada para preservar o histórico.');
       return;
     }
@@ -626,7 +641,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     <FinanceContext.Provider
       value={{
         editValueAndPay,
-        paymentRequest, cancelPayment, confirmPayment, closeCurrentMonth, operationError, clearOperationError: () => setOperationError(''),
+        paymentRequest, cancelPayment, confirmPayment, closeCurrentMonth, reopenCurrentMonth, operationError, clearOperationError: () => setOperationError(''),
         currentMonth,
         setCurrentMonth,
         activeTab,

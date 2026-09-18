@@ -161,3 +161,97 @@ test('dados legados carregam sem reset e snapshots sobrevivem a reload', () => {
   storage.setItem = () => { throw new Error('quota'); };
   assert.throws(() => saveFinanceStore(closed), /Não foi possível salvar/);
 });
+
+// Reopening keeps old closures as immutable audit data, never as the active month.
+test('reabrir preserva contas, valores, pagamentos e saldo anterior; novo fechamento substitui vigente', async () => {
+  const { reopenMonth, canCloseMonth } = await import('../src/domain/monthOperations');
+  let store = fixture();
+  store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
+  store.cardExpenses.push({ id: 'old', cardId: 'card', description: 'Anterior', amount: 75, month: '2026-08', createdAt: '' });
+  assert.equal(canCloseMonth(store, month), false);
+  for (const account of computeMonthlyAccounts(month, store)) store = recordPayment(store, month, account.id, account.type, 'pago');
+  assert.equal(canCloseMonth(store, month), true);
+  const closed = closeMonth(store, month);
+  const snapshot = structuredClone(closed.closedMonths![month]);
+  assert.equal(canCloseMonth(closed, month), false);
+  const reopened = reopenMonth(closed, month);
+  assert.equal(reopened.closedMonths?.[month], undefined);
+  assert.deepEqual(reopened.closedMonthHistory?.[month], [snapshot]);
+  for (const field of ['simpleAccounts', 'recurringDefinitions', 'recurringMonthlyRecords', 'installmentPurchases', 'creditCards', 'cardExpenses', 'cardMonthlyInvoices', 'categories'] as const) assert.deepEqual(reopened[field], closed[field]);
+  assert.deepEqual(closed.closedMonths![month], snapshot);
+  assert.doesNotThrow(() => assertMonthOpen(reopened, month));
+  assert.throws(() => reopenMonth(reopened, month), /andamento/);
+  assert.throws(() => assertFinancialMutation(closed, reopened)); // Ordinary mutations cannot reopen.
+  const added = { ...reopened, simpleAccounts: [...reopened.simpleAccounts, { ...reopened.simpleAccounts[0], id: 'forgotten', name: 'Esquecida', value: 25, status: 'pendente' as const }] };
+  assert.doesNotThrow(() => assertFinancialMutation(reopened, added));
+  assert.equal(canCloseMonth(added, month), false);
+  assert.throws(() => closeMonth(added, month), /pendente/);
+  assert.equal(computeFinancialSummary(month, added).totalExpected, 205);
+  const resolved = recordPayment(added, month, 'forgotten', 'simple', 'pago', 30);
+  assert.equal(canCloseMonth(resolved, month), true);
+  const reclosed = closeMonth(resolved, month);
+  assert.equal(reclosed.closedMonths![month].summary.totalExpected, 210);
+  assert.equal(reclosed.closedMonths![month].summary.totalPaid, 210);
+  assert.deepEqual(reclosed.closedMonthHistory![month], [snapshot]);
+  assert.equal(reclosed.closedMonths![month].summary.previousPendingCardsTotal, 75);
+  assert.deepEqual(getPreviousPendingCardInvoices('card', month, reclosed), [{ month: '2026-08', amount: 75 }]);
+  assert.throws(() => recordPayment(reclosed, month, 'forgotten', 'simple', 'pendente'), /fechado/);
+  const twice = reopenMonth(reclosed, month);
+  assert.equal(twice.closedMonthHistory![month].length, 2);
+  const corrupt = structuredClone(twice); corrupt.closedMonthHistory![month][0].summary.totalPaid = 1;
+  assert.throws(() => assertFinancialMutation(twice, corrupt), /anteriores/);
+  let raw = '';
+  Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => raw, setItem: (_key: string, value: string) => { raw = value; } }, configurable: true });
+  saveFinanceStore(twice);
+  assert.deepEqual(loadFinanceStore(), JSON.parse(JSON.stringify(twice)));
+});
+
+test('reabertura libera pagamentos e reversões de todos os tipos sem alterar outros meses fechados', async () => {
+  const { reopenMonth } = await import('../src/domain/monthOperations');
+  let store = fixture();
+  store.recurringDefinitions.push({ id: 'fixed', name: 'Luz', startMonth: month, isActive: true, createdAt: '' });
+  store.installmentPurchases.push({ id: 'inst', description: 'Sofá', totalAmount: 300, installmentsCount: 3, startMonth: month, createdAt: '' });
+  store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
+  store.cardExpenses.push({ id: 'item', cardId: 'card', description: 'Compra', amount: 40, month, createdAt: '' });
+  for (const m of [month, '2026-10']) {
+    for (const a of computeMonthlyAccounts(m, store)) store = recordPayment(store, m, a.id, a.type, 'pago');
+    store = closeMonth(store, m);
+  }
+  const future = structuredClone(store.closedMonths!['2026-10']);
+  store = reopenMonth(store, month);
+  for (const a of computeMonthlyAccounts(month, store)) {
+    store = recordPayment(store, month, a.id, a.type, 'pendente');
+    store = recordPayment(store, month, a.id, a.type, 'pago', a.type === 'credit_card' ? undefined : 123);
+  }
+  assert.deepEqual(store.closedMonths!['2026-10'], future);
+  assert.equal(computeFinancialSummary(month, store).totalPaid, 409);
+  const edited = { ...store, simpleAccounts: store.simpleAccounts.map(a => ({ ...a, name: 'Corrigida', value: 99 })) };
+  assert.doesNotThrow(() => assertFinancialMutation(store, edited));
+  const deleted = { ...edited, simpleAccounts: [] };
+  assert.doesNotThrow(() => assertFinancialMutation(edited, deleted));
+});
+
+test('anual soma meses sem duplicar cartões, saldo anterior ou fechamentos arquivados', async () => {
+  const { computeAnnualHistory } = await import('../src/domain/history');
+  const { reopenMonth } = await import('../src/domain/monthOperations');
+  let store = fixture();
+  store.simpleAccounts[0].value = 10.10;
+  store.simpleAccounts.push({ ...store.simpleAccounts[0], id: 'aug', month: '2026-08', value: 20.20 });
+  store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
+  store.cardExpenses.push({ id: 'old', cardId: 'card', description: 'Compra', amount: 30.30, month: '2026-08', createdAt: '' });
+  store.recurringDefinitions.push({ id: 'fixed', name: 'Fixa sem valor', startMonth: month, isActive: true, createdAt: '' });
+  store.installmentPurchases.push({ id: 'inst', description: 'Compra parcelada', totalAmount: 60, installmentsCount: 2, startMonth: month, createdAt: '' });
+  assert.equal(computeAnnualHistory(2026, store).total, 120.60);
+  assert.equal(computeAnnualHistory(2026, store).months[0].total, 0);
+  assert.equal(computeAnnualHistory(2026, store).months[0].closed, false);
+  assert.equal(computeAnnualHistory(2025, store).total, 0);
+  for (const a of computeMonthlyAccounts(month, store)) store = recordPayment(store, month, a.id, a.type, 'pago');
+  store = closeMonth(store, month);
+  store.simpleAccounts[0].value = 99; // A closed month must still use the official snapshot.
+  assert.equal(computeAnnualHistory(2026, store).total, 120.60);
+  store = reopenMonth(store, month);
+  assert.equal(computeAnnualHistory(2026, store).total, 209.50);
+  store = closeMonth(store, month);
+  assert.equal(computeAnnualHistory(2026, store).total, 209.50);
+  assert.equal(computeAnnualHistory(2026, store).months.length, 12);
+});

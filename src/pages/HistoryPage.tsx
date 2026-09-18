@@ -2,32 +2,68 @@ import React, { useState } from 'react';
 import { useFinance } from '../context/FinanceContext';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
 import { ConfirmDialog } from '../components/ConfirmDialog';
-import { AccountType } from '../types/finance';
+import { canCloseMonth } from '../domain/monthOperations';
+import { computeAnnualHistory } from '../domain/history';
 
-const typeNames: Record<AccountType, string> = { simple: 'Simples', recurring: 'Fixas', installment: 'Parcelamentos avulsos', credit_card: 'Faturas de cartão' };
+const monthNames = ['JAN', 'FEV', 'MAR', 'ABR', 'MAI', 'JUN', 'JUL', 'AGO', 'SET', 'OUT', 'NOV', 'DEZ'];
 
 export function HistoryPage() {
-  const { currentMonth, store, monthlyAccounts, financialSummary, closeCurrentMonth, setActiveTab } = useFinance();
-  const [confirmMonth, setConfirmMonth] = useState<string | null>(null);
+  const { currentMonth, setCurrentMonth, store, monthlyAccounts, financialSummary, closeCurrentMonth, reopenCurrentMonth } = useFinance();
+  const [view, setView] = useState<'monthly' | 'annual'>('monthly');
+  const [year, setYear] = useState(() => Number(currentMonth.slice(0, 4)));
+  const [confirmation, setConfirmation] = useState<{ month: string; action: 'close' | 'reopen' } | null>(null);
   const snapshot = store.closedMonths?.[currentMonth];
   const accounts = snapshot?.accounts ?? monthlyAccounts;
   const summary = snapshot?.summary ?? financialSummary;
-  const previousCount = accounts.reduce((count, account) => count + (account.cardInfo?.previousPendingInvoices.length ?? 0), 0);
-  const pending = accounts.filter(account => account.status !== 'pago' || (account.recurringInfo && !account.recurringInfo.isValueSet)).length;
+  const eligible = canCloseMonth(store, currentMonth);
+  const annual = view === 'annual' ? computeAnnualHistory(year, store) : null;
+  const reopening = confirmation?.action === 'reopen';
+
   return <section className="history-page">
-    <div className="history-heading"><div><span className="history-eyebrow">CONSULTA MENSAL</span><h1>Histórico</h1><p>Consulte os registros e preserve o fechamento de cada mês.</p></div><span className={`history-status ${snapshot ? 'closed' : ''}`}>{snapshot ? 'Fechado' : 'Em andamento'}</span></div>
-    <section className="history-panel">
-      <div className="history-month"><h2>{formatMonthYear(currentMonth)}</h2><span>{accounts.length} contas · {summary.totalCount - summary.pendingCount} pagas · {summary.pendingCount} pendentes</span></div>
-      <div className="history-totals"><div><span>Total do mês</span><strong>{formatBRL(summary.totalExpected)}</strong></div><div><span>Total pago</span><strong>{formatBRL(summary.totalPaid)}</strong></div><div><span>Total pendente</span><strong>{formatBRL(summary.totalPending)}</strong></div></div>
-      {snapshot ? <p className="history-provenance">Fechado em {new Date(snapshot.closedAt).toLocaleString('pt-BR')}. Este retrato está preservado e não permite alterações.</p> : <p className="history-provenance">Dados reconstruídos a partir dos registros disponíveis. Este mês ainda não tem um retrato de fechamento; alterações nos cadastros podem atualizar esta consulta.</p>}
-      {!snapshot && <div className="history-closing"><p>{pending ? `Ainda há ${pending} conta(s) deste mês para resolver antes do fechamento.` : `Todas as contas de ${formatMonthYear(currentMonth)} estão resolvidas. Você já pode fechar o mês.`}</p><button className="finance-primary" onClick={() => pending ? setActiveTab('accounts') : setConfirmMonth(currentMonth)}>{pending ? 'Resolver em Contas' : 'Fechar mês'}</button></div>}
-      {previousCount > 0 && <p className="history-hint">{snapshot ? 'No momento do fechamento, havia' : 'Existem'} {formatBRL(summary.previousPendingCardsTotal)} em {previousCount} faturas de meses anteriores. Esse saldo é separado das contas deste mês e {snapshot ? 'não foi quitado por este fechamento' : 'não impede seu fechamento'}.</p>}
-    </section>
-    <div className="history-breakdowns">
-      <section className="history-panel"><h2>Por categoria</h2>{summary.categoryBreakdown.length ? summary.categoryBreakdown.map(category => <div className="history-row" key={category.categoryId}><span>{category.categoryName}</span><strong>{formatBRL(category.total)}</strong></div>) : <p>Sem valores registrados por categoria.</p>}<p className="history-hint">Compras dos cartões aparecem em suas próprias categorias.</p></section>
-      <section className="history-panel"><h2>Por tipo de conta</h2>{(Object.keys(typeNames) as AccountType[]).map(type => { const items = accounts.filter(account => account.type === type); return <div className="history-row" key={type}><span>{typeNames[type]} <small>({items.length})</small></span><strong>{formatBRL(items.reduce((sum, item) => sum + item.amount, 0))}</strong></div>; })}</section>
+    <div className="history-heading">
+      <h1>Histórico</h1>
+      <div className="history-view" role="group" aria-label="Visão do histórico">
+        <button type="button" aria-pressed={view === 'monthly'} onClick={() => setView('monthly')}>Mensal</button>
+        <button type="button" aria-pressed={view === 'annual'} onClick={() => { setYear(Number(currentMonth.slice(0, 4))); setView('annual'); }}>Anual</button>
+      </div>
     </div>
-    <section className="history-panel"><h2>Contas do mês</h2>{!accounts.length && <p>Nenhuma conta encontrada nos registros disponíveis.</p>}{accounts.map(account => <div className="history-account" key={`${account.type}:${account.id}`}><div className="history-row"><span><b>{account.name}</b><small>{typeNames[account.type]} · {account.status === 'pago' ? 'Pago' : 'Pendente'}</small></span><strong>{formatBRL(account.amount)}</strong></div>{account.cardInfo && account.cardInfo.items.length > 0 && <details><summary>Ver {account.cardInfo.items.length} compras</summary>{account.cardInfo.items.map(item => <div className="history-row" key={item.id}><span>{item.description}<small>{item.category?.name ?? 'Geral / Outros'}</small></span><span>{formatBRL(item.amount)}</span></div>)}</details>}</div>)}</section>
-    <ConfirmDialog isOpen={confirmMonth === currentMonth} title="Fechar este mês?" message={`${formatMonthYear(currentMonth)}: ${accounts.length} contas, ${formatBRL(summary.totalExpected)} no total e ${formatBRL(summary.totalPaid)} pagos. O mês será fechado e não poderá mais ser editado. Não há reabertura nesta versão.`} confirmLabel="Confirmar fechamento" isDestructive={false} onCancel={() => setConfirmMonth(null)} onConfirm={() => { if (closeCurrentMonth()) setConfirmMonth(null); }} />
+    {view === 'monthly' ? <>
+      <section className="history-panel">
+        <div className="history-month"><h2>{formatMonthYear(currentMonth)}</h2><span className={`history-status ${snapshot ? 'closed' : ''}`}>{snapshot ? 'Fechado' : 'Em andamento'}</span></div>
+        <div className="history-totals">
+          <div><span>Total do mês</span><strong>{formatBRL(summary.totalExpected)}</strong></div>
+          <div><span>Total pago</span><strong>{formatBRL(summary.totalPaid)}</strong></div>
+          <div><span>Total pendente</span><strong>{formatBRL(summary.totalPending)}</strong></div>
+        </div>
+        {(snapshot || eligible) && <div className="history-closing">
+          <p>{snapshot ? `Mês fechado em ${new Date(snapshot.closedAt).toLocaleDateString('pt-BR')}` : 'Todas as contas estão pagas.'}</p>
+          <button type="button" className={snapshot ? 'history-secondary' : 'finance-primary'} onClick={() => setConfirmation({ month: currentMonth, action: snapshot ? 'reopen' : 'close' })}>{snapshot ? 'Reabrir mês' : 'Fechar mês'}</button>
+        </div>}
+        {summary.previousPendingCardsTotal > 0 && <p className="history-hint">{snapshot ? 'No fechamento, havia' : 'Há'} {formatBRL(summary.previousPendingCardsTotal)} em aberto de meses anteriores.</p>}
+      </section>
+      <section className="history-panel history-account-list">
+        <h2>Contas do mês <span className="history-count">{accounts.length}</span></h2>
+        {!accounts.length && <p>Nenhuma conta neste mês.</p>}
+        {accounts.map(account => <div className="history-account" key={`${account.type}:${account.id}`}>
+          <div className="history-row">
+            <span><b>{account.name}</b>{account.category && <small>{account.category.name}</small>}</span>
+            <span className="history-account-value"><strong>{formatBRL(account.amount)}</strong><small className={account.status === 'pago' ? 'history-paid' : ''}>{account.status === 'pago' ? 'Pago' : 'Pendente'}</small></span>
+          </div>
+          {account.cardInfo && account.cardInfo.items.length > 0 && <details><summary>Ver compras</summary>{account.cardInfo.items.map(item => <div className="history-row" key={item.id}><span>{item.description}<small>{item.category?.name ?? 'Sem categoria'}</small></span><strong>{formatBRL(item.amount)}</strong></div>)}</details>}
+        </div>)}
+      </section>
+      {summary.categoryBreakdown.length > 0 && <details className="history-panel history-categories"><summary>Gastos por categoria</summary>{summary.categoryBreakdown.map(category => <div className="history-row" key={category.categoryId}><span>{category.categoryName}</span><strong>{formatBRL(category.total)}</strong></div>)}</details>}
+    </> : <section className="history-panel history-annual">
+      <div className="history-year" role="group" aria-label="Selecionar ano">
+        <button type="button" aria-label="Ano anterior" onClick={() => setYear(value => Math.max(1, value - 1))}>‹</button>
+        <span>{year}</span>
+        <button type="button" aria-label="Próximo ano" onClick={() => setYear(value => Math.min(9999, value + 1))}>›</button>
+      </div>
+      <div className="history-year-total"><h2>Total gasto em {year}</h2><strong>{formatBRL(annual!.total)}</strong><p>Contas registradas no ano, pagas e pendentes.</p></div>
+      <div className="history-month-grid">{annual!.months.map((month, index) => <button type="button" key={month.month} aria-label={`Consultar ${formatMonthYear(month.month)}`} onClick={() => { setCurrentMonth(month.month); setView('monthly'); }}>
+        <span>{monthNames[index]}{month.closed && <small>Fechado</small>}</span><strong>{formatBRL(month.total)}</strong>
+      </button>)}</div>
+    </section>}
+    <ConfirmDialog isOpen={view === 'monthly' && confirmation?.month === currentMonth} title={`${reopening ? 'Reabrir' : 'Fechar'} ${formatMonthYear(currentMonth)}?`} message={reopening ? 'Você poderá adicionar ou corrigir contas deste mês novamente.' : 'Todas as contas estão pagas. Você poderá reabrir este mês depois, se precisar fazer alguma correção.'} confirmLabel={reopening ? 'Reabrir mês' : 'Fechar mês'} isDestructive={false} onCancel={() => setConfirmation(null)} onConfirm={() => { if ((reopening ? reopenCurrentMonth : closeCurrentMonth)()) setConfirmation(null); }} />
   </section>;
 }

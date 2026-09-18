@@ -19,6 +19,7 @@ import { addMonths, compareMonths, getMonthDifference } from '../utils/formatter
 
 export interface FinanceDataStore {
   closedMonths?: Record<string, ClosedMonthSnapshot>;
+  closedMonthHistory?: Record<string, ClosedMonthSnapshot[]>;
   categories: Category[];
   creditCards: CreditCard[];
   simpleAccounts: SimpleAccount[];

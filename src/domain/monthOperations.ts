@@ -3,6 +3,9 @@ import { AccountType, PaymentStatus } from '../types/finance';
 
 // Commands can target a month different from the one currently displayed.
 export function assertFinancialMutation(previous: FinanceDataStore, next: FinanceDataStore) {
+  if (JSON.stringify(previous.closedMonthHistory ?? {}) !== JSON.stringify(next.closedMonthHistory ?? {})) {
+    throw new Error('Os fechamentos anteriores não podem ser alterados.');
+  }
   for (const month of Object.keys(previous.closedMonths ?? {})) {
     if (JSON.stringify(previous.closedMonths![month]) !== JSON.stringify(next.closedMonths?.[month])) {
       throw new Error('O retrato de um mês fechado não pode ser alterado.');
@@ -19,6 +22,28 @@ export function assertFinancialMutation(previous: FinanceDataStore, next: Financ
 
 export function assertMonthOpen(store: FinanceDataStore, month: string) {
   if (store.closedMonths?.[month]) throw new Error('Este mês está fechado. Pagamentos, reversões e edições estão bloqueados para preservar o histórico.');
+}
+
+export function canCloseMonth(store: FinanceDataStore, month: string): boolean {
+  if (store.closedMonths?.[month]) return false;
+  return computeMonthlyAccounts(month, store).every(account =>
+    account.status === 'pago' && (!account.recurringInfo || account.recurringInfo.isValueSet));
+}
+
+/** Explicit lifecycle command: archive the official snapshot, never mutate financial records. */
+export function reopenMonth(store: FinanceDataStore, month: string): FinanceDataStore {
+  const snapshot = store.closedMonths?.[month];
+  if (!snapshot) throw new Error('Este mês já está em andamento.');
+  const closedMonths = { ...store.closedMonths };
+  delete closedMonths[month];
+  return {
+    ...store,
+    closedMonths,
+    closedMonthHistory: {
+      ...store.closedMonthHistory,
+      [month]: [...(store.closedMonthHistory?.[month] ?? []), structuredClone(snapshot)],
+    },
+  };
 }
 
 export function closeMonth(store: FinanceDataStore, month: string): FinanceDataStore {
