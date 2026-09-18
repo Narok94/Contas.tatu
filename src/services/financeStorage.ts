@@ -252,7 +252,7 @@ export function loadFinanceStore(): FinanceDataStore {
     if (raw) {
       const parsed = JSON.parse(raw);
       if (parsed && Array.isArray(parsed.categories)) {
-        return parsed as FinanceDataStore;
+        return { ...parsed, closedMonths: parsed.closedMonths ?? {} } as FinanceDataStore;
       }
     }
   } catch (err) {
@@ -282,7 +282,7 @@ export function saveFinanceStore(store: FinanceDataStore): void {
   try {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(store));
   } catch (err) {
-    console.error('Erro ao salvar no localStorage:', err);
+    throw new Error('Não foi possível salvar neste navegador. Libere espaço ou permita o armazenamento e tente novamente.');
   }
 }
 

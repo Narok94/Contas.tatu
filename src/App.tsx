@@ -6,6 +6,9 @@ import { AccountsPage } from './pages/AccountsPage';
 import { SettingsModal } from './components/SettingsModal';
 import { AccountModal } from './components/AccountModal';
 import './shell.css';
+import { HistoryPage } from './pages/HistoryPage';
+import { PaymentDialog } from './components/PaymentDialog';
+import './history.css';
 
 const AppContent: React.FC = () => {
   const {
@@ -15,6 +18,7 @@ const AppContent: React.FC = () => {
     isAccountModalOpen,
     closeAccountModal,
     editingAccount,
+    operationError, clearOperationError,
   } = useFinance();
 
   return (
@@ -24,8 +28,10 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="app-main flex-1 pb-10">
-        {activeTab === 'dashboard' ? <DashboardPage /> : <AccountsPage />}
+        {activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <AccountsPage /> : <HistoryPage />}
       </main>
+      <PaymentDialog />
+      {operationError && <div className="operation-error" role="alert"><span>{operationError}</span><button onClick={clearOperationError} aria-label="Fechar aviso">×</button></div>}
 
       {/* Account Modal (Create / Edit) */}
       <AccountModal

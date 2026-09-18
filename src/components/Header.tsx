@@ -1,5 +1,5 @@
 import React from 'react';
-import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight } from 'lucide-react';
+import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { MonthSelector } from './MonthSelector';
 import { TatuIllustration } from './TatuIllustration';
@@ -14,6 +14,7 @@ export const Header: React.FC = () => {
         <nav className="app-nav" aria-label="Navegação principal">
           <button id="tab-dashboard" type="button" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /><span>Início</span></button>
           <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => setActiveTab('accounts')}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
+          <button id="tab-history" type="button" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History size={18} /><span>Histórico</span></button>
           <button id="btn-settings-header" type="button" aria-haspopup="dialog" aria-expanded={isSettingsOpen} onClick={() => setIsSettingsOpen(true)}><Settings size={18} /><span>Configurações</span></button>
         </nav>
         <div className="sidebar-note"><span className="note-kicker">UM PASSO DE CADA VEZ</span><p>Disciplina hoje,<br />mais liberdade amanhã.</p><TatuIllustration variant="laptop" className="note-mascot" /><span className="note-signature">Cada conta em seu lugar.</span></div>

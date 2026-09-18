@@ -1,5 +1,6 @@
 import { categoryDisplayColor } from '../utils/categoryPalette';
 import React from 'react';
+import { PaymentOptions } from './PaymentOptions';
 import { Undo2, CheckCircle2, Circle, Edit3, Trash2, Repeat, Layers, Plus } from 'lucide-react';
 import { UnifiedMonthlyAccount } from '../types/finance';
 import { formatBRL, formatMonthEnd } from '../utils/formatters';
@@ -196,7 +197,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           <button
             id={`btn-toggle-${account.id}`}
             type="button"
-            onClick={() => onToggleStatus(account)}
+            onClick={event => { if (event.detail < 2) onToggleStatus(account); }}
             title="Clique para marcar como pendente se necessário"
             className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-xl border border-brand text-xs font-semibold text-brand-strong bg-white hover:bg-teal-soft shadow-xs transition-colors cursor-pointer"
           >
@@ -204,15 +205,18 @@ export const AccountCard: React.FC<AccountCardProps> = ({
             <span>Marcar como pendente</span>
           </button>
         ) : (
+          <div className="payment-actions">
           <button
             id={`btn-toggle-${account.id}`}
             type="button"
-            onClick={() => onToggleStatus(account)}
+            onClick={event => { if (event.detail < 2) onToggleStatus(account); }}
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand hover:bg-brand-strong text-white shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
             <span>Marcar como pago</span>
           </button>
+          <PaymentOptions account={account} />
+          </div>
         )}
 
         {/* Secondary Actions: Edit & Delete */}

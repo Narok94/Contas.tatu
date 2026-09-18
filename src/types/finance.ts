@@ -115,6 +115,7 @@ export interface InstallmentPurchase {
   categoryId?: string;
   // Status para parcelamento independente caso não esteja em cartão
   statusByMonth?: Record<string, PaymentStatus>;
+  paymentAmountsByMonth?: Record<string, number>;
   notes?: string;
   createdAt: string;
 
@@ -220,4 +221,11 @@ export interface MonthFinancialSummary {
     endMonth: string;
     cardName?: string;
   }[];
+}
+
+export interface ClosedMonthSnapshot {
+  month: string;
+  closedAt: string;
+  accounts: UnifiedMonthlyAccount[];
+  summary: MonthFinancialSummary;
 }

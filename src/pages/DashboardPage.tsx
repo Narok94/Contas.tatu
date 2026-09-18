@@ -1,5 +1,6 @@
 import '../dashboard.css';
 import React from 'react';
+import { PaymentOptions } from '../components/PaymentOptions';
 import { ArrowRight, CheckCircle2, Circle, Layers, ReceiptText } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { TatuIllustration } from '../components/TatuIllustration';
@@ -48,7 +49,7 @@ export const DashboardPage: React.FC = () => {
                   <span className="desk-account-icon category-chip" style={{ '--category-color': categoryDisplayColor(account.category?.color || 'var(--color-brand)') } as React.CSSProperties}>{getCategoryOrTypeIcon(account.category?.name, account.type, 'w-4 h-4')}</span>
                   <div className="desk-account-name"><h4>{account.name}</h4><p>{account.category?.name || 'Geral'} · {account.type === 'credit_card' ? 'Fatura de cartão' : account.type === 'recurring' ? 'Fixa' : account.type === 'installment' ? `Parcela ${account.installmentInfo?.currentInstallment}/${account.installmentInfo?.totalInstallments}` : 'Simples'}</p></div>
                   <strong>{formatBRL(account.amount)}</strong>
-                  <button type="button" className="desk-pay" aria-label={`Marcar ${account.name} como pago`} onClick={() => toggleAccountStatus(account)}>Pagar</button>
+                  <div className="payment-actions"><button type="button" className="desk-pay" aria-label={`Marcar ${account.name} como pago`} onClick={() => toggleAccountStatus(account)}>Pagar</button><PaymentOptions account={account} /></div>
                 </div>
               ))}
             </div>

@@ -1,10 +1,10 @@
-import React, { createContext, useContext, useEffect, useState, useMemo } from 'react';
+import { assertMonthOpen, assertFinancialMutation, closeMonth, recordPayment } from '../domain/monthOperations';
+import React, { createContext, useContext, useState, useMemo, useRef } from 'react';
 import {
   applyInstallmentUpdate,
   computeFinancialSummary,
-  computeMonthlyAccounts,
+  computeOperationalMonthlyAccounts,
   FinanceDataStore,
-  resolveRecurringMonthlyRecord,
 } from '../domain/financeRules';
 import {
   loadFinanceStore,
@@ -18,19 +18,18 @@ import {
   CreditCard,
   InstallmentPurchase,
   MonthFinancialSummary,
-  PaymentStatus,
   RecurringAccountDefinition,
   RecurringAccountMonthlyRecord,
   SimpleAccount,
   UnifiedMonthlyAccount,
 } from '../types/finance';
-import { addMonths, getCurrentMonth } from '../utils/formatters';
+import { getCurrentMonth } from '../utils/formatters';
 
 interface FinanceContextType {
   currentMonth: string;
   setCurrentMonth: (month: string) => void;
-  activeTab: 'dashboard' | 'accounts';
-  setActiveTab: (tab: 'dashboard' | 'accounts') => void;
+  activeTab: 'dashboard' | 'accounts' | 'history';
+  setActiveTab: (tab: 'dashboard' | 'accounts' | 'history') => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
   
@@ -42,6 +41,7 @@ interface FinanceContextType {
 
   // Operações de Contas
   toggleAccountStatus: (account: UnifiedMonthlyAccount) => void;
+  editValueAndPay: (account: UnifiedMonthlyAccount) => void;
   updateAccountValueAndDetails: (
     account: UnifiedMonthlyAccount,
     newName: string,
@@ -117,6 +117,12 @@ interface FinanceContextType {
   openEditAccountModal: (account: UnifiedMonthlyAccount) => void;
   closeAccountModal: () => void;
 
+  paymentRequest: { account: UnifiedMonthlyAccount; month: string } | null;
+  cancelPayment: () => void;
+  confirmPayment: (amount: number) => boolean;
+  closeCurrentMonth: () => boolean;
+  operationError: string;
+  clearOperationError: () => void;
   // Utilitários
   resetData: () => void;
 }
@@ -125,18 +131,55 @@ const FinanceContext = createContext<FinanceContextType | undefined>(undefined);
 
 export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentMonth, setCurrentMonth] = useState<string>(() => getCurrentMonth());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'history'>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
   const [editingAccount, setEditingAccount] = useState<UnifiedMonthlyAccount | null>(null);
-  const [store, setStore] = useState<FinanceDataStore>(() => loadFinanceStore());
+  const [store, setStoreState] = useState<FinanceDataStore>(() => loadFinanceStore());
+
+  const storeRef = useRef(store);
+  const [operationError, setOperationError] = useState('');
+  const [paymentRequest, setPaymentRequest] = useState<{ account: UnifiedMonthlyAccount; month: string } | null>(null);
+  const paymentRef = useRef(paymentRequest);
+  const commit = (update: (previous: FinanceDataStore) => FinanceDataStore, month = currentMonth) => {
+    try {
+      assertMonthOpen(storeRef.current, month);
+      const next = update(storeRef.current);
+      assertFinancialMutation(storeRef.current, next);
+      saveFinanceStore(next);
+      storeRef.current = next;
+      setStoreState(next);
+      setOperationError('');
+      return true;
+    } catch (error) {
+      setOperationError(error instanceof Error ? error.message : 'Não foi possível salvar. Tente novamente.');
+      return false;
+    }
+  };
+  const setStore = (update: FinanceDataStore | ((previous: FinanceDataStore) => FinanceDataStore)) => commit(previous => typeof update === 'function' ? update(previous) : update);
+  const requestPayment = (account: UnifiedMonthlyAccount, month: string) => {
+    try { assertMonthOpen(storeRef.current, month); } catch (error) { setOperationError((error as Error).message); return; }
+    paymentRef.current = { account, month };
+    setPaymentRequest(paymentRef.current);
+  };
+  const cancelPayment = () => { paymentRef.current = null; setPaymentRequest(null); };
+  const confirmPayment = (amount: number) => {
+    const request = paymentRef.current;
+    if (!request) return false;
+    const success = commit(previous => recordPayment(previous, request.month, request.account.id, request.account.type, 'pago', amount), request.month);
+    if (success) cancelPayment();
+    return success;
+  };
+  const closeCurrentMonth = () => commit(previous => closeMonth(previous, currentMonth));
 
   const openCreateAccountModal = () => {
+    if (storeRef.current.closedMonths?.[currentMonth]) { setOperationError('Este mês está fechado. Novos lançamentos estão bloqueados.'); return; }
     setEditingAccount(null);
     setIsAccountModalOpen(true);
   };
 
   const openEditAccountModal = (account: UnifiedMonthlyAccount) => {
+    if (storeRef.current.closedMonths?.[currentMonth]) { setOperationError('Este mês está fechado. Edições estão bloqueadas para preservar o histórico.'); return; }
     setEditingAccount(account);
     setIsAccountModalOpen(true);
   };
@@ -146,102 +189,24 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     setEditingAccount(null);
   };
 
-  // Salva no storage sempre que store muda
-  useEffect(() => {
-    saveFinanceStore(store);
-  }, [store]);
-
   // Contas unificadas do mês corrente
   const monthlyAccounts = useMemo(() => {
-    return computeMonthlyAccounts(currentMonth, store);
+    return computeOperationalMonthlyAccounts(currentMonth, store);
   }, [currentMonth, store]);
 
   // Resumo financeiro do mês corrente
   const financialSummary = useMemo(() => {
-    return computeFinancialSummary(currentMonth, store);
-  }, [currentMonth, store]);
+    const summary = computeFinancialSummary(currentMonth, store);
+    const previousPendingCardsTotal = monthlyAccounts.reduce((sum, account) => sum + (account.cardInfo?.previousPendingAmount ?? 0), 0);
+    return { ...summary, previousPendingCardsTotal, totalOpenWithPreviousPending: summary.totalPending + previousPendingCardsTotal };
+  }, [currentMonth, store, monthlyAccounts]);
 
-  // Alternar status (Pago <-> Pendente)
   const toggleAccountStatus = (account: UnifiedMonthlyAccount) => {
-    const nextStatus: PaymentStatus = account.status === 'pago' ? 'pendente' : 'pago';
-
-    setStore((prev) => {
-      if (account.type === 'simple') {
-        const updatedSimples = prev.simpleAccounts.map((item) =>
-          item.id === account.id ? { ...item, status: nextStatus } : item
-        );
-        return { ...prev, simpleAccounts: updatedSimples };
-      }
-
-      if (account.type === 'recurring') {
-        const defId = account.recurringInfo?.definitionId || account.id;
-        const existingIdx = prev.recurringMonthlyRecords.findIndex(
-          (r) => r.definitionId === defId && r.month === currentMonth
-        );
-
-        let updatedRecords = [...prev.recurringMonthlyRecords];
-        if (existingIdx >= 0) {
-          updatedRecords[existingIdx] = {
-            ...updatedRecords[existingIdx],
-            status: nextStatus,
-          };
-        } else {
-          updatedRecords.push({
-            id: `rec_rec_${defId}_${currentMonth}`,
-            definitionId: defId,
-            month: currentMonth,
-            value: account.amount,
-            isValueSet: account.recurringInfo?.isValueSet ?? false,
-            status: nextStatus,
-          });
-        }
-        return { ...prev, recurringMonthlyRecords: updatedRecords };
-      }
-
-      if (account.type === 'credit_card') {
-        const cardId = account.cardInfo?.cardId || account.id;
-        const existingIdx = prev.cardMonthlyInvoices.findIndex(
-          (inv) => inv.cardId === cardId && inv.month === currentMonth
-        );
-
-        let updatedInvoices = [...prev.cardMonthlyInvoices];
-        if (existingIdx >= 0) {
-          updatedInvoices[existingIdx] = {
-            ...updatedInvoices[existingIdx],
-            status: nextStatus,
-            paidAt: nextStatus === 'pago' ? new Date().toISOString() : undefined,
-          };
-        } else {
-          updatedInvoices.push({
-            id: `inv_${cardId}_${currentMonth}`,
-            cardId,
-            month: currentMonth,
-            status: nextStatus,
-            paidAt: nextStatus === 'pago' ? new Date().toISOString() : undefined,
-          });
-        }
-        return { ...prev, cardMonthlyInvoices: updatedInvoices };
-      }
-
-      if (account.type === 'installment') {
-        const purchaseId = account.installmentInfo?.purchaseId || account.id;
-        const updatedPurchases = prev.installmentPurchases.map((p) => {
-          if (p.id === purchaseId) {
-            return {
-              ...p,
-              statusByMonth: {
-                ...(p.statusByMonth || {}),
-                [currentMonth]: nextStatus,
-              },
-            };
-          }
-          return p;
-        });
-        return { ...prev, installmentPurchases: updatedPurchases };
-      }
-
-      return prev;
-    });
+    const status = account.status === 'pendente' ? 'pago' : 'pendente';
+    commit(previous => recordPayment(previous, currentMonth, account.id, account.type, status));
+  };
+  const editValueAndPay = (account: UnifiedMonthlyAccount) => {
+    if (account.type !== 'credit_card' && account.status === 'pendente') requestPayment(account, currentMonth);
   };
 
   // Atualizar valor e detalhes de uma conta
@@ -412,6 +377,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     categoryId?: string;
     month?: string;
   }) => {
+    if (storeRef.current.closedMonths?.[month]) { setOperationError('O mês de destino está fechado.'); return; }
     const newSimple: SimpleAccount = {
       id: `simp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       name,
@@ -439,6 +405,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     categoryId?: string;
     startMonth?: string;
   }) => {
+    if (storeRef.current.closedMonths?.[startMonth]) { setOperationError('O mês de destino está fechado.'); return; }
     const defId = `rec_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;
     const newDef: RecurringAccountDefinition = {
       id: defId,
@@ -481,6 +448,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     creditCardId?: string;
     categoryId?: string;
   }) => {
+    if (storeRef.current.closedMonths?.[startMonth]) { setOperationError('O mês de destino está fechado.'); return; }
     const newPurchase: InstallmentPurchase = {
       id: `inst_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       description,
@@ -515,6 +483,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     month?: string;
     categoryId?: string;
   }) => {
+    if (storeRef.current.closedMonths?.[month]) { setOperationError('O mês de destino está fechado.'); return; }
     const newExpense: CardSimpleExpense = {
       id: `cexp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
       cardId,
@@ -574,38 +543,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
-  // Pagar ou alternar status de fatura específica de cartão em um mês determinado
   const paySpecificCardInvoice = (cardId: string, month: string) => {
-    setStore((prev) => {
-      const existingIdx = prev.cardMonthlyInvoices.findIndex(
-        (inv) => inv.cardId === cardId && inv.month === month
-      );
-
-      let updatedInvoices = [...prev.cardMonthlyInvoices];
-      if (existingIdx >= 0) {
-        const current = updatedInvoices[existingIdx];
-        const nextStatus: PaymentStatus = current.status === 'pago' ? 'pendente' : 'pago';
-        updatedInvoices[existingIdx] = {
-          ...current,
-          status: nextStatus,
-          paidAt: nextStatus === 'pago' ? new Date().toISOString() : undefined,
-        };
-      } else {
-        // Estava pendente por padrão, agora marcamos como paga
-        updatedInvoices.push({
-          id: `card_inv_${cardId}_${month}`,
-          cardId,
-          month,
-          status: 'pago',
-          paidAt: new Date().toISOString(),
-        });
-      }
-
-      return {
-        ...prev,
-        cardMonthlyInvoices: updatedInvoices,
-      };
-    });
+    commit(previous => recordPayment(previous, month, cardId, 'credit_card', 'pago'), month);
   };
 
   // Atualizar despesa simples no cartão
@@ -675,6 +614,10 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Resetar dados para o padrão
   const resetData = () => {
+    if (Object.keys(storeRef.current.closedMonths ?? {}).length) {
+      setOperationError('Há meses fechados. A restauração de demonstração está bloqueada para preservar o histórico.');
+      return;
+    }
     const fresh = resetFinanceStore();
     setStore(fresh);
   };
@@ -682,6 +625,8 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   return (
     <FinanceContext.Provider
       value={{
+        editValueAndPay,
+        paymentRequest, cancelPayment, confirmPayment, closeCurrentMonth, operationError, clearOperationError: () => setOperationError(''),
         currentMonth,
         setCurrentMonth,
         activeTab,

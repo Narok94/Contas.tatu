@@ -1,5 +1,6 @@
 import {
   AccountType,
+  ClosedMonthSnapshot,
   CardInternalItem,
   CardPendingPreviousInvoice,
   CardSimpleExpense,
@@ -17,6 +18,7 @@ import {
 import { addMonths, compareMonths, getMonthDifference } from '../utils/formatters';
 
 export interface FinanceDataStore {
+  closedMonths?: Record<string, ClosedMonthSnapshot>;
   categories: Category[];
   creditCards: CreditCard[];
   simpleAccounts: SimpleAccount[];
@@ -169,6 +171,7 @@ export function getPreviousPendingCardInvoices(
   const pendingInvoices: CardPendingPreviousInvoice[] = [];
 
   for (const m of sortedPastMonths) {
+    if (store.closedMonths?.[m]) continue; // Fechamentos só aceitam meses integralmente resolvidos.
     const mExpenses = store.cardExpenses.filter((e) => e.cardId === cardId && e.month === m);
     let mTotal = mExpenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -233,6 +236,7 @@ export function computeMonthlyAccounts(
   targetMonth: string,
   store: FinanceDataStore
 ): UnifiedMonthlyAccount[] {
+  if (store.closedMonths?.[targetMonth]) return structuredClone(store.closedMonths[targetMonth].accounts);
   const categoryMap = new Map<string, Category>((store.categories || []).map((c) => [c.id, c]));
   const results: UnifiedMonthlyAccount[] = [];
 
@@ -376,7 +380,7 @@ export function computeMonthlyAccounts(
         id: purchase.id,
         type: 'installment',
         name: installmentStatus.description || purchase.description,
-        amount: installmentStatus.installmentAmount,
+        amount: purchase.paymentAmountsByMonth?.[targetMonth] ?? installmentStatus.installmentAmount,
         status: monthStatus,
         categoryId: installmentStatus.categoryId || purchase.categoryId,
         category: (installmentStatus.categoryId || purchase.categoryId)
@@ -405,6 +409,7 @@ export function computeFinancialSummary(
   targetMonth: string,
   store: FinanceDataStore
 ): MonthFinancialSummary {
+  if (store.closedMonths?.[targetMonth]) return structuredClone(store.closedMonths[targetMonth].summary);
   const accounts = computeMonthlyAccounts(targetMonth, store);
 
   let totalExpected = 0;
@@ -494,6 +499,19 @@ export function computeFinancialSummary(
     categoryBreakdown,
     activeEndingInstallments,
   };
+}
+
+/** Saldo anterior é operacional: pode ser quitado após o fechamento do mês consultado.
+ * As contas do próprio mês e o snapshot histórico permanecem intactos.
+ */
+export function computeOperationalMonthlyAccounts(month: string, store: FinanceDataStore): UnifiedMonthlyAccount[] {
+  return computeMonthlyAccounts(month, store).map(account => {
+    if (!account.cardInfo || !store.closedMonths?.[month]) return account;
+    const previousPendingInvoices = getPreviousPendingCardInvoices(account.cardInfo.cardId, month, store);
+    const previousPendingAmount = previousPendingInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
+    return { ...account, cardInfo: { ...account.cardInfo, previousPendingInvoices, previousPendingAmount,
+      totalOpenAmount: (account.status === 'pago' ? 0 : account.amount) + previousPendingAmount } };
+  });
 }
 
 /**
