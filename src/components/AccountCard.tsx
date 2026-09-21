@@ -60,9 +60,9 @@ export const AccountCard: React.FC<AccountCardProps> = ({
           : 'bg-white border-line border-l-4 border-l-amber-500 hover:border-line-strong'
       }`}
     >
-      <div className="p-3.5 sm:p-4">
+      <div className="account-body">
         {/* Linha Superior: Ícone pequeno, tipo, categoria/tag e status à direita */}
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="account-header flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5 flex-wrap min-w-0">
             {/* Ícone linear minimalista da categoria ou tipo */}
             <div
@@ -114,7 +114,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         {/* Centro: Nome da Conta */}
         <h3
           title={account.name}
-          className="text-sm font-bold tracking-tight text-stone-900 leading-snug line-clamp-1"
+          className="account-name text-sm font-bold tracking-tight text-stone-900 leading-snug"
         >
           {account.name}
         </h3>
@@ -186,7 +186,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
       {/* Rodapé: Botão de ação (Terracota se pendente, discreto se pago) + Editar + Excluir */}
       <div
-        className={`px-3.5 py-2 border-t rounded-b-2xl flex items-center justify-between gap-2 ${
+        className={`account-footer border-t rounded-b-2xl flex items-center justify-between gap-2 ${
           isPaid
             ? 'bg-emerald-50/40 border-emerald-100/80'
             : 'bg-surface-soft border-line'

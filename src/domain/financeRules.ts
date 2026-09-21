@@ -117,12 +117,11 @@ export function getInstallmentStatusForMonth(
   };
 }
 
-/**
- * Calcula as faturas pendentes de meses anteriores para um determinado cartão
- * REGRA CRÍTICA:
- * - Cada mês anterior com saldo não pago aparece exatamente UMA vez (origem real).
- * - Ao pagar a fatura de determinado mês, sua pendência é zerada.
- * - Não duplica dívidas entre meses.
+const money = (value: number) => Math.round(value * 100) / 100;
+
+/** Saldo encadeado: compras + saldo anterior - pagamento efetivo.
+ * Registros legados pagos quitavam somente as compras daquele mês. Não inferimos
+ * pagamentos de dívidas anteriores. Snapshots oficiais nunca são reescritos.
  */
 export function getPreviousPendingCardInvoices(
   cardId: string,
@@ -148,10 +147,10 @@ export function getPreviousPendingCardInvoices(
         }
       }
     }
-    const startM = p.startMonth;
-    let curM = startM;
+    let curM = p.effectiveFromMonth || p.startMonth;
     let limit = 0;
-    while (compareMonths(curM, targetMonth) < 0 && limit < 120) {
+    const remainingOccurrences = p.installmentsCount - (p.baseInstallmentNumber || 1) + 1;
+    while (compareMonths(curM, targetMonth) < 0 && limit < remainingOccurrences) {
       const st = getInstallmentStatusForMonth(p, curM);
       if (st.isActive) {
         pastMonthsSet.add(curM);
@@ -168,11 +167,18 @@ export function getPreviousPendingCardInvoices(
     }
   }
 
+  for (const [month, snapshot] of Object.entries(store.closedMonths ?? {})) {
+    if (month < targetMonth && snapshot.accounts.some(a => a.cardInfo?.cardId === cardId)) pastMonthsSet.add(month);
+  }
   const sortedPastMonths = Array.from(pastMonthsSet).sort((a, b) => compareMonths(a, b));
-  const pendingInvoices: CardPendingPreviousInvoice[] = [];
+  let balance = 0;
 
   for (const m of sortedPastMonths) {
-    if (store.closedMonths?.[m]) continue; // Fechamentos só aceitam meses integralmente resolvidos.
+    const frozen = store.closedMonths?.[m]?.accounts.find(a => a.cardInfo?.cardId === cardId);
+    if (frozen?.cardInfo?.paidAmount !== undefined) {
+      balance = frozen.cardInfo.totalOpenAmount;
+      continue;
+    }
     const mExpenses = store.cardExpenses.filter((e) => e.cardId === cardId && e.month === m);
     let mTotal = mExpenses.reduce((sum, e) => sum + e.amount, 0);
 
@@ -186,17 +192,15 @@ export function getPreviousPendingCardInvoices(
     const invoiceRecord = store.cardMonthlyInvoices.find(
       (inv) => inv.cardId === cardId && inv.month === m
     );
-    const isPaid = invoiceRecord?.status === 'pago';
-
-    if (mTotal > 0 && !isPaid) {
-      pendingInvoices.push({
-        month: m,
-        amount: mTotal,
-      });
-    }
+    // A legacy closure records only its own purchases/payment, not carried debt.
+    if (frozen) mTotal = frozen.cardInfo?.currentMonthAmount ?? frozen.amount;
+    const paid = frozen
+      ? (frozen.status === 'pago' ? mTotal : 0)
+      : invoiceRecord?.paidAmount ?? (invoiceRecord?.status === 'pago' ? mTotal : 0);
+    balance = money(Math.max(0, balance + mTotal - paid));
   }
 
-  return pendingInvoices;
+  return balance > 0 ? [{ month: addMonths(targetMonth, -1), amount: balance }] : [];
 }
 
 /**
@@ -339,18 +343,21 @@ export function computeMonthlyAccounts(
     }
 
     // Calcula o valor total da fatura deste mês específico
-    const totalInvoiceAmount = internalItems.reduce((acc, item) => acc + item.amount, 0);
+    const currentMonthAmount = money(internalItems.reduce((acc, item) => acc + item.amount, 0));
 
     // Encontra o status da fatura do mês corrente
     const invoiceRecord = store.cardMonthlyInvoices.find(
       (inv) => inv.cardId === card.id && inv.month === targetMonth
     );
-    const invoiceStatus: PaymentStatus = invoiceRecord ? invoiceRecord.status : 'pendente';
 
     // Calcula pendências de faturas anteriores que ainda não foram pagas
     const previousPendingInvoices = getPreviousPendingCardInvoices(card.id, targetMonth, store);
     const previousPendingAmount = previousPendingInvoices.reduce((acc, inv) => acc + inv.amount, 0);
-    const totalOpenAmount = (invoiceStatus === 'pago' ? 0 : totalInvoiceAmount) + previousPendingAmount;
+    const totalInvoiceAmount = money(currentMonthAmount + previousPendingAmount);
+    const paidAmount = invoiceRecord?.paidAmount ?? (invoiceRecord?.status === 'pago' ? currentMonthAmount : 0);
+    const totalOpenAmount = money(Math.max(0, totalInvoiceAmount - paidAmount));
+    const invoiceStatus: PaymentStatus = totalOpenAmount === 0 && (paidAmount > 0 || invoiceRecord?.status === 'pago')
+      ? 'pago' : paidAmount > 0 ? 'parcial' : 'pendente';
 
     results.push({
       id: card.id,
@@ -363,7 +370,8 @@ export function computeMonthlyAccounts(
         invoiceStatus,
         items: internalItems,
         totalItemsCount: internalItems.length,
-        currentMonthAmount: totalInvoiceAmount,
+        currentMonthAmount,
+        paidAmount,
         previousPendingAmount,
         previousPendingInvoices,
         totalOpenAmount,
@@ -423,7 +431,11 @@ export function computeFinancialSummary(
 
   for (const acc of accounts) {
     totalExpected += acc.amount;
-    if (acc.status === 'pago') {
+    if (acc.cardInfo) {
+      totalPaid += acc.cardInfo.paidAmount ?? (acc.status === 'pago' ? acc.amount : 0);
+      totalPending += acc.cardInfo.totalOpenAmount;
+      if (acc.status !== 'pago') pendingCount += 1;
+    } else if (acc.status === 'pago') {
       totalPaid += acc.amount;
     } else {
       totalPending += acc.amount;
@@ -431,7 +443,8 @@ export function computeFinancialSummary(
     }
 
     if (acc.type === 'credit_card' && acc.cardInfo) {
-      previousPendingCardsTotal += acc.cardInfo.previousPendingAmount;
+      // Informational subset of the remaining debt, already included in totalPending.
+      previousPendingCardsTotal += Math.min(acc.cardInfo.previousPendingAmount, acc.cardInfo.totalOpenAmount);
     }
 
     // Para agregação de categorias:
@@ -447,7 +460,7 @@ export function computeFinancialSummary(
     }
   }
 
-  const totalOpenWithPreviousPending = totalPending + previousPendingCardsTotal;
+  const totalOpenWithPreviousPending = money(totalPending);
 
   // Monta as principais categorias
   const categoriesMap = new Map<string, Category>(store.categories.map((c) => [c.id, c]));
@@ -490,9 +503,9 @@ export function computeFinancialSummary(
 
   return {
     month: targetMonth,
-    totalExpected,
-    totalPaid,
-    totalPending,
+    totalExpected: money(totalExpected),
+    totalPaid: money(totalPaid),
+    totalPending: money(totalPending),
     previousPendingCardsTotal,
     totalOpenWithPreviousPending,
     pendingCount,
@@ -502,16 +515,15 @@ export function computeFinancialSummary(
   };
 }
 
-/** Saldo anterior é operacional: pode ser quitado após o fechamento do mês consultado.
- * As contas do próprio mês e o snapshot histórico permanecem intactos.
- */
+/** Um fechamento legado quitava só as compras do mês. Sua conta continua sendo
+ * aquela fatura original; a dívida externa ao retrato é consolidada no mês seguinte.
+ * O resumo oficial mantém a indicação histórica, sem reescrever o snapshot. */
 export function computeOperationalMonthlyAccounts(month: string, store: FinanceDataStore): UnifiedMonthlyAccount[] {
   return computeMonthlyAccounts(month, store).map(account => {
-    if (!account.cardInfo || !store.closedMonths?.[month]) return account;
-    const previousPendingInvoices = getPreviousPendingCardInvoices(account.cardInfo.cardId, month, store);
-    const previousPendingAmount = previousPendingInvoices.reduce((sum, invoice) => sum + invoice.amount, 0);
-    return { ...account, cardInfo: { ...account.cardInfo, previousPendingInvoices, previousPendingAmount,
-      totalOpenAmount: (account.status === 'pago' ? 0 : account.amount) + previousPendingAmount } };
+    if (!account.cardInfo || !store.closedMonths?.[month] || account.cardInfo.paidAmount !== undefined) return account;
+    return { ...account, cardInfo: { ...account.cardInfo,
+      previousPendingAmount: 0, previousPendingInvoices: [],
+      totalOpenAmount: account.status === 'pago' ? 0 : account.amount } };
   });
 }
 

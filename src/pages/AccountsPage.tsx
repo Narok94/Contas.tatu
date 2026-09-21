@@ -7,6 +7,7 @@ import {
   CreditCard as CardIcon,
   Repeat,
   FileText,
+  SlidersHorizontal, ChevronDown, ChevronUp,
 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { UnifiedMonthlyAccount } from '../types/finance';
@@ -35,6 +36,8 @@ export const AccountsPage: React.FC = () => {
 
   // Bloco 2 - Filtro de Tipo de Conta
   const [typeFilter, setTypeFilter] = useState<AccountTypeFilter>('all');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const activeFilters = Number(statusFilter !== 'all') + Number(typeFilter !== 'all');
 
   // Modal para adicionar ou editar compra interna no cartão
   const [cardPurchaseModalCardId, setCardPurchaseModalCardId] = useState<string | null>(null);
@@ -55,7 +58,7 @@ export const AccountsPage: React.FC = () => {
   const filteredAccounts = useMemo(() => {
     return monthlyAccounts.filter((acc) => {
       // Bloco 1: Status
-      if (statusFilter !== 'all' && acc.status !== statusFilter) {
+      if ((statusFilter === 'pago' && acc.status !== 'pago') || (statusFilter === 'pendente' && acc.status === 'pago')) {
         return false;
       }
       // Bloco 2: Tipo de Conta
@@ -68,7 +71,7 @@ export const AccountsPage: React.FC = () => {
 
   // Contadores para o resumo e badges
   const paidCount = monthlyAccounts.filter((a) => a.status === 'pago').length;
-  const pendingCount = monthlyAccounts.filter((a) => a.status === 'pendente').length;
+  const pendingCount = monthlyAccounts.filter((a) => a.status !== 'pago').length;
 
   const typeCounts = useMemo(() => {
     return {
@@ -97,29 +100,33 @@ export const AccountsPage: React.FC = () => {
     <div className="accounts-page">
       <header className="accounts-heading">
         <h2>Contas <span>· {formatMonthYear(currentMonth)}</span></h2>
-        <span>{monthlyAccounts.length} {monthlyAccounts.length === 1 ? 'conta no mês' : 'contas no mês'}</span>
       </header>
 
       <section className="accounts-summary" aria-label="Resumo financeiro do mês">
         <div className="accounts-total">
           <span><Layers size={15} />Total previsto</span>
           <strong>{formatBRL(financialSummary.totalExpected)}</strong>
-          <small>{monthlyAccounts.length} contas no mês</small>
         </div>
         <div className="accounts-pending">
           <span><Circle size={15} />Ainda pendente</span>
           <strong>{formatBRL(financialSummary.totalPending)}</strong>
-          <small>{pendingCount} a pagar{financialSummary.previousPendingCardsTotal > 0 && <> · + {formatBRL(financialSummary.previousPendingCardsTotal)} em faturas anteriores</>}</small>
+          {financialSummary.totalOpenWithPreviousPending > financialSummary.totalPending && <small>+ {formatBRL(financialSummary.previousPendingCardsTotal)} em faturas anteriores no fechamento</small>}
         </div>
         <div className="accounts-paid">
           <span><CheckCircle2 size={15} />Total pago</span>
           <strong>{formatBRL(financialSummary.totalPaid)}</strong>
-          <small>{paidCount} quitadas</small>
         </div>
       </section>
 
       {/* Control Filters Bar - Bloco 1 (Status) + Bloco 2 (Tipo de Conta) */}
-      <div className="accounts-filters">
+      <div className="accounts-list-toolbar">
+        <span aria-live="polite" aria-atomic="true" className="accounts-result-count">{filteredAccounts.length} {filteredAccounts.length === 1 ? 'conta' : 'contas'}</span>
+        <button id="toggle-account-filters" type="button" aria-expanded={filtersExpanded} aria-controls="account-filters" onClick={() => setFiltersExpanded(value => !value)}>
+          <SlidersHorizontal size={14} /> Filtrar{activeFilters > 0 && <span className="accounts-filter-indicator">· {activeFilters}</span>}
+          {filtersExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+        </button>
+      </div>
+      <div id="account-filters" className="accounts-filters" hidden={!filtersExpanded}>
         {/* Bloco 1: Status */}
         <div className="accounts-filter-group">
           <span className="text-[11px] font-bold text-stone-500 uppercase tracking-wider shrink-0">
@@ -253,6 +260,7 @@ export const AccountsPage: React.FC = () => {
             </button>
           </div>
         </div>
+        {activeFilters > 0 && <button type="button" className="accounts-clear-filters" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); }}>Limpar filtros</button>}
       </div>
 
       {/* Grid of Accounts (approximately 3 cards per row on desktop, independent height) */}

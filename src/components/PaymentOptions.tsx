@@ -5,7 +5,7 @@ import { UnifiedMonthlyAccount } from '../types/finance';
 
 export const PaymentOptions: React.FC<{ account: UnifiedMonthlyAccount }> = ({ account }) => {
   const { editValueAndPay } = useFinance();
-  if (account.type === 'credit_card' || account.status === 'pago') return null;
+  if (account.status === 'pago') return null;
   return <details className="payment-options" onBlur={event => {
     if (!event.currentTarget.contains(event.relatedTarget)) event.currentTarget.removeAttribute('open');
   }} onKeyDown={event => {
@@ -18,6 +18,6 @@ export const PaymentOptions: React.FC<{ account: UnifiedMonthlyAccount }> = ({ a
     <button type="button" onClick={event => {
       event.currentTarget.closest('details')?.removeAttribute('open');
       editValueAndPay(account);
-    }}>Alterar valor ao pagar</button>
+    }}>{account.type === 'credit_card' ? 'Registrar pagamento parcial' : 'Alterar valor ao pagar'}</button>
   </details>;
 };

@@ -101,7 +101,6 @@ interface FinanceContextType {
       creditCardId?: string;
     }
   ) => void;
-  paySpecificCardInvoice: (cardId: string, month: string) => void;
 
   // Gerenciamento de Categorias
   addCategory: (name: string, color: string, description?: string) => void;
@@ -167,7 +166,7 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const confirmPayment = (amount: number) => {
     const request = paymentRef.current;
     if (!request) return false;
-    const success = commit(previous => recordPayment(previous, request.month, request.account.id, request.account.type, 'pago', amount), request.month);
+    const success = commit(previous => recordPayment(previous, request.month, request.account.id, request.account.type, request.account.type === 'credit_card' ? 'parcial' : 'pago', amount), request.month);
     if (success) cancelPayment();
     return success;
   };
@@ -211,17 +210,15 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   // Resumo financeiro do mês corrente
   const financialSummary = useMemo(() => {
-    const summary = computeFinancialSummary(currentMonth, store);
-    const previousPendingCardsTotal = monthlyAccounts.reduce((sum, account) => sum + (account.cardInfo?.previousPendingAmount ?? 0), 0);
-    return { ...summary, previousPendingCardsTotal, totalOpenWithPreviousPending: summary.totalPending + previousPendingCardsTotal };
-  }, [currentMonth, store, monthlyAccounts]);
+    return computeFinancialSummary(currentMonth, store);
+  }, [currentMonth, store]);
 
   const toggleAccountStatus = (account: UnifiedMonthlyAccount) => {
-    const status = account.status === 'pendente' ? 'pago' : 'pendente';
+    const status = account.status === 'pago' ? 'pendente' : 'pago';
     commit(previous => recordPayment(previous, currentMonth, account.id, account.type, status));
   };
   const editValueAndPay = (account: UnifiedMonthlyAccount) => {
-    if (account.type !== 'credit_card' && account.status === 'pendente') requestPayment(account, currentMonth);
+    if (account.status !== 'pago') requestPayment(account, currentMonth);
   };
 
   // Atualizar valor e detalhes de uma conta
@@ -558,10 +555,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
     }));
   };
 
-  const paySpecificCardInvoice = (cardId: string, month: string) => {
-    commit(previous => recordPayment(previous, month, cardId, 'credit_card', 'pago'), month);
-  };
-
   // Atualizar despesa simples no cartão
   const updateCardExpense = (
     expenseId: string,
@@ -670,7 +663,6 @@ export const FinanceProvider: React.FC<{ children: React.ReactNode }> = ({ child
         deleteCardItem,
         updateCardExpense,
         updateInstallmentPurchase,
-        paySpecificCardInvoice,
         addCategory,
         updateCategory,
         deleteCategory,

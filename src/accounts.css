@@ -15,8 +15,34 @@
 .accounts-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 10px 12px; background: white; border: 1px solid var(--color-line); border-radius: 14px; }
 .accounts-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .accounts-filter-group button { padding: 5px 9px; }
-.accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 14px; align-items: start; }
+.accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
 .accounts-grid .account-tile > div:last-child { flex-wrap: wrap; }
+.accounts-filters[hidden] { display: none; }
+.accounts-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--color-stone-600); }
+.accounts-list-toolbar button { display: inline-flex; align-items: center; gap: 6px; padding: 5px 8px; min-height: 30px; border-radius: 8px; cursor: pointer; }
+.accounts-list-toolbar button:hover { background: var(--color-surface-muted); }
+.accounts-filter-indicator { color: var(--color-brand-strong); font-weight: 650; }
+.accounts-clear-filters { margin-left: auto; color: var(--color-brand-strong); font-size: 12px; cursor: pointer; }
+.account-body { padding: 10px 12px; }
+.account-header { margin-bottom: 4px; }
+.account-header .w-8 { width: 26px; height: 26px; }
+.account-name { white-space: normal; overflow-wrap: anywhere; }
+.account-footer { padding: 4px 12px; }
+.account-footer button, .account-footer summary { min-height: 28px; min-width: 28px; }
+.account-footer > div:last-child { flex-shrink: 0; }
+.account-body > .mt-1\.5 { margin-top: 4px; }
+.card-invoice-values { margin-top: 4px; }
+.card-invoice-total { display: block; font-size: 24px; line-height: 1.25; letter-spacing: -.5px; font-variant-numeric: tabular-nums; white-space: nowrap; }
+.card-invoice-caption { display: block; font-size: 11px; color: var(--color-stone-500); }
+.card-invoice-breakdown { display: grid; gap: 2px; margin-top: 4px; font-size: 11px; color: var(--color-stone-600); }
+.card-invoice-breakdown > div { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; }
+.card-previous-balance { color: var(--color-expense); }
+.card-payment-summary { display: flex; flex-wrap: wrap; gap: 4px 14px; font-size: 11px; margin-top: 4px; color: var(--color-stone-600); }
+.card-payment-summary b { color: var(--color-stone-800); white-space: nowrap; }
+.card-purchase-row { flex-wrap: wrap; }
+.card-purchase-copy { flex: 1 1 120px; min-width: 0; }
+.card-purchase-actions { margin-left: auto; }
+.card-purchase-actions button { min-width: 28px; min-height: 28px; }
 @media (min-width: 1024px) and (max-width: 1399px) {
   .accounts-summary > div { grid-template-columns: 1fr; gap: 2px; padding-block: 9px; }
 }

@@ -1,6 +1,6 @@
 export type AccountType = 'simple' | 'recurring' | 'installment' | 'credit_card';
 
-export type PaymentStatus = 'pendente' | 'pago';
+export type PaymentStatus = 'pendente' | 'parcial' | 'pago';
 
 export interface Category {
   id: string;
@@ -70,6 +70,8 @@ export interface CreditCardMonthlyInvoice {
   cardId: string;
   month: string; // YYYY-MM
   status: PaymentStatus;
+  /** Total efetivamente pago neste mês; ausente em registros legados. */
+  paidAmount?: number;
   manualAdjustment?: number; // caso haja ajuste manual
   paidAt?: string;
 }
@@ -189,6 +191,7 @@ export interface UnifiedMonthlyAccount {
     previousPendingAmount: number;
     previousPendingInvoices: CardPendingPreviousInvoice[];
     totalOpenAmount: number;
+    paidAmount?: number;
   };
 }
 

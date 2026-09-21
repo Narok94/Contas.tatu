@@ -11,10 +11,8 @@ import {
   ChevronUp,
   Layers,
   Edit3,
-  AlertTriangle,
-  Clock,
 } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
+import { PaymentOptions } from './PaymentOptions';
 import { CardInternalItem, UnifiedMonthlyAccount } from '../types/finance';
 import { formatBRL, formatMonthEnd, formatMonthYear } from '../utils/formatters';
 
@@ -43,7 +41,6 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
   onEditItem,
   onDeleteItem,
 }) => {
-  const { paySpecificCardInvoice } = useFinance();
   const [isExpanded, setIsExpanded] = useState(false);
   const isPaid = account.status === 'pago';
   const cardInfo = account.cardInfo;
@@ -66,9 +63,9 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
           : 'bg-white border-line border-l-4 border-l-amber-500 hover:border-line-strong'
       }`}
     >
-      <div className="p-3.5 sm:p-4">
+      <div className="account-body">
         {/* Header: Tipo Cartão de Crédito + Status Badge */}
-        <div className="flex items-center justify-between gap-2 mb-2">
+        <div className="account-header flex items-center justify-between gap-2">
           <div className="flex items-center gap-1.5">
             <div className="w-8 h-8 rounded-lg bg-info-soft text-info flex items-center justify-center shrink-0">
               <CardIcon className="w-3.5 h-3.5" />
@@ -94,7 +91,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
             ) : (
               <>
                 <Circle className="w-3 h-3 text-amber-600" />
-                Pendente
+                {account.status === 'parcial' ? 'Parcial' : 'Pendente'}
               </>
             )}
           </span>
@@ -103,66 +100,37 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
         {/* Nome do Cartão */}
         <h3
           title={account.name}
-          className="text-sm font-bold tracking-tight text-stone-900 truncate"
+          className="text-sm font-bold tracking-tight text-stone-900 account-name"
         >
           {account.name}
         </h3>
 
-        {/* Valor Total da Fatura e Pendências Anteriores */}
-        <div className="mt-1.5 space-y-1.5">
-          {hasPreviousPending ? (
-            <div className="rounded-xl bg-warning-soft border border-amber-200/80 p-2.5 space-y-1.5">
-              <div className="flex items-center justify-between">
-                <span className="text-xs font-semibold text-amber-900 flex items-center gap-1">
-                  <AlertTriangle className="w-3.5 h-3.5 text-amber-600" />
-                  Total em Aberto
-                </span>
-                <span className="text-lg font-bold tracking-tight text-amber-950">
-                  {formatBRL(totalOpenAmount)}
-                </span>
-              </div>
-              <div className="pt-1.5 border-t border-amber-200/60 space-y-1 text-xs">
-                <div className="flex items-center justify-between text-stone-600">
-                  <span>Fatura do mês ({isPaid ? 'Paga' : 'Pendente'}):</span>
-                  <span className="font-semibold text-stone-800">
-                    {formatBRL(currentMonthAmount)}
-                  </span>
-                </div>
-                <div className="flex items-center justify-between text-amber-900">
-                  <span>Pendências anteriores:</span>
-                  <span className="font-bold text-amber-900">
-                    {formatBRL(previousPendingAmount)}
-                  </span>
-                </div>
-              </div>
-            </div>
-          ) : (
-            <div>
-              <div
-                className={`text-xl sm:text-2xl font-bold tracking-tight ${
-                  isPaid ? 'text-stone-800' : 'text-stone-900'
-                }`}
-              >
-                {formatBRL(account.amount)}
-              </div>
-              <p className="text-[11px] text-stone-500 mt-0.5">
-                Total da fatura fechada do mês
-              </p>
-            </div>
-          )}
+        <div className="card-invoice-values">
+          <strong className="card-invoice-total">{formatBRL(account.amount)}</strong>
+          <span className="card-invoice-caption">Total da fatura</span>
+          {hasPreviousPending && <div className="card-invoice-breakdown">
+            <div><span>Compras do mês</span><span>{formatBRL(currentMonthAmount)}</span></div>
+            <div className="card-previous-balance"><span>Saldo anterior · {formatMonthYear(previousPendingInvoices[0].month).split(' ')[0]}</span><span>{formatBRL(previousPendingAmount)}</span></div>
+          </div>}
+          {account.status === 'parcial' && <div className="card-payment-summary">
+            <span>Pago <b>{formatBRL(cardInfo?.paidAmount ?? 0)}</b></span>
+            <span>Restante <b>{formatBRL(totalOpenAmount)}</b></span>
+          </div>}
         </div>
 
         {/* Botão de Expandir / Recolher Itens */}
         <button
           id={`btn-expand-card-${account.id}`}
           type="button"
+          aria-expanded={isExpanded}
+          aria-controls={`card-items-${account.id}`}
           onClick={() => setIsExpanded(!isExpanded)}
           className="mt-2 w-full flex items-center justify-between px-2.5 py-1.5 bg-surface-soft hover:bg-surface-muted border border-line rounded-xl text-xs font-medium text-stone-700 transition-colors cursor-pointer"
         >
           <span>
             {isExpanded
               ? 'Ocultar detalhes da fatura'
-              : `Ver compras (${items.length})${hasPreviousPending ? ` + ${previousPendingInvoices.length} pendências` : ''}`}
+              : `Ver compras (${items.length})`}
           </span>
           {isExpanded ? (
             <ChevronUp className="w-3.5 h-3.5 text-stone-500" />
@@ -172,9 +140,9 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
         </button>
       </div>
 
-      {/* Visão Expandida das Compras Internas e Pendências */}
+      {/* Compras que compõem a fatura do mês */}
       {isExpanded && (
-        <div className="border-t border-line bg-surface-soft/50 p-3 space-y-3 animate-in slide-in-from-top-1 duration-150">
+        <div id={`card-items-${account.id}`} className="border-t border-line bg-surface-soft/50 p-3 space-y-3 animate-in slide-in-from-top-1 duration-150">
           {/* Seção 1: Compras do Mês */}
           <div>
             <div className="flex items-center justify-between mb-2">
@@ -201,10 +169,10 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
                 {items.map((item) => (
                   <div
                     key={item.id}
-                    className="flex items-center justify-between p-2 rounded-lg bg-white border border-line text-xs gap-2 group/item hover:border-line-strong transition-colors"
+                    className="card-purchase-row flex items-center justify-between p-2 rounded-lg bg-white border border-line text-xs gap-2 group/item hover:border-line-strong transition-colors"
                   >
-                    <div className="flex-1 min-w-0">
-                      <div className="font-medium text-stone-800 truncate">
+                    <div className="card-purchase-copy">
+                      <div className="card-purchase-name font-medium text-stone-800">
                         {item.description}
                       </div>
                       <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
@@ -234,7 +202,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2 shrink-0">
+                    <div className="card-purchase-actions flex items-center gap-2 shrink-0">
                       <div className="text-right">
                         <span className="font-semibold text-stone-900 block">
                           {formatBRL(item.amount)}
@@ -275,60 +243,12 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
               </div>
             )}
           </div>
-
-          {/* Seção 2: Pendências de Meses Anteriores (se houver) */}
-          {previousPendingInvoices.length > 0 && (
-            <div className="pt-2.5 border-t border-amber-200 space-y-2">
-              <div className="flex items-center justify-between">
-                <span className="text-[11px] font-semibold text-amber-900 uppercase tracking-wider flex items-center gap-1">
-                  <Clock className="w-3 h-3 text-amber-700" />
-                  Pendências Anteriores
-                </span>
-                <span className="text-xs font-bold text-amber-900">
-                  {formatBRL(previousPendingAmount)}
-                </span>
-              </div>
-              <div className="space-y-1.5">
-                {previousPendingInvoices.map((inv) => (
-                  <div
-                    key={`past-invoice-${inv.month}`}
-                    className="flex items-center justify-between p-2 rounded-lg bg-warning-soft border border-amber-200 text-xs"
-                  >
-                    <div>
-                      <div className="font-semibold text-stone-900 capitalize">
-                        {formatMonthYear(inv.month)}
-                      </div>
-                      <div className="text-[10px] text-amber-800">
-                        Fatura não paga naquele mês
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <span className="font-bold text-amber-950">
-                        {formatBRL(inv.amount)}
-                      </span>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          paySpecificCardInvoice(cardInfo?.cardId || account.id, inv.month)
-                        }
-                        className="inline-flex items-center gap-1 px-2.5 py-1 bg-white hover:bg-emerald-50 border border-emerald-300 text-emerald-800 text-[11px] font-semibold rounded-md shadow-2xs transition-colors cursor-pointer"
-                        title={`Quitar fatura de ${formatMonthYear(inv.month)}`}
-                      >
-                        <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600" />
-                        Pagar fatura
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          )}
         </div>
       )}
 
       {/* Card Action Bar */}
       <div
-        className={`px-3.5 py-2 border-t rounded-b-2xl flex items-center justify-between gap-2 ${
+        className={`account-footer border-t rounded-b-2xl flex items-center justify-between gap-2 ${
           isPaid
             ? 'bg-emerald-50/40 border-emerald-100/80'
             : 'bg-surface-soft border-line'
@@ -347,6 +267,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
             <span>Marcar como pendente</span>
           </button>
         ) : (
+          <div className="payment-actions">
           <button
             id={`btn-toggle-${account.id}`}
             type="button"
@@ -354,8 +275,10 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
             className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold bg-brand hover:bg-brand-strong text-white shadow-2xs hover:shadow-xs transition-all cursor-pointer active:scale-[0.98]"
           >
             <Plus className="w-3.5 h-3.5 stroke-[2.5]" />
-            <span>Marcar como paga</span>
+            <span>Marcar como pago</span>
           </button>
+          <PaymentOptions account={account} />
+          </div>
         )}
 
         {/* Secondary Actions: Edit & Delete Card */}

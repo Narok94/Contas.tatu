@@ -50,8 +50,9 @@ export function HistoryPage() {
         {accounts.map(account => <div className="history-account" key={`${account.type}:${account.id}`}>
           <div className="history-row">
             <span><b>{account.name}</b>{account.category && <small>{account.category.name}</small>}</span>
-            <span className="history-account-value"><strong>{formatBRL(account.amount)}</strong><small className={account.status === 'pago' ? 'history-paid' : ''}>{account.status === 'pago' ? 'Pago' : 'Pendente'}</small></span>
+            <span className="history-account-value"><strong>{formatBRL(account.amount)}</strong><small className={account.status === 'pago' ? 'history-paid' : ''}>{account.status === 'pago' ? 'Pago' : account.status === 'parcial' ? 'Parcial' : 'Pendente'}</small></span>
           </div>
+          {account.status === 'parcial' && account.cardInfo && <p className="history-hint">Pago: {formatBRL(account.cardInfo.paidAmount ?? 0)} · Restante: {formatBRL(account.cardInfo.totalOpenAmount)}</p>}
           {account.cardInfo && account.cardInfo.items.length > 0 && <details><summary>Ver compras</summary>{account.cardInfo.items.map(item => <div className="history-row" key={item.id}><span>{item.description}<small>{item.category?.name ?? 'Sem categoria'}</small></span><strong>{formatBRL(item.amount)}</strong></div>)}</details>}
         </div>)}
       </section>

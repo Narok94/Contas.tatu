@@ -62,12 +62,24 @@ export function recordPayment(store: FinanceDataStore, month: string, id: string
   assertMonthOpen(store, month);
   const account = computeMonthlyAccounts(month, store).find(a => a.id === id && a.type === type);
   if (!account) throw new Error('Esta conta não está mais disponível neste mês.');
-  if (account.status === status) return store;
+  if (account.status === status && (type !== 'credit_card' || amount === undefined)) return store;
   const value = amount ?? account.amount;
   if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * 100)) || Math.abs(value * 100 - Math.round(value * 100)) > 0.00001) {
     throw new Error('Informe um valor válido, não negativo, com até duas casas decimais.');
   }
-  if (type === 'credit_card' && value !== account.amount) throw new Error('O total da fatura é calculado pelas compras. Corrija os itens antes de pagar.');
+  if (type === 'credit_card') {
+    if (value > account.amount) throw new Error('O pagamento não pode superar o total da fatura.');
+    if (status === 'parcial' && value <= 0) throw new Error('Informe um pagamento maior que zero.');
+    const paidAmount = status === 'pendente' ? 0 : value;
+    const invoiceStatus: PaymentStatus = status === 'pendente' ? 'pendente'
+      : paidAmount >= account.amount ? 'pago' : paidAmount > 0 ? 'parcial' : 'pendente';
+    const existing = store.cardMonthlyInvoices.find(i => i.cardId === id && i.month === month);
+    if (existing?.paidAmount === paidAmount && existing.status === invoiceStatus) return store;
+    const invoice = { ...existing, id: existing?.id ?? `inv_${id}_${month}`, cardId: id, month,
+      status: invoiceStatus, paidAmount, paidAt: paidAmount > 0 ? new Date().toISOString() : undefined };
+    return { ...store, cardMonthlyInvoices: [...store.cardMonthlyInvoices.filter(i => i !== existing), invoice] };
+  }
+  if (status === 'parcial') throw new Error('Pagamento parcial disponível apenas para cartões.');
   const paidValue = status === 'pago' ? value : account.amount;
   if (type === 'simple') return { ...store, simpleAccounts: store.simpleAccounts.map(a => a.id === id ? { ...a, value: paidValue, status } : a) };
   if (type === 'recurring') {
@@ -76,7 +88,5 @@ export function recordPayment(store: FinanceDataStore, month: string, id: string
     return { ...store, recurringMonthlyRecords: [...store.recurringMonthlyRecords.filter(r => r !== existing), record] };
   }
   if (type === 'installment') return { ...store, installmentPurchases: store.installmentPurchases.map(p => p.id === id ? { ...p, statusByMonth: { ...p.statusByMonth, [month]: status }, paymentAmountsByMonth: { ...p.paymentAmountsByMonth, [month]: paidValue } } : p) };
-  const existing = store.cardMonthlyInvoices.find(i => i.cardId === id && i.month === month);
-  const invoice = { ...existing, id: existing?.id ?? `inv_${id}_${month}`, cardId: id, month, status, paidAt: status === 'pago' ? new Date().toISOString() : undefined };
-  return { ...store, cardMonthlyInvoices: [...store.cardMonthlyInvoices.filter(i => i !== existing), invoice] };
+  return store;
 }

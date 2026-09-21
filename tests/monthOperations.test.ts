@@ -91,11 +91,11 @@ test('parcela corrigida não redistribui diferença e edição futura preserva p
   assert.equal(computeMonthlyAccounts(month, updated)[0].amount, 112);
   assert.equal(computeMonthlyAccounts(month, updated)[0].status, 'pago');
 });
-test('cartão confere soma dos itens e rejeita total arbitrário', () => {
+test('cartão mantém soma dos itens e rejeita pagamento acima da fatura', () => {
   const store = fixture(); store.simpleAccounts = [];
   store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
   store.cardExpenses.push({ id: 'item', cardId: 'card', description: 'Compra', amount: 193.47, month, categoryId: 'home', createdAt: '' });
-  assert.throws(() => recordPayment(store, month, 'card', 'credit_card', 'pago', 180), /calculado/);
+  assert.throws(() => recordPayment(store, month, 'card', 'credit_card', 'pago', 200), /superar/);
   const paid = recordPayment(store, month, 'card', 'credit_card', 'pago', 193.47);
   assert.deepEqual(paid.cardExpenses, store.cardExpenses);
   const closed = closeMonth(paid, month);
@@ -104,47 +104,44 @@ test('cartão confere soma dos itens e rejeita total arbitrário', () => {
   assert.equal(computeMonthlyAccounts(month, closed)[0].cardInfo?.items[0].description, 'Compra');
   assert.equal(computeMonthlyAccounts(month, closed)[0].name, 'Cartão');
 });
-test('fatura anterior não bloqueia fechamento, não é absorvida e pode ser paga depois', () => {
+test('pagamento integral absorve saldo anterior sem alterar o mês de origem', () => {
   const store = fixture(); store.simpleAccounts = [];
   store.creditCards.push({ id: 'card', name: 'Cartão', createdAt: '' });
   store.cardExpenses.push({ id: 'item', cardId: 'card', description: 'Compra antiga', amount: 100, month: '2026-08', createdAt: '' });
+  assert.throws(() => closeMonth(store, month), /pendente/);
   const paid = recordPayment(store, month, 'card', 'credit_card', 'pago');
   const closed = closeMonth(paid, month);
   assert.deepEqual(closed.cardExpenses, store.cardExpenses);
   assert.deepEqual(closed.cardMonthlyInvoices, paid.cardMonthlyInvoices);
-  assert.deepEqual(getPreviousPendingCardInvoices('card', '2026-10', closed), [{ month: '2026-08', amount: 100 }]);
-  assert.equal(closed.closedMonths![month].summary.totalExpected, 0);
-  assert.equal(closed.closedMonths![month].summary.totalPaid, 0);
+  assert.deepEqual(getPreviousPendingCardInvoices('card', '2026-10', closed), []);
+  assert.equal(closed.closedMonths![month].summary.totalExpected, 100);
+  assert.equal(closed.closedMonths![month].summary.totalPaid, 100);
   assert.equal(closed.closedMonths![month].summary.totalPending, 0);
-  assert.equal(closed.closedMonths![month].summary.previousPendingCardsTotal, 100);
-  assert.throws(() => closeMonth(closed, '2026-08'), /pendente/);
-  const resolved = recordPayment(closed, '2026-08', 'card', 'credit_card', 'pago');
-  assert.doesNotThrow(() => assertFinancialMutation(closed, resolved));
-  assert.deepEqual(getPreviousPendingCardInvoices('card', '2026-10', resolved), []);
-  assert.deepEqual(resolved.closedMonths, closed.closedMonths);
-  assert.equal(computeOperationalMonthlyAccounts(month, resolved)[0].cardInfo?.previousPendingAmount, 0);
-  assert.equal(computeMonthlyAccounts(month, resolved)[0].cardInfo?.previousPendingAmount, 100);
-  assert.equal(computeFinancialSummary(month, resolved).totalPaid, 0);
+  assert.equal(closed.closedMonths![month].summary.previousPendingCardsTotal, 0);
+  assert.equal(computeMonthlyAccounts('2026-08', closed)[0].status, 'pendente');
+  assert.equal(computeFinancialSummary('2026-08', closed).totalPaid, 0);
+  assert.equal(computeOperationalMonthlyAccounts(month, closed)[0].cardInfo?.totalOpenAmount, 0);
 });
-test('Setembro: 8 pagas, R$ 4.844,90 fechados, R$ 5.110 anteriores preservados', () => {
+
+test('Setembro: 8 pagas, R$ 9.954,90 fechados incluindo R$ 5.110 anteriores quitados', () => {
   let raw: string | null = null;
   Object.defineProperty(globalThis, 'localStorage', { value: { getItem: () => raw, setItem: (_key: string, value: string) => { raw = value; } }, configurable: true });
   let store = loadFinanceStore();
-  const debt = getPreviousPendingCardInvoices('card_nubank', month, store);
+  assert.deepEqual(getPreviousPendingCardInvoices('card_nubank', month, store), [{ month: '2026-08', amount: 5110 }]);
   for (const account of computeMonthlyAccounts(month, store)) store = recordPayment(store, month, account.id, account.type, 'pago');
   const closed = closeMonth(store, month);
   const summary = closed.closedMonths![month].summary;
   assert.equal(summary.totalCount, 8);
   assert.equal(summary.pendingCount, 0);
-  assert.equal(Math.round(summary.totalExpected * 100), 484490);
-  assert.equal(Math.round(summary.totalPaid * 100), 484490);
+  assert.equal(Math.round(summary.totalExpected * 100), 995490);
+  assert.equal(Math.round(summary.totalPaid * 100), 995490);
   assert.equal(summary.totalPending, 0);
-  assert.equal(summary.previousPendingCardsTotal, 5110);
+  assert.equal(summary.previousPendingCardsTotal, 0);
   assert.equal(Math.round(summary.categoryBreakdown.reduce((sum, c) => sum + c.total, 0) * 100), 484490);
-  assert.deepEqual(getPreviousPendingCardInvoices('card_nubank', '2026-10', closed), debt);
+  assert.deepEqual(getPreviousPendingCardInvoices('card_nubank', '2026-10', closed), []);
   assert.deepEqual(closed.cardMonthlyInvoices, store.cardMonthlyInvoices);
   saveFinanceStore(closed);
-  assert.deepEqual(getPreviousPendingCardInvoices('card_nubank', '2026-10', loadFinanceStore()), debt);
+  assert.deepEqual(getPreviousPendingCardInvoices('card_nubank', '2026-10', loadFinanceStore()), []);
   assert.throws(() => closeMonth(closed, month), /fechado/);
   assert.throws(() => recordPayment(closed, month, 'card_nubank', 'credit_card', 'pendente'), /fechado/);
 });
@@ -186,14 +183,14 @@ test('reabrir preserva contas, valores, pagamentos e saldo anterior; novo fecham
   assert.doesNotThrow(() => assertFinancialMutation(reopened, added));
   assert.equal(canCloseMonth(added, month), false);
   assert.throws(() => closeMonth(added, month), /pendente/);
-  assert.equal(computeFinancialSummary(month, added).totalExpected, 205);
+  assert.equal(computeFinancialSummary(month, added).totalExpected, 280);
   const resolved = recordPayment(added, month, 'forgotten', 'simple', 'pago', 30);
   assert.equal(canCloseMonth(resolved, month), true);
   const reclosed = closeMonth(resolved, month);
-  assert.equal(reclosed.closedMonths![month].summary.totalExpected, 210);
-  assert.equal(reclosed.closedMonths![month].summary.totalPaid, 210);
+  assert.equal(reclosed.closedMonths![month].summary.totalExpected, 285);
+  assert.equal(reclosed.closedMonths![month].summary.totalPaid, 285);
   assert.deepEqual(reclosed.closedMonthHistory![month], [snapshot]);
-  assert.equal(reclosed.closedMonths![month].summary.previousPendingCardsTotal, 75);
+  assert.equal(reclosed.closedMonths![month].summary.previousPendingCardsTotal, 0);
   assert.deepEqual(getPreviousPendingCardInvoices('card', month, reclosed), [{ month: '2026-08', amount: 75 }]);
   assert.throws(() => recordPayment(reclosed, month, 'forgotten', 'simple', 'pendente'), /fechado/);
   const twice = reopenMonth(reclosed, month);
@@ -248,11 +245,11 @@ test('anual soma meses sem duplicar cartões, saldo anterior ou fechamentos arqu
   for (const a of computeMonthlyAccounts(month, store)) store = recordPayment(store, month, a.id, a.type, 'pago');
   store = closeMonth(store, month);
   store.simpleAccounts[0].value = 99; // A closed month must still use the official snapshot.
-  assert.equal(computeAnnualHistory(2026, store).total, 40.10);
+  assert.equal(computeAnnualHistory(2026, store).total, 70.40);
   store = reopenMonth(store, month);
-  assert.equal(computeAnnualHistory(2026, store).total, 129);
+  assert.equal(computeAnnualHistory(2026, store).total, 159.30);
   store = closeMonth(store, month);
-  assert.equal(computeAnnualHistory(2026, store).total, 129);
+  assert.equal(computeAnnualHistory(2026, store).total, 159.30);
   assert.equal(computeAnnualHistory(2026, store).months.length, 12);
 });
 

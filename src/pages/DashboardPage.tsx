@@ -10,7 +10,7 @@ import { getCategoryOrTypeIcon } from '../utils/iconHelper';
 
 export const DashboardPage: React.FC = () => {
   const { currentMonth, financialSummary: summary, monthlyAccounts, toggleAccountStatus, setActiveTab } = useFinance();
-  const pendingAccounts = monthlyAccounts.filter(account => account.status === 'pendente');
+  const pendingAccounts = monthlyAccounts.filter(account => account.status !== 'pago');
   const paidCount = monthlyAccounts.filter(account => account.status === 'pago').length;
   // Same value-based progress used by the existing dashboard.
   const paidPercent = summary.totalExpected > 0 ? Math.round(summary.totalPaid / summary.totalExpected * 100) : 0;
@@ -35,7 +35,7 @@ export const DashboardPage: React.FC = () => {
       <section className="desk-metrics" aria-label="Indicadores do mês">
         <article className="desk-metric metric-total"><div><ReceiptText size={18} /><h3>Total do mês</h3></div><strong>{formatBRL(summary.totalExpected)}</strong><p>{summary.totalCount} contas em {formatMonthYear(currentMonth)}</p></article>
         <article className="desk-metric metric-paid"><div><CheckCircle2 size={18} /><h3>Pago</h3></div><strong>{formatBRL(summary.totalPaid)}</strong><p>{paidCount} contas pagas</p></article>
-        <article className="desk-metric metric-pending"><div><Circle size={18} /><h3>Pendente</h3></div><strong>{formatBRL(summary.totalPending)}</strong><p>{summary.previousPendingCardsTotal > 0 ? `+ ${formatBRL(summary.previousPendingCardsTotal)} em faturas anteriores` : `${summary.pendingCount} contas em aberto`}</p></article>
+        <article className="desk-metric metric-pending"><div><Circle size={18} /><h3>Pendente</h3></div><strong>{formatBRL(summary.totalPending)}</strong><p>{summary.previousPendingCardsTotal > 0 ? `${summary.totalOpenWithPreviousPending > summary.totalPending ? '+' : 'Inclui'} ${formatBRL(summary.previousPendingCardsTotal)} de saldo anterior` : `${summary.pendingCount} contas em aberto`}</p></article>
         <article className="desk-metric metric-installments"><div><Layers size={18} /><h3>Parcelamentos perto do fim</h3></div><strong>{endingInstallments.length}</strong><p>Com até 3 parcelas restantes</p></article>
       </section>
 
@@ -48,7 +48,7 @@ export const DashboardPage: React.FC = () => {
                 <div className="desk-account-row" key={account.id}>
                   <span className="desk-account-icon category-chip" style={{ '--category-color': categoryDisplayColor(account.category?.color || 'var(--color-brand)') } as React.CSSProperties}>{getCategoryOrTypeIcon(account.category?.name, account.type, 'w-4 h-4')}</span>
                   <div className="desk-account-name"><h4>{account.name}</h4><p>{account.category?.name || 'Geral'} · {account.type === 'credit_card' ? 'Fatura de cartão' : account.type === 'recurring' ? 'Fixa' : account.type === 'installment' ? `Parcela ${account.installmentInfo?.currentInstallment}/${account.installmentInfo?.totalInstallments}` : 'Simples'}</p></div>
-                  <strong>{formatBRL(account.amount)}</strong>
+                  <strong>{formatBRL(account.cardInfo?.totalOpenAmount ?? account.amount)}</strong>
                   <div className="payment-actions"><button type="button" className="desk-pay" aria-label={`Marcar ${account.name} como pago`} onClick={() => toggleAccountStatus(account)}>Pagar</button><PaymentOptions account={account} /></div>
                 </div>
               ))}
