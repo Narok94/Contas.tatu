@@ -38,15 +38,15 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
         }
       }
     }
-    return { overflow: document.documentElement.scrollWidth > innerWidth,
+    return { viewport: innerWidth, overflow: document.documentElement.scrollWidth > innerWidth,
       columns: getComputedStyle(document.querySelector('.accounts-grid')).gridTemplateColumns.split(' ').length,
       collisions,
       clipped: [...document.querySelectorAll('.account-name, .card-purchase-name, .card-invoice-total, .account-footer button, .accounts-filter-group button')]
-        .filter(e => e.getBoundingClientRect().width > 0 && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)).map(e => e.textContent),
+        .filter(e => !(e.matches('.account-name') && e.title === e.textContent.trim()) && e.getBoundingClientRect().width > 0 && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)).map(e => e.textContent),
       cards: cards.map(e => ({ id: e.id, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width })) };
   });
   const checkGeometry = metrics => {
-    assert.equal(metrics.overflow, false); assert.equal(metrics.columns, 3);
+    assert.equal(metrics.overflow, false); assert.equal(metrics.columns, metrics.viewport >= 1440 ? 4 : 3);
     assert.deepEqual(metrics.collisions, []); assert.deepEqual(metrics.clipped, []);
   };
   const partial = async amount => {
@@ -67,6 +67,9 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
       assert.equal(await page.locator('.accounts-summary small').count(), 0);
       assert.equal(await page.locator('.accounts-result-count').count(), 1);
       const metrics = await geometry(); checkGeometry(metrics);
+      assert.ok(metrics.cards.find(c => c.id.startsWith('credit-card')).height <= Math.max(...metrics.cards.filter(c => c.id.startsWith('account-card')).map(c => c.height)) + 20);
+      assert.doesNotMatch(await page.locator('[id^=credit-card-]').innerText(), /Saldo anterior|Compras do mês|Restante|Pago R\$/);
+      assert.equal(await page.getByRole('button', { name: 'Ver detalhes', exact: true }).count(), 1);
       await page.screenshot({ path: path.join(output, `compact-${width}x${height}.png`), fullPage: true });
       await page.locator('#toggle-account-filters').click();
       assert.equal(await page.locator('#account-filters').isVisible(), true);
@@ -98,6 +101,56 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     assert.equal(await page.locator('#account-filters').isVisible(), false);
     report.flows.push('Collapsed by default, keyboard toggle, every status/type, combined filters, active indicator, collapse preserves selection, clear, count 0/1/plural, reload resets transient selection');
 
+    const filterFixture = {
+      categories: [{ id: 'casa', name: 'Casa', color: '#558877' }, { id: 'saude', name: 'Saúde', color: '#775588' }, { id: 'nova', name: 'Categoria cadastrada agora', color: '#885577' }],
+      simpleAccounts: [
+        { id: 'z', name: 'Zebra', value: 500, month: '2026-09', status: 'pendente', categoryId: 'casa', createdAt: '' },
+        { id: 'a', name: 'Água', value: 100, month: '2026-09', status: 'pago', categoryId: 'saude', createdAt: '' },
+        { id: 'b', name: 'Banho', value: 500, month: '2026-09', status: 'pendente', categoryId: 'casa', createdAt: '' }],
+      recurringDefinitions: [{ id: 'r', name: 'Aluguel', categoryId: 'casa', startMonth: '2026-09', isActive: true, createdAt: '' }],
+      recurringMonthlyRecords: [{ id: 'rm', definitionId: 'r', month: '2026-09', value: 800, isValueSet: true, status: 'pendente' }],
+      installmentPurchases: [], creditCards: [{ id: 'card', name: 'Cartão', createdAt: '' }], cardMonthlyInvoices: [],
+      cardExpenses: [{ id: 'old', cardId: 'card', description: 'Anterior', month: '2026-08', amount: 200, createdAt: '' },
+        { id: 'now', cardId: 'card', description: 'Atual', month: '2026-09', amount: 700, categoryId: 'saude', createdAt: '' }]
+    };
+    await seed(filterFixture);
+    const names = () => page.locator('.accounts-grid .account-name').allTextContents();
+    const original = await names();
+    await page.locator('#toggle-account-filters').click();
+    assert.deepEqual(await page.locator('#filter-category option').allTextContents(), ['Todas as categorias', ...filterFixture.categories.map(c => c.name)]);
+    for (const [sort, expected] of [
+      ['highest', ['Cartão', 'Aluguel', 'Zebra', 'Banho', 'Água']],
+      ['lowest', ['Água', 'Zebra', 'Banho', 'Aluguel', 'Cartão']],
+      ['category', ['Cartão', 'Zebra', 'Banho', 'Aluguel', 'Água']],
+      ['name', ['Água', 'Aluguel', 'Banho', 'Cartão', 'Zebra']],
+      ['default', original]
+    ]) {
+      await page.locator('#account-sort').selectOption(sort);
+      assert.deepEqual(await names(), expected);
+      await count(5);
+    }
+    await page.locator('#filter-category').selectOption('casa');
+    await page.locator('#account-sort').selectOption('highest');
+    assert.deepEqual(await names(), ['Aluguel', 'Zebra', 'Banho']);
+    await page.locator('#filter-status-pending').click();
+    await page.locator('#filter-type-recurring').click(); await count(1);
+    assert.deepEqual(await names(), ['Aluguel']);
+    assert.match(await page.locator('#toggle-account-filters').innerText(), /3/);
+    await page.locator('#toggle-account-filters').click(); await count(1);
+    await page.locator('#toggle-account-filters').click();
+    assert.equal(await page.locator('#filter-category').inputValue(), 'casa');
+    assert.equal(await page.locator('#account-sort').inputValue(), 'highest');
+    await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+    assert.deepEqual(await names(), original);
+    assert.equal(await page.locator('#account-sort').inputValue(), 'default');
+    assert.equal(await page.locator('#filter-category').inputValue(), 'all');
+    await page.locator('#filter-category').selectOption('nova'); await count(0);
+    await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+    await page.locator('#account-sort').selectOption('name');
+    await page.locator('#toggle-account-filters').click();
+    assert.equal(await page.getByLabel('Ordenação personalizada ativa').count(), 1);
+    report.flows.push('Real category source including unused new category; all five stable sort orders; invoice total includes carryover exactly once; status/type/category intersection; collapsed persistence; reset restores original order and all defaults');
+
     const fixture = { categories: [], simpleAccounts: [], recurringDefinitions: [], recurringMonthlyRecords: [], installmentPurchases: [],
       creditCards: [{ id: 'card', name: 'Cartão', createdAt: '' }], cardMonthlyInvoices: [],
       cardExpenses: [{ id: 'aug', cardId: 'card', description: 'Compras de agosto', month: '2026-08', amount: 1000, createdAt: '' },
@@ -106,10 +159,16 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     await partial('900,00');
     assert.equal((await read()).cardMonthlyInvoices[0].paidAmount, 900);
     assert.match(await page.locator('#credit-card-card').innerText(), /Parcial/);
+    await page.locator('#toggle-account-filters').click();
+    await page.locator('#filter-status-partial').click(); await count(1);
+    await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
+    await page.locator('#toggle-account-filters').click();
     assert.match(await page.locator('.card-payment-summary').innerText(), /900,00.*100,00/s);
     await page.locator('#btn-next-month').click();
     assert.match(await page.locator('.card-invoice-total').innerText(), /2\.000,00/);
+    if (await page.locator('#btn-expand-card-card').getAttribute('aria-expanded') === 'false') await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.card-previous-balance').innerText(), /Saldo anterior · Agosto.*100,00/s);
+    await page.locator('#btn-expand-card-card').click();
     const beforeCancel = await read();
     await page.getByLabel('Opções de pagamento de Cartão', { exact: true }).click();
     await page.getByRole('button', { name: 'Registrar pagamento parcial', exact: true }).click();
@@ -124,6 +183,18 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     for (const [width, height] of sizes) {
       await page.setViewportSize({ width, height }); checkGeometry(await geometry());
       await page.screenshot({ path: path.join(output, `september-partial-${width}x${height}.png`), fullPage: true });
+      const compactHeight = (await page.locator('#credit-card-card').boundingBox()).height;
+      const beforeDetails = await read();
+      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+      checkGeometry(await geometry());
+      assert.match(await page.locator('.card-invoice-breakdown').innerText(), /Total da fatura.*2\.000,00.*Compras do mês.*1\.900,00.*Saldo anterior · Agosto.*100,00.*Pago.*1\.500,00.*Restante.*500,00/s);
+      assert.equal(await page.locator('.card-previous-balance').count(), 1);
+      assert.match(await page.locator('#card-items-card').innerText(), /Compras de setembro/);
+      assert.doesNotMatch(await page.locator('#card-items-card').innerText(), /Compras de agosto/);
+      await page.screenshot({ path: path.join(output, `partial-details-${width}x${height}.png`), fullPage: true });
+      await page.getByRole('button', { name: 'Ocultar detalhes', exact: true }).click();
+      assert.equal((await page.locator('#credit-card-card').boundingBox()).height, compactHeight);
+      assert.deepEqual(await read(), beforeDetails);
     }
     const septemberRecords = (await read()).cardMonthlyInvoices;
     await page.locator('#tab-history').click();
@@ -137,8 +208,12 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     await page.getByRole('button', { name: 'Limpar filtros', exact: true }).click();
     await page.locator('#toggle-account-filters').click();
     await page.locator('#btn-next-month').click();
+    if (await page.locator('#btn-expand-card-card').getAttribute('aria-expanded') === 'false') await page.locator('#btn-expand-card-card').click();
     assert.equal(await page.locator('.card-previous-balance').count(), 1);
+    await page.locator('#btn-expand-card-card').click();
+    if (await page.locator('#btn-expand-card-card').getAttribute('aria-expanded') === 'false') await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.card-previous-balance').innerText(), /Saldo anterior · Setembro.*500,00/s);
+    await page.locator('#btn-expand-card-card').click();
     assert.doesNotMatch(await page.locator('#credit-card-card').innerText(), /Agosto|100,00|pendências/);
     for (const [width, height] of sizes) {
       await page.setViewportSize({ width, height }); checkGeometry(await geometry());
@@ -149,9 +224,13 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     assert.equal(await page.getByRole('button', { name: 'Pagar fatura', exact: true }).count(), 0);
     await page.locator('#btn-expand-card-card').click();
     await page.reload(); await page.locator('#tab-accounts').click(); await page.locator('#btn-next-month').click();
+    if (await page.locator('#btn-expand-card-card').getAttribute('aria-expanded') === 'false') await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.card-previous-balance').innerText(), /Setembro.*500,00/s);
+    await page.locator('#btn-expand-card-card').click();
     await page.locator('#btn-toggle-card').click();
     assert.equal(await page.locator('#payment-value').count(), 0);
+    assert.doesNotMatch(await page.locator('#credit-card-card').innerText(), /Restante|Saldo anterior|Compras do mês/);
+    assert.equal(await page.locator('.card-payment-summary').count(), 0);
     let store = await read();
     assert.equal(store.cardMonthlyInvoices.find(i => i.month === '2026-10').paidAmount, 500);
     assert.equal(store.cardMonthlyInvoices.find(i => i.month === '2026-10').status, 'pago');
@@ -163,7 +242,9 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     await page.getByRole('button', { name: 'Reabrir mês', exact: true }).click(); await page.locator('#btn-confirm-action').click();
     assert.deepEqual((await read()).closedMonthHistory['2026-10'], [snapshot]);
     await page.locator('#tab-accounts').click(); await page.locator('#btn-next-month').click();
+    await page.locator('#btn-expand-card-card').click();
     assert.equal(await page.locator('.card-previous-balance').count(), 0);
+    await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.card-invoice-total').innerText(), /0,00/);
     await page.locator('#tab-history').click(); await page.getByRole('button', { name: 'Anual', exact: true }).click();
     assert.match(await page.locator('.history-year-total > strong').innerText(), /2\.900,00/);
@@ -195,17 +276,23 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
     await seed(legacy);
     assert.match(await page.locator('.card-invoice-total').innerText(), /1\.900,00/);
     assert.match(await page.locator('#credit-card-card').innerText(), /Pago/);
+    await page.locator('#btn-expand-card-card').click();
     assert.equal(await page.locator('.card-previous-balance').count(), 0);
+    await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.accounts-pending small').innerText(), /1\.000,00.*no fechamento/);
     await page.locator('#tab-dashboard').click();
     assert.match(await page.locator('.metric-pending p').innerText(), /^\+.*1\.000,00/);
     await page.locator('#tab-accounts').click();
     await page.locator('#btn-next-month').click();
+    if (await page.locator('#btn-expand-card-card').getAttribute('aria-expanded') === 'false') await page.locator('#btn-expand-card-card').click();
     assert.match(await page.locator('.card-previous-balance').innerText(), /Setembro.*1\.000,00/s);
+    await page.locator('#btn-expand-card-card').click();
     await page.locator('#btn-toggle-card').click();
     assert.deepEqual((await read()).closedMonths, legacy.closedMonths);
     await page.locator('#btn-next-month').click();
+    await page.locator('#btn-expand-card-card').click();
     assert.equal(await page.locator('.card-previous-balance').count(), 0);
+    await page.locator('#btn-expand-card-card').click();
     report.flows.push('Legacy closure retains official paid total and historical prior-debt hint; next month consolidates and pays that debt without changing the old snapshot');
     assert.deepEqual(errors, []);
     fs.writeFileSync(path.join(output, 'accounts-validation.json'), JSON.stringify(report, null, 2));

@@ -17,12 +17,14 @@ import { ConfirmDialog } from '../components/ConfirmDialog';
 import { CardPurchaseModal } from '../components/CardPurchaseModal';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
 
-type StatusFilterType = 'all' | 'pendente' | 'pago';
+type StatusFilterType = 'all' | 'pendente' | 'pago' | 'parcial';
+type SortOrder = 'default' | 'highest' | 'lowest' | 'category' | 'name';
 type AccountTypeFilter = 'all' | 'simple' | 'recurring' | 'installment' | 'credit_card';
 
 export const AccountsPage: React.FC = () => {
   const {
     currentMonth,
+    categories,
     monthlyAccounts,
     financialSummary,
     toggleAccountStatus,
@@ -37,7 +39,10 @@ export const AccountsPage: React.FC = () => {
   // Bloco 2 - Filtro de Tipo de Conta
   const [typeFilter, setTypeFilter] = useState<AccountTypeFilter>('all');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
-  const activeFilters = Number(statusFilter !== 'all') + Number(typeFilter !== 'all');
+  const [categoryFilter, setCategoryFilter] = useState('all');
+  const [sortOrder, setSortOrder] = useState<SortOrder>('default');
+  const activeFilters = Number(statusFilter !== 'all') + Number(typeFilter !== 'all') + Number(categoryFilter !== 'all');
+  const hasConfiguration = activeFilters > 0 || sortOrder !== 'default';
 
   // Modal para adicionar ou editar compra interna no cartão
   const [cardPurchaseModalCardId, setCardPurchaseModalCardId] = useState<string | null>(null);
@@ -61,13 +66,23 @@ export const AccountsPage: React.FC = () => {
       if ((statusFilter === 'pago' && acc.status !== 'pago') || (statusFilter === 'pendente' && acc.status === 'pago')) {
         return false;
       }
+      if (statusFilter === 'parcial' && acc.status !== 'parcial') return false;
+      if (categoryFilter !== 'all' && acc.categoryId !== categoryFilter) return false;
       // Bloco 2: Tipo de Conta
       if (typeFilter !== 'all' && acc.type !== typeFilter) {
         return false;
       }
       return true;
-    }).sort((a, b) => Number(a.status === 'pago') - Number(b.status === 'pago'));
-  }, [monthlyAccounts, statusFilter, typeFilter]);
+    }).sort((a, b) => Number(a.status === 'pago') - Number(b.status === 'pago')).sort((a, b) => {
+      switch (sortOrder) {
+        case 'highest': return b.amount - a.amount;
+        case 'lowest': return a.amount - b.amount;
+        case 'category': return (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'pt-BR');
+        case 'name': return a.name.localeCompare(b.name, 'pt-BR');
+        default: return 0;
+      }
+    });
+  }, [monthlyAccounts, statusFilter, typeFilter, categoryFilter, sortOrder]);
 
   // Contadores para o resumo e badges
   const paidCount = monthlyAccounts.filter((a) => a.status === 'pago').length;
@@ -123,6 +138,7 @@ export const AccountsPage: React.FC = () => {
         <span aria-live="polite" aria-atomic="true" className="accounts-result-count">{filteredAccounts.length} {filteredAccounts.length === 1 ? 'conta' : 'contas'}</span>
         <button id="toggle-account-filters" type="button" aria-expanded={filtersExpanded} aria-controls="account-filters" onClick={() => setFiltersExpanded(value => !value)}>
           <SlidersHorizontal size={14} /> Filtrar{activeFilters > 0 && <span className="accounts-filter-indicator">· {activeFilters}</span>}
+          {sortOrder !== 'default' && <span className="accounts-filter-indicator" title="Ordenação personalizada ativa" aria-label="Ordenação personalizada ativa">↕</span>}
           {filtersExpanded ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
         </button>
       </div>
@@ -176,6 +192,7 @@ export const AccountsPage: React.FC = () => {
               <CheckCircle2 className="w-3 h-3" />
               Pagas ({paidCount})
             </button>
+            <button id="filter-status-partial" type="button" aria-pressed={statusFilter === 'parcial'} onClick={() => setStatusFilter('parcial')} className={`px-3 py-1 rounded-xl text-xs font-semibold ${statusFilter === 'parcial' ? 'bg-amber-700 text-white' : 'bg-amber-50 text-amber-900 border border-amber-200/80'}`}>Parciais ({monthlyAccounts.filter(a => a.status === 'parcial').length})</button>
           </div>
         </div>
 
@@ -260,10 +277,27 @@ export const AccountsPage: React.FC = () => {
             </button>
           </div>
         </div>
-        {activeFilters > 0 && <button type="button" className="accounts-clear-filters" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); }}>Limpar filtros</button>}
+        <div className="accounts-filter-group">
+          <label htmlFor="filter-category">Categoria</label>
+          <select id="filter-category" value={categoryFilter} onChange={event => setCategoryFilter(event.target.value)}>
+            <option value="all">Todas as categorias</option>
+            {categories.map(category => <option key={category.id} value={category.id}>{category.name}</option>)}
+          </select>
+        </div>
+        <div className="accounts-filter-group">
+          <label htmlFor="account-sort">Organizar por</label>
+          <select id="account-sort" value={sortOrder} onChange={event => setSortOrder(event.target.value as SortOrder)}>
+            <option value="default">Padrão</option>
+            <option value="highest">Maior valor</option>
+            <option value="lowest">Menor valor</option>
+            <option value="category">Categoria</option>
+            <option value="name">Nome A–Z</option>
+          </select>
+        </div>
+        {hasConfiguration && <button type="button" className="accounts-clear-filters" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setCategoryFilter('all'); setSortOrder('default'); }}>Limpar filtros</button>}
       </div>
 
-      {/* Grid of Accounts (approximately 3 cards per row on desktop, independent height) */}
+      {/* Grid of Accounts (up to 4 cards per row according to available width, independent height) */}
       {filteredAccounts.length === 0 ? (
         <div className="py-14 text-center bg-white border border-stone-200 rounded-xl p-8 shadow-xs">
           <div className="w-12 h-12 rounded-full bg-stone-100 text-stone-400 mx-auto flex items-center justify-center mb-3">
@@ -273,7 +307,7 @@ export const AccountsPage: React.FC = () => {
             Nenhuma conta encontrada
           </h3>
           <p className="text-sm text-stone-500 mt-1 max-w-md mx-auto">
-            Não há contas correspondentes aos filtros selecionados para este mês. Tente alternar os filtros de status ou tipo.
+            Não há contas correspondentes aos filtros selecionados para este mês. Tente alternar os filtros de status, tipo ou categoria.
           </p>
         </div>
       ) : (

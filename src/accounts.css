@@ -12,10 +12,10 @@
 .accounts-total { background: var(--color-info-soft); color: var(--color-info); }
 .accounts-pending { background: var(--color-expense-soft); color: var(--color-expense); }
 .accounts-paid { background: var(--color-success-soft); color: var(--color-success); }
-.accounts-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 10px 12px; background: white; border: 1px solid var(--color-line); border-radius: 14px; }
+.accounts-filters { display: flex; flex-wrap: wrap; align-items: center; gap: 10px 22px; padding: 10px; background: white; border: 1px solid var(--color-line); border-radius: 14px; }
 .accounts-filter-group { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .accounts-filter-group button { padding: 5px 9px; }
-.accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; align-items: start; }
+.accounts-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; align-items: start; }
 .accounts-grid .account-tile > div:last-child { flex-wrap: wrap; }
 .accounts-filters[hidden] { display: none; }
 .accounts-list-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--color-stone-600); }
@@ -23,11 +23,10 @@
 .accounts-list-toolbar button:hover { background: var(--color-surface-muted); }
 .accounts-filter-indicator { color: var(--color-brand-strong); font-weight: 650; }
 .accounts-clear-filters { margin-left: auto; color: var(--color-brand-strong); font-size: 12px; cursor: pointer; }
-.account-body { padding: 10px 12px; }
+.account-body { padding: 10px; }
 .account-header { margin-bottom: 4px; }
-.account-header .w-8 { width: 26px; height: 26px; }
-.account-name { white-space: normal; overflow-wrap: anywhere; }
-.account-footer { padding: 4px 12px; }
+.account-name { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.account-footer { padding: 4px 8px; }
 .account-footer button, .account-footer summary { min-height: 28px; min-width: 28px; }
 .account-footer > div:last-child { flex-shrink: 0; }
 .account-body > .mt-1\.5 { margin-top: 4px; }
@@ -54,3 +53,22 @@
   .accounts-page { padding-inline: 16px; }
   .accounts-grid, .accounts-summary { grid-template-columns: 1fr; }
 }
+
+/* Four columns only when the content area can provide at least 275px per tile. */
+.accounts-page { container-type: inline-size; }
+@container (min-width: 1130px) {
+  .accounts-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
+.accounts-grid .account-tile { min-width: 0; }
+.account-header > div:first-child { flex-wrap: nowrap; min-width: 0; gap: 4px; }
+.account-header > div:first-child > span { flex-shrink: 0; }
+.account-header > div:first-child > span.category-chip { flex-shrink: 1; min-width: 0; }
+.account-header .w-8 { width: 22px; height: 22px; }
+.account-footer { gap: 4px; }
+.account-footer button { padding-inline: 6px; }
+.account-footer svg { flex-shrink: 0; }
+.card-payment-summary { gap: 2px 6px; }
+.card-payment-summary > span + span::before { content: '· '; }
+.card-purchases-heading { flex-wrap: wrap; gap: 6px; }
+.accounts-filter-group label { font-size: 11px; font-weight: 650; color: var(--color-stone-600); }
+.accounts-filter-group select { max-width: 220px; padding: 5px 8px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 12px; background: var(--color-surface-soft); }

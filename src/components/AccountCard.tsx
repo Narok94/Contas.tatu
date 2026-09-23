@@ -79,6 +79,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
 
             {account.category && (
               <span
+                title={account.category.name}
                 className="category-chip inline-flex items-center gap-1 text-[11px] font-medium px-1.5 py-0.5 rounded-md truncate max-w-[120px]"
                 style={{
                   '--category-color': categoryDisplayColor(account.category.color),

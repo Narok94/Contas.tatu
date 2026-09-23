@@ -107,11 +107,6 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
 
         <div className="card-invoice-values">
           <strong className="card-invoice-total">{formatBRL(account.amount)}</strong>
-          <span className="card-invoice-caption">Total da fatura</span>
-          {hasPreviousPending && <div className="card-invoice-breakdown">
-            <div><span>Compras do mês</span><span>{formatBRL(currentMonthAmount)}</span></div>
-            <div className="card-previous-balance"><span>Saldo anterior · {formatMonthYear(previousPendingInvoices[0].month).split(' ')[0]}</span><span>{formatBRL(previousPendingAmount)}</span></div>
-          </div>}
           {account.status === 'parcial' && <div className="card-payment-summary">
             <span>Pago <b>{formatBRL(cardInfo?.paidAmount ?? 0)}</b></span>
             <span>Restante <b>{formatBRL(totalOpenAmount)}</b></span>
@@ -129,8 +124,8 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
         >
           <span>
             {isExpanded
-              ? 'Ocultar detalhes da fatura'
-              : `Ver compras (${items.length})`}
+              ? 'Ocultar detalhes'
+              : 'Ver detalhes'}
           </span>
           {isExpanded ? (
             <ChevronUp className="w-3.5 h-3.5 text-stone-500" />
@@ -143,9 +138,16 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
       {/* Compras que compõem a fatura do mês */}
       {isExpanded && (
         <div id={`card-items-${account.id}`} className="border-t border-line bg-surface-soft/50 p-3 space-y-3 animate-in slide-in-from-top-1 duration-150">
+          <div className="card-invoice-breakdown" aria-label="Detalhes financeiros da fatura">
+            <div><span>Total da fatura</span><b>{formatBRL(account.amount)}</b></div>
+            <div><span>Compras do mês</span><span>{formatBRL(currentMonthAmount)}</span></div>
+            {hasPreviousPending && <div className="card-previous-balance"><span>Saldo anterior{previousPendingInvoices[0] && ` · ${formatMonthYear(previousPendingInvoices[0].month).split(' ')[0]}`}</span><span>{formatBRL(previousPendingAmount)}</span></div>}
+            <div><span>Pago</span><span>{formatBRL(cardInfo?.paidAmount ?? (isPaid ? account.amount : 0))}</span></div>
+            <div><span>Restante</span><span>{formatBRL(totalOpenAmount)}</span></div>
+          </div>
           {/* Seção 1: Compras do Mês */}
           <div>
-            <div className="flex items-center justify-between mb-2">
+            <div className="card-purchases-heading flex items-center justify-between mb-2">
               <span className="text-[11px] font-semibold text-stone-600 uppercase tracking-wider">
                 Compras do Mês ({formatBRL(currentMonthAmount)})
               </span>
