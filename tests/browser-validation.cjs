@@ -38,6 +38,15 @@ const key = 'organizacao_financeira_store_v1';
         for (const element of ['sidebar', 'header', 'month', 'create']) assert.deepEqual(metrics[element], baseline[element], `shell moved at ${width}: ${tab}/${element}`);
         assert.equal(metrics.overflowX, false);
         if (tab === 'dashboard') assert.ok(metrics.scrollHeight <= height, `Dashboard scroll at ${width}: ${metrics.scrollHeight}`);
+        if (tab === 'dashboard') {
+          const panels = await page.locator('.desk-workspace > .desk-panel').evaluateAll(elements => elements.map(e => {
+            const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, overflow: e.scrollHeight > e.clientHeight + 1 };
+          }));
+          assert.ok(Math.abs(panels[0].top - panels[1].top) < 1);
+          assert.ok(Math.abs(panels[0].bottom - panels[1].bottom) < 1);
+          assert.ok(panels.every(p => !p.overflow));
+          metrics.panels = panels;
+        }
         await page.screenshot({ path: path.join(output, `${tab}-${width}x${height}.png`), fullPage: true });
         report.viewports.push({ width, height, tab, ...metrics });
         if (tab === 'history') {
@@ -68,6 +77,23 @@ const key = 'organizacao_financeira_store_v1';
         }
       }
     }
+    const initialStore = JSON.parse(await read());
+    const single = { ...initialStore, simpleAccounts: [{ id: 'single', name: 'Conta em aberto', value: 180, month: '2026-09', status: 'pendente', createdAt: '' }], recurringDefinitions: [], recurringMonthlyRecords: [], installmentPurchases: [], creditCards: [], cardExpenses: [], cardMonthlyInvoices: [], closedMonths: {} };
+    await page.evaluate(({ key, single }) => localStorage.setItem(key, JSON.stringify(single)), { key, single });
+    await page.reload();
+    for (const [width, height] of [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]]) {
+      await page.setViewportSize({ width, height });
+      await page.locator('#tab-dashboard').click();
+      assert.equal(await page.locator('.desk-account-row').count(), 1);
+      const left = await page.locator('.desk-open').boundingBox();
+      const right = await page.locator('.desk-progress').boundingBox();
+      assert.ok(Math.abs(left.y - right.y) < 1);
+      assert.ok(Math.abs(left.height - right.height) < 1);
+      assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
+      await page.screenshot({ path: path.join(output, `dashboard-single-${width}x${height}.png`), fullPage: true });
+    }
+    await page.evaluate(({ key, initialStore }) => localStorage.setItem(key, JSON.stringify(initialStore)), { key, initialStore });
+    await page.reload();
     report.flows.push('Shared shell stable across all three pages and four viewports; Dashboard without vertical scroll');
     await page.setViewportSize({ width: 1440, height: 900 });
     // Exact scenario supplied by the user, resolved through the real UI.

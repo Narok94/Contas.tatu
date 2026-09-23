@@ -43,7 +43,7 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
       collisions,
       clipped: [...document.querySelectorAll('.account-name, .card-purchase-name, .card-invoice-total, .account-footer button, .accounts-filter-group button')]
         .filter(e => !(e.matches('.account-name') && e.title === e.textContent.trim()) && e.getBoundingClientRect().width > 0 && (e.scrollWidth > e.clientWidth + 1 || e.scrollHeight > e.clientHeight + 1)).map(e => e.textContent),
-      cards: cards.map(e => ({ id: e.id, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width })) };
+      cards: cards.map(e => ({ id: e.id, top: e.getBoundingClientRect().top, bottom: e.getBoundingClientRect().bottom, footerTop: e.querySelector('.account-footer').getBoundingClientRect().top, height: e.getBoundingClientRect().height, width: e.getBoundingClientRect().width })) };
   });
   const checkGeometry = metrics => {
     assert.equal(metrics.overflow, false); assert.equal(metrics.columns, metrics.viewport >= 1440 ? 4 : 3);
@@ -67,6 +67,23 @@ const sizes = [[1280, 720], [1366, 768], [1440, 900], [1920, 1080]];
       assert.equal(await page.locator('.accounts-summary small').count(), 0);
       assert.equal(await page.locator('.accounts-result-count').count(), 1);
       const metrics = await geometry(); checkGeometry(metrics);
+      for (let i = 0; i < metrics.cards.length; i += metrics.columns) {
+        const row = metrics.cards.slice(i, i + metrics.columns);
+        for (const card of row) {
+          assert.ok(Math.abs(card.top - row[0].top) < 1);
+          assert.ok(Math.abs(card.bottom - row[0].bottom) < 1, 'row bases must align');
+          assert.ok(Math.abs(card.footerTop - row[0].footerTop) < 1, 'row footers must align');
+          assert.ok(card.height <= 183, 'closed sample cards must remain compact');
+        }
+      }
+      await page.getByRole('button', { name: 'Ver detalhes', exact: true }).click();
+      const expanded = await geometry(); checkGeometry(expanded);
+      for (const card of expanded.cards.filter(c => c.id.startsWith('account-card'))) {
+        assert.ok(card.height <= metrics.cards.find(c => c.id === card.id).height + 1, 'expansion must not enlarge other cards');
+      }
+      await page.screenshot({ path: path.join(output, `aligned-expanded-${width}x${height}.png`), fullPage: true });
+      await page.getByRole('button', { name: 'Ocultar detalhes', exact: true }).click();
+      assert.deepEqual((await geometry()).cards, metrics.cards);
       assert.ok(metrics.cards.find(c => c.id.startsWith('credit-card')).height <= Math.max(...metrics.cards.filter(c => c.id.startsWith('account-card')).map(c => c.height)) + 20);
       assert.doesNotMatch(await page.locator('[id^=credit-card-]').innerText(), /Saldo anterior|Compras do mês|Restante|Pago R\$/);
       assert.equal(await page.getByRole('button', { name: 'Ver detalhes', exact: true }).count(), 1);

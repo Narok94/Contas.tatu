@@ -70,7 +70,7 @@
 .desk-empty p { font-size: 12px; }
 @media (min-width: 1024px) {
   .desk-metrics { grid-template-columns: repeat(4, minmax(0, 1fr)); }
-  .desk-workspace { width: 100%; max-width: 1000px; margin-inline: auto; grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); align-self: start; align-items: start; }
+  .desk-workspace { width: 100%; max-width: 1000px; margin-inline: auto; grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); align-self: start; align-items: stretch; }
   .desk-panel { padding: clamp(14px, 2dvh, 18px); }
   .desktop-dashboard { grid-template-rows: auto auto minmax(min-content, 1fr); }
 }
