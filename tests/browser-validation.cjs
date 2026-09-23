@@ -40,11 +40,14 @@ const key = 'organizacao_financeira_store_v1';
         if (tab === 'dashboard') assert.ok(metrics.scrollHeight <= height, `Dashboard scroll at ${width}: ${metrics.scrollHeight}`);
         if (tab === 'dashboard') {
           const panels = await page.locator('.desk-workspace > .desk-panel').evaluateAll(elements => elements.map(e => {
-            const r = e.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, overflow: e.scrollHeight > e.clientHeight + 1 };
+            const r = e.getBoundingClientRect(); return { left: r.left, right: r.right, top: r.top, bottom: r.bottom, overflow: e.scrollHeight > e.clientHeight + 1 };
           }));
           assert.ok(Math.abs(panels[0].top - panels[1].top) < 1);
           assert.ok(Math.abs(panels[0].bottom - panels[1].bottom) < 1);
           assert.ok(panels.every(p => !p.overflow));
+          const summary = await page.locator('.desk-metrics').boundingBox();
+          assert.ok(Math.abs(panels[0].left - summary.x) < 1, 'open accounts must align with Total do mês');
+          assert.ok(Math.abs(panels[1].right - (summary.x + summary.width)) < 1, 'lower section must use the same available width');
           metrics.panels = panels;
         }
         await page.screenshot({ path: path.join(output, `${tab}-${width}x${height}.png`), fullPage: true });
@@ -87,6 +90,9 @@ const key = 'organizacao_financeira_store_v1';
       assert.equal(await page.locator('.desk-account-row').count(), 1);
       const left = await page.locator('.desk-open').boundingBox();
       const right = await page.locator('.desk-progress').boundingBox();
+      const summary = await page.locator('.desk-metrics').boundingBox();
+      assert.ok(Math.abs(left.x - summary.x) < 1);
+      assert.ok(Math.abs(right.x + right.width - summary.x - summary.width) < 1);
       assert.ok(Math.abs(left.y - right.y) < 1);
       assert.ok(Math.abs(left.height - right.height) < 1);
       assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
