@@ -295,6 +295,11 @@ CREATE TABLE finance_v2.installment_month_snapshots (
     CHECK (current_installment BETWEEN 1 AND total_installments),
     CHECK (remaining_installments = total_installments - current_installment),
     CHECK (end_month >= month),
+    CHECK (
+        (EXTRACT(YEAR FROM end_month) - EXTRACT(YEAR FROM month)) * 12
+        + EXTRACT(MONTH FROM end_month) - EXTRACT(MONTH FROM month)
+        = remaining_installments
+    ),
     CHECK (schema_version IN (1, 2)),
     CHECK (card_assignment_known OR card_id_snapshot IS NULL),
     CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND captured_at IS NOT NULL))
@@ -351,7 +356,9 @@ CREATE TABLE finance_v2.card_monthly_invoices (
     FOREIGN KEY (household_id, card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT,
     UNIQUE (household_id, card_id, month),
     CHECK (paid_amount IS NULL OR recorded_status <> 'pendente' OR paid_amount = 0),
-    CHECK (paid_amount IS NULL OR recorded_status <> 'parcial' OR paid_amount > 0)
+    CHECK (paid_amount IS NULL OR recorded_status <> 'parcial' OR paid_amount > 0),
+    -- Unknown legacy payment is preserved; explicit zero cannot carry a payment time.
+    CHECK (paid_amount IS NULL OR paid_amount > 0 OR paid_at IS NULL)
 );
 
 -- NULL current_closure_id means open. Closure pointer FK is added after both tables exist.
