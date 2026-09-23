@@ -1,9 +1,15 @@
-# Projeto do banco finance_v2 — etapa 1
+# Projeto do banco finance_v2 — etapa 2
 
-Status: proposta para revisão, sem integração ou execução de SQL. Análise em
-23/09/2026 sobre o código da revisão `e0c261b`. O comportamento do domínio atual
-é a referência de compatibilidade. Todas as tabelas aqui propostas pertencem
-exclusivamente a `finance_v2`. Não há dependência de tabelas de `public`.
+**DRAFT ONLY — DO NOT EXECUTE WITHOUT REVIEW.** Proposta revisada sobre
+`1d7a038236825c6fff6b9d6d7b7db750b1d88cbf`, em 23/09/2026, branch main.
+O SQL correspondente é [001_finance_v2_draft.sql](../database/migrations/001_finance_v2_draft.sql).
+Nenhum banco foi acessado; nenhum SQL foi executado, sequer localmente.
+
+O draft contém **17 tabelas, 4 domains, 6 índices adicionais, 1 função de proteção
+e 4 triggers de imutabilidade**, todos em finance_v2. A única instrução ALTER
+completa a FK circular entre duas tabelas novas do próprio schema. Não há role,
+GRANT, seed, driver, conexão, API financeira ou execução automática de migration.
+O arquivo falha se o schema já existir; não usa IF NOT EXISTS para ocultar divergências.
 
 ## 1. Diagnóstico e fontes analisadas
 
@@ -42,323 +48,606 @@ Fontes do levantamento:
 - `server/neon.ts`, `api/health.ts` (único arquivo de API), `README.md`,
   `package.json` e `vite.config.ts`: fronteira backend e comandos de validação.
 
-O arquivo previamente não rastreado `HISTORY-SIMPLIFICATION-REVIEW.md` não faz
-parte desta entrega e não foi alterado nem incluído no commit.
 
-## 2. Mapa completo FinanceDataStore → banco
+## 2. Revisão da Etapa 2
 
-| Estrutura atual | Destino proposto | Transformação |
+Nenhuma tabela removida ou combinada: as 17 foram reavaliadas abaixo. O ganho de
+simplicidade está em não materializar projeções, saldos ou parcelas futuras e em
+não acrescentar um ledger de pagamentos fictícios. Cada tabela mantém uma
+responsabilidade e um ciclo de vida verificável.
+
+| Tabela mantida | Fonte de verdade / natureza | Por que manter separada; redundância e risco |
 | --- | --- | --- |
-| categories | categories | Cadastro por household; categoria ausente continua opcional |
-| creditCards | credit_cards | Cadastro agregador, sem vencimento |
-| simpleAccounts | simple_accounts | Uma ocorrência no mês; valor e estado persistidos |
-| recurringDefinitions | recurring_definitions | Definição global, início e atividade |
-| recurringMonthlyRecords | recurring_monthly_records | Uma linha por definição/mês; ausência gera zero virtual |
-| installmentPurchases | installment_purchases | Configuração vigente e identidade da compra |
-| installmentPurchases.statusByMonth | installment_month_states | Estado mensal avulso, ausência equivale a pendente |
-| installmentPurchases.paymentAmountsByMonth | installment_month_states.amount_override | Valor mensal corrigido, inclusive após reversão |
-| installmentPurchases.monthlySnapshots | installment_month_snapshots | Uma ocorrência congelada anterior à edição |
-| cardExpenses | card_expenses | Compra interna vinculada ao cartão e ao mês |
-| cardMonthlyInvoices | card_monthly_invoices | Total pago acumulado e intenção/estado registrado; não o total calculado da fatura |
-| closedMonths | financial_months.current_closure_id → month_closures | Ponteiro para fechamento oficial vigente |
-| closedMonthHistory | month_closures + month_reopenings | Revisões anteriores preservadas e evento de arquivamento |
+| households | Identidade do núcleo e revisão de concorrência | Dados pertencem ao núcleo, não a um usuário; revision não é saldo |
+| app_users | Identidade externa do usuário | Não confundir pessoa com núcleo ou criar login nesta etapa |
+| household_memberships | Relação N:N e papel | Permissão varia por núcleo; não duplicar usuários por família |
+| categories | Nome, cor, descrição | Referência opcional; snapshots congelam metadados antigos intencionalmente |
+| credit_cards | Identidade do agregador | Saldo e total não são atributos do cartão |
+| simple_accounts | Ocorrência, valor e estado do mês | Uma linha por conta, sem tabela de pagamento redundante |
+| recurring_definitions | Identidade, início, atividade e metadados | Misturar valor aqui copiaria indevidamente o mês anterior |
+| recurring_monthly_records | Valor informado e estado de uma ocorrência | Independência mensal; ausência é zero virtual, não nova linha automática |
+| installment_purchases | Configuração vigente | Não persistir calendário futuro inteiro nem mês final calculável |
+| installment_month_states | Estado e override mensal | Combina os dois maps atuais; não combinar com snapshot imutável |
+| installment_month_snapshots | Fato histórico esparso congelado | Separado de pagamentos reversíveis; duplicação histórica deliberada |
+| card_expenses | Componentes da fatura | Sem estado pago próprio; somá-los ao pago da fatura duplicaria despesa |
+| card_monthly_invoices | Total pago acumulado e estado registrado | Não é total da fatura nem lista de parcelas de pagamento |
+| financial_months | Ponteiro para fechamento oficial vigente | Permite mês reaberto sem apagar fechamento; MAX(revision) não substitui ponteiro |
+| month_closures | Snapshot integral e versão | Não combinar com ponteiro mutável; não recalcular histórico |
+| month_reopenings | Evento imutável de arquivamento | Evita editar o fechamento para marcar reabertura; tempo legado pode ser desconhecido |
+| import_batches | Recibo imutável, evidência e backup lógico do lote | Idempotência e rastreabilidade; payload não é outra fonte operacional |
 
-Novas entidades de infraestrutura: `households`, `app_users`,
-`household_memberships`, `financial_months` e `import_batches`. Não há uma tabela
-global de contas polimórficas nem ledger de pagamentos individuais: o produto
-atual registra estados e totais mensais, não transações bancárias individuais.
+Mudanças relevantes em relação à Etapa 1:
 
-## 3. Diagrama textual de relações
+- IDs próprios passam de text para **uuid nativo**, com mapeamento tipado por
+  tabela através de source_import_id + legacy_id. Não é necessária tabela
+  polimórfica de mapeamento; cada FK aponta a uma entidade real.
+- Oito tabelas operacionais ganham archived_at. A exclusão lógica reproduz a
+  retirada dos arrays sem apagar dados históricos. Não é cancelamento prospectivo:
+  não inventa um mês final e não passa a manter a conta na projeção antiga aberta.
+- sort_order nessas oito tabelas preserva a ordem dos arrays, inclusive prepend
+  de simples e append de registros mensais atualizados. UUID não define ordem.
+- Domains centralizam CHECKs de mês, valores e status; requiredness continua na
+  coluna. Não há enum PostgreSQL de status.
+- O lote registra hash bruto, hash canônico e classificação/evidências de origem.
+  Distinguir demo de dado real exige análise e decisão explícita.
+- closed_at fica nullable somente para fechamento importado com data inválida ou
+  desconhecida; texto original permanece no payload. Novos fechamentos exigem
+  data. captured_at e reopened_at também não recebem datas históricas inventadas.
+- Proteção append-only agora consta como função/triggers no arquivo draft,
+  inclusive para TRUNCATE. Não foi instalada em banco algum.
+- Estados impossíveis locais de fatura explícita são restringidos, mantendo NULL
+  legado e sem CHECK contra total derivado de outras linhas.
+- Não foram adicionadas tabelas de saldo, resumo mensal, visão unificada,
+  transações bancárias ou versões completas de configuração.
+
+## 3. Matriz de mapeamento e relações
+
+| FinanceDataStore atual | Tabela(s) finance_v2 | Natureza | Observações de migração |
+| --- | --- | --- | --- |
+| categories | categories | Persistido | UUID novo, legacy_id, ordem e metadados preservados |
+| creditCards | credit_cards | Persistido | Agregador; não importar saldo como coluna |
+| simpleAccounts | simple_accounts | Persistido | value → amount; mês, categoria opcional e status |
+| recurringDefinitions | recurring_definitions | Persistido | Sem valor padrão mensal |
+| recurringMonthlyRecords | recurring_monthly_records | Persistido | UNIQUE definição/mês; ausente continua virtual zero |
+| installmentPurchases | installment_purchases | Persistido | Configuração vigente, início, vigência e base |
+| installmentPurchases.statusByMonth / paymentAmountsByMonth | installment_month_states | Persistido | União das chaves dos maps; NULL preserva ausência individual |
+| installmentPurchases.monthlySnapshots | installment_month_snapshots | Snapshot | Esparsos; não gerar meses futuros ou preencher histórico desconhecido |
+| cardExpenses | card_expenses | Persistido | Compra interna sem pagamento próprio |
+| cardMonthlyInvoices | card_monthly_invoices | Persistido | status → recorded_status; NULL paid_amount mantém inferência legada |
+| closedMonths | financial_months + month_closures | Ponteiro + snapshot | Fechamento vigente; payload original e IDs embutidos não reescritos |
+| closedMonthHistory | month_closures + month_reopenings | Snapshot + evento | Ordem do array vira revision; reabertura legada sem instante conhecido |
+| UnifiedMonthlyAccount | Nenhuma tabela operacional | Derivado / snapshot no fechamento | Contas e itens internos são congelados em payload.accounts |
+| MonthFinancialSummary | Nenhuma tabela operacional | Derivado / snapshot no fechamento | Resumo integral em payload.summary; anual soma somente vigente/aberto |
 
 ```text
 app_users 1 ── N household_memberships N ── 1 households
-households 1 ── N [todas as entidades financeiras abaixo]
+households 1 ── N entidades financeiras e import_batches
 categories 1 ── N simple_accounts / recurring_definitions /
-                  installment_purchases / card_expenses (vínculos opcionais)
-recurring_definitions 1 ── N recurring_monthly_records
+                  installment_purchases / card_expenses (FKs opcionais)
 credit_cards 1 ── N card_expenses / card_monthly_invoices
-credit_cards 1 ── N installment_purchases (opcional: ausência = avulso)
-installment_purchases 1 ── N installment_month_states
-installment_purchases 1 ── N installment_month_snapshots
+credit_cards 1 ── N installment_purchases (opcional; NULL = avulso)
+recurring_definitions 1 ── N recurring_monthly_records
+installment_purchases 1 ── N installment_month_states / installment_month_snapshots
 financial_months 1 ── N month_closures
-financial_months 0..1 ── 1 month_closures (current_closure_id, mesmo mês)
+financial_months ── aponta para zero ou um month_closures do mesmo núcleo/mês
 month_closures 1 ── 0..1 month_reopenings
-households 1 ── N import_batches
+import_batches 1 ── N entidades importadas / month_closures
+app_users 1 ── N autoria opcional de importações, fechamentos e reaberturas
 ```
 
-Snapshots contêm identificadores históricos descritivos, sem FK para cadastros
-vivos. Assim, excluir/renomear um cadastro não destrói a representação fechada.
+Todas as FKs financeiras incluem household_id. Referências de autoria apontam à
+identidade global de usuário; associação ao núcleo no instante do comando deve
+ser validada pelo serviço. Remover membership não apaga autoria. Identificadores
+embutidos em snapshots não são FKs para cadastros vivos.
 
-## 4. Convenções, dinheiro e tipos
+## 4. IDs, meses, dinheiro, status e convenções
 
-Todos os nomes de objetos deverão ser qualificados por `finance_v2`; não usar
-`search_path` para escolher silenciosamente outro schema. Nenhuma tabela, função,
-sequência ou FK deste projeto aponta para `public.Contas`, `public.Controle_Contas`
-ou qualquer outra estrutura legada.
+**Identidade:** servidor/importador futuro gera UUID v4 e envia ao PostgreSQL;
+nenhum DEFAULT de geração, extensão ou sequência é necessário. PKs das entidades
+financeiras incluem household_id para isolamento estrutural. Estados/snapshots
+de parcela e memberships usam chaves naturais compostas; fechamentos usam
+(household_id, month, id) para permitir FK do ponteiro no mesmo mês. Não acrescentar
+UUID artificial a uma ocorrência já identificada por compra/mês.
 
-As listas de campos da seção 5 são exaustivas juntamente com os conjuntos comuns
-abaixo. `?` significa NULL permitido; todos os demais campos são NOT NULL.
+Em cada uma das oito tabelas com ID no store, source_import_id e legacy_id são
+ambos NULL (novo cadastro) ou ambos preenchidos (importado).
+UNIQUE(household_id, source_import_id, legacy_id) define o mapeamento dentro da
+tabela e do lote. Exemplo: categories/cat_casa → UUID A, simpleAccounts/categoryId
+cat_casa → FK A. O mesmo texto pode existir em outra tabela ou em outro núcleo.
+Não usar hash do ID sozinho, nem presumir UUID nos IDs atuais.
 
-- **H**: `household_id uuid`, FK para households(id), exclusão RESTRICT.
-- **E**: H + `id text`, PK composta `(household_id, id)`. Preserva IDs atuais
-  (`cat_casa`, `inv_...`, etc.), evitando remapeamento dentro dos snapshots.
-  Novos IDs podem ser UUIDs serializados como texto, gerados pelo servidor futuro.
-- **T**: `created_at timestamptz`, `updated_at timestamptz`; padrão de inserção
-  no servidor, atualização explícita em cada comando. `createdAt` válido existente
-  é preservado, não substituído pela hora da importação. Campos novos recebem o
-  instante da importação. T não é um histórico de auditoria.
-- **M**: `date` limitado ao primeiro dia do mês, anos 0001–9999, com CHECK
-  equivalente a `extract(day from campo) = 1` e intervalo explícito de datas.
-  O adaptador transforma YYYY-MM em YYYY-MM-01 e vice-versa sem conversão de fuso.
-  Trata-se de competência, nunca vencimento. Nenhum `due_date` será introduzido.
-- **D**: `numeric(15,2)`, entre 0 e 9.999.999.999.999,99 e diferente de NaN.
-  CHECK de faixa finita em cada coluna; nullable permite apenas NULL ou valor
-  válido. Para ajuste legado assinado, faixa simétrica e exclusão explícita de NaN.
-- **S**: `text` com CHECK em `('pendente','parcial','pago')`. Para novos comandos
-  não cartão, aceitar apenas pendente/pago no serviço. Manter S na importação
-  permite preservar estados legados que a interface TypeScript admite.
+Importador monta todo o mapa antes de resolver FKs. Maps mensais referenciam o UUID
+da compra + mês; não possuem ID legado independente. Fechamentos são identificados
+pela chave do mês, origem vigente/histórico e índice da revisão no lote.
+Snapshots importados retêm IDs textuais originais; source_import_id do fechamento
+ou da compra permite resolver sua origem. Se o cadastro já foi excluído, não
+inventar uma linha: o identificador descritivo continua no payload/backup. Ao
+adaptar snapshots e cadastros juntos, usar namespaces de IDs por versão/lote ou
+traduzir apenas a cópia de leitura; nunca mutar a fonte congelada.
 
-NUMERIC/DECIMAL são exatos; PostgreSQL pode arredondar entradas com escala maior
-que a declarada. Por isso a futura API deve rejeitar mais de duas casas ANTES
-de converter/inserir e usar strings decimais ou aritmética de centavos; nunca
-`real`/`double precision` para dinheiro. A documentação oficial também descreve
-NaN e o comportamento de arredondamento. [Referência PostgreSQL](https://www.postgresql.org/docs/current/datatype-numeric.html).
+**Mês:** finance_v2.month_key é date com primeiro dia e intervalo
+0001-01-01 a 9999-12-01. Ano/mês inválido falha no tipo date; dia diferente de 1,
+infinity ou ano fora da faixa falha no CHECK. YYYY-MM ↔ YYYY-MM-01 sem fuso.
+Timestamp só representa instantes reais de gravação, pagamento ou fechamento.
+Não existe conceito de vencimento neste modelo.
 
-A precisão proposta comporta 13 dígitos inteiros e mantém cada valor em centavos
-abaixo de Number.MAX_SAFE_INTEGER. Somatórios também precisam de controle de
-limite antes de voltar a `number`; a precisão individual não garante a soma.
-Valores legados fora da faixa, negativos ou fracionados além dos centavos exigem
-revisão, nunca correção silenciosa. BRL é a única moeda desta etapa.
+**Dinheiro:** finance_v2.money_amount usa NUMERIC(15,2), faixa
+0..9.999.999.999.999,99 e rejeita NaN. signed_money_amount usa a faixa simétrica
+somente para manual_adjustment legado. Isso comporta 13 dígitos inteiros; cada
+valor em centavos fica abaixo do inteiro seguro JS, mas somas exigem limite próprio.
+API futura valida escala antes da conversão: NUMERIC(15,2) arredonda entradas
+com mais casas. Strings decimais/centavos devem evitar cálculos binários financeiros.
+Não redistribuir resíduos de parcelamento. [Tipos numéricos PostgreSQL](https://www.postgresql.org/docs/current/datatype-numeric.html).
 
-## 5. Tabelas e dicionário de campos
+**Status:** payment_status é text com CHECK de pendente/parcial/pago, mais simples
+de evoluir que enum. Os tipos atuais admitem parcial também fora de cartão;
+importação preserva esses legados e o serviço continua recusando NOVOS comandos
+parciais fora de cartão. Em fatura com paid_amount explícito, pendente exige zero
+e parcial exige positivo. Pago com zero é válido para quitação explícita de fatura
+zero. Não exigir status igual ao estado exibido, nem paid_amount <= total em CHECK:
+compras/edições posteriores podem alterar o total sem alterar pagamento registrado.
+
+**Conjuntos comuns do dicionário:** nenhum campo implícito além dos listados aqui.
+
+- **T**: created_at e updated_at, ambos timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP.
+  O serviço atualiza updated_at explicitamente; não há trigger automático para isso.
+  Datas createdAt válidas de origem são preservadas; datas ausentes/ inválidas são
+  reportadas e permanecem no backup, não confundidas com o instante da importação.
+- **E**: household_id uuid NOT NULL, id uuid NOT NULL, source_import_id uuid NULL,
+  legacy_id text NULL, sort_order bigint NOT NULL, archived_at timestamptz NULL,
+  mais T. PK(household_id,id), FK household RESTRICT, FK composta source_import_id
+  para import_batches RESTRICT, UNIQUE(household_id,source_import_id,legacy_id),
+  CHECK de nulidade conjunta e legacy_id não vazio quando presente.
+- sort_order aceita negativos para prepend; não é chave ou valor financeiro.
+  Importar índice do array; comandos posteriores reproduzem posição atual sob lock.
+  Ler ORDER BY sort_order,id. Empates são determinísticos; preservação exata da
+  ordem depende do serviço manter posições distintas. Não indexar ordenação pequena.
+- Domains permitem NULL; cada coluna obrigatória tem NOT NULL próprio.
+  Isso segue a recomendação de [CREATE DOMAIN](https://www.postgresql.org/docs/current/sql-createdomain.html).
+- Todas as FKs têm ON UPDATE RESTRICT e ON DELETE RESTRICT. Não há SET NULL
+  automático, CASCADE ou vínculo com tabela de public.
+
+## 5. Dicionário exato da proposta SQL
+
+As colunas E/T e respectivas constraints estão expandidas no SQL. Abaixo,
+NULL indica opcional; “—” em default significa que não há default. Os CHECKs
+dos domains da seção 4 aplicam-se a todas as colunas daquele tipo.
 
 ### 5.1 households
 
-`id uuid PK`, `name text`, T, `revision bigint DEFAULT 0 CHECK >= 0`.
-Nome não vazio. Revision é incrementada uma vez por comando financeiro confirmado
-e usada para detectar clientes desatualizados. Não existe household global fixo.
+Núcleo financeiro e revisão de concorrência. Inclui **T**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| id | uuid | Não | — |
+| name | text | Não | — |
+| revision | bigint | Não | `0` |
+
+Constraints:
+
+- `PRIMARY KEY (id)`
+- `CHECK (btrim(name) <> '')`
+- `CHECK (revision >= 0)`
 
 ### 5.2 app_users
 
-`id uuid PK`, `auth_issuer text`, `auth_subject text`, `display_name text?`, T.
-UNIQUE(auth_issuer, auth_subject), ambos não vazios. Identidade independente do
-provedor; nenhuma senha, sessão ou dependência de Clerk. Tabela pode permanecer
-vazia enquanto não existir autenticação; household não exige um usuário fictício.
+Identidade externa sem implementação de autenticação. Inclui **T**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| id | uuid | Não | — |
+| auth_issuer | text | Não | — |
+| auth_subject | text | Não | — |
+| display_name | text | Sim | — |
+
+Constraints:
+
+- `PRIMARY KEY (id)`
+- `UNIQUE (auth_issuer, auth_subject)`
+- `CHECK (btrim(auth_issuer) <> '')`
+- `CHECK (btrim(auth_subject) <> '')`
 
 ### 5.3 household_memberships
 
-H, `user_id uuid FK app_users(id)`, `role text`, T.
-PK(household_id, user_id), CHECK role IN ('owner','editor','viewer').
-Exclusão do usuário RESTRICT até remoção explícita de vínculos. A regra de manter
-pelo menos um owner quando o household tiver membros exige serviço transacional.
+Participação e papel por núcleo. Inclui **T**.
 
-### 5.4 categories
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| user_id | uuid | Não | — |
+| role | text | Não | — |
 
-E, `name text`, `color text`, `description text?`, T.
-Sem UNIQUE por nome: hoje categorias homônimas são possíveis. Nome não vazio;
-cor é metadado textual preservado, sem impor apenas a paleta atual.
+Constraints:
 
-### 5.5 credit_cards
+- `PRIMARY KEY (household_id, user_id)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (user_id) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (role IN ('owner', 'editor', 'viewer'))`
 
-E, `name text`, `brand text?`, `color text?`, T. Nome não vazio.
-Nenhum saldo, limite, fechamento bancário ou vencimento no cadastro.
-Todos os cartões existentes aparecem na projeção de cada mês, inclusive sem
-compras: `created_at` não é um filtro de vigência no domínio atual.
+### 5.4 import_batches
 
-### 5.6 simple_accounts
+Recibo de importação concluída; imutável.
 
-E, `name text`, `amount D`, `month M`, `category_id text?`, `status S`,
-`notes text?`, T. Nome não vazio; status padrão pendente.
-FK(household_id, category_id) → categories. `value` torna-se `amount`.
-Não adicionar `paid_amount`: o valor pago de uma simples paga é o próprio amount.
-Corrigir ao pagar substitui esse valor; não existe valor original separado hoje.
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| id | uuid | Não | — |
+| source_key | text | Não | `'organizacao_financeira_store_v1'` |
+| source_sha256 | text | Não | — |
+| canonical_sha256 | text | Não | — |
+| source_payload | jsonb | Não | — |
+| source_classification | text | Não | — |
+| classification_evidence | jsonb | Não | — |
+| imported_by | uuid | Sim | — |
+| imported_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
+| importer_version | text | Não | — |
 
-### 5.7 recurring_definitions
+Constraints:
 
-E, `name text`, `category_id text?`, `start_month M`,
-`is_active boolean DEFAULT true`, `notes text?`, T.
-FK composta para categories. Nome não vazio. Não existe valor padrão mensal.
-Alterações de nome/categoria/atividade afetam projeções abertas; snapshots de
-meses fechados têm precedência. Inativar hoje não possui mês final de vigência.
+- `PRIMARY KEY (household_id, id)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (imported_by) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `UNIQUE (household_id, source_sha256)`
+- `UNIQUE (household_id, canonical_sha256)`
+- `CHECK (source_key = 'organizacao_financeira_store_v1')`
+- `CHECK (source_sha256 ~ '^[0-9a-f]{64}$')`
+- `CHECK (canonical_sha256 ~ '^[0-9a-f]{64}$')`
+- `CHECK (jsonb_typeof(source_payload) = 'object')`
+- `CHECK (jsonb_typeof(classification_evidence) = 'object')`
+- `CHECK (source_classification IN ('empty', 'demo_match', 'user_confirmed', 'modified_demo', 'unknown'))`
+- `CHECK (btrim(importer_version) <> '')`
 
-### 5.8 recurring_monthly_records
+### 5.5 categories
 
-E, `definition_id text`, `month M`, `amount D DEFAULT 0`,
-`is_value_set boolean DEFAULT false`, `status S DEFAULT 'pendente'`,
-`notes text?`, T. FK composta para recurring_definitions.
-UNIQUE(household_id, definition_id, month).
-CHECK(is_value_set OR (amount = 0 AND status = 'pendente')).
-Serviço valida mês >= start_month. Um zero explicitamente informado/pago pode
-ter is_value_set=true; zero não é sinônimo de ausência de informação.
-`notes` do registro é preservado embora a projeção atual use as notas da definição.
+Cadastro opcional de classificação. Inclui **E**.
 
-### 5.9 installment_purchases
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| name | text | Não | — |
+| color | text | Não | — |
+| description | text | Sim | — |
 
-E, `description text`, `total_amount D`, `installments_count integer`,
-`start_month M`, `effective_from_month M?`, `base_installment_number integer?`,
-`credit_card_id text?`, `category_id text?`, `notes text?`, T.
-FKs compostas para credit_cards/categories. Description não vazia.
-CHECK installments_count >= 1; base, quando presente, entre 1 e installments_count.
-Sem teto de 60/120: os testes incluem 130 parcelas. NULL em effective/base mantém
-fallback do domínio para start_month/1. Não impor effective >= start: a edição
-retroativa precisa de decisão específica antes de impor tal restrição.
-Mês final, parcela corrente e valor mensal normal não são colunas desta tabela.
+Constraints adicionais a E:
 
-### 5.10 installment_month_states
+- `CHECK (btrim(name) <> '')`
 
-H, `purchase_id text`, `month M`, `status S?`, `amount_override D?`, T.
-PK(household_id, purchase_id, month), FK composta para installment_purchases.
-CHECK(status IS NOT NULL OR amount_override IS NOT NULL).
-Os dois maps opcionais atuais são unidos pela união de suas chaves, preservando
-ausência individual; status NULL resolve para pendente. O override é o valor da
-ocorrência, não necessariamente dinheiro pago: persiste após reversão.
-Maps existentes em compras de cartão são preservados, mas ignorados na fatura.
-Novos pagamentos avulsos só podem ocorrer se a ocorrência estiver ativa e avulsa.
+### 5.6 credit_cards
 
-### 5.11 installment_month_snapshots
+Identidade do cartão agregador. Inclui **E**.
 
-H, `purchase_id text`, `month M`, `current_installment integer`,
-`total_installments integer`, `remaining_installments integer`,
-`installment_amount D`, `end_month M`, `description text?`,
-`category_id_snapshot text?`, `total_amount D?`,
-`card_id_snapshot text?`, `card_assignment_known boolean DEFAULT false`,
-`schema_version integer`, `captured_at timestamptz?`, `recorded_at timestamptz`.
-PK(household_id, purchase_id, month), FK composta para installment_purchases.
-CHECK total_installments >= 1, current entre 1 e total, remaining = total-current,
-end_month >= month, schema_version >= 1 e
-(card_assignment_known OR card_id_snapshot IS NULL).
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| name | text | Não | — |
+| brand | text | Sim | — |
+| color | text | Sim | — |
 
-Essa duplicação é intencional: são fatos congelados. category/card históricos
-não são FKs para cadastros vivos. `card_assignment_known=true` + NULL identifica
-avulso conhecido; false identifica associação histórica não registrada no legado.
-Snapshot legado usa schema_version=1; versão futura completa usa 2, com nome,
-total e associação resolvidos no momento da captura. Não inventar informação
-ausente na importação. Categoria NULL no legado mantém o fallback atual; sua
-ambiguidade é documentada na seção 17. O legado não registra instante da captura:
-captured_at fica NULL e recorded_at registra a importação. Novas capturas exigem
-captured_at preenchido, sem atribuir esse instante a snapshots antigos.
+Constraints adicionais a E:
 
-### 5.12 card_expenses
+- `CHECK (btrim(name) <> '')`
 
-E, `card_id text`, `description text`, `amount D`, `month M`,
-`category_id text?`, T. FKs compostas para credit_cards e categories.
-Description não vazia. Não tem status/pagamento próprio: integra a fatura.
+### 5.7 simple_accounts
 
-### 5.13 card_monthly_invoices
+Conta de um mês; amount é o próprio valor pago quando status=pago. Inclui **E**.
 
-E, `card_id text`, `month M`, `recorded_status S`, `paid_amount D?`,
-`manual_adjustment numeric(15,2)?`, `paid_at timestamptz?`, T.
-FK composta para credit_cards; UNIQUE(household_id, card_id, month).
-`status` atual mapeia para recorded_status para distingui-lo do estado exibido,
-que depende do saldo recalculado. Status padrão pendente; paid_amount NÃO recebe
-default zero: NULL é a semântica legada, diferente de pagamento explícito zero.
-manual_adjustment admite sinal, finito, e é preservado sem entrar no cálculo.
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| name | text | Não | — |
+| amount | money_amount | Não | — |
+| month | month_key | Não | — |
+| category_id | uuid | Sim | — |
+| status | payment_status | Não | `'pendente'` |
+| notes | text | Sim | — |
 
-Não impor CHECK ligando status e total calculado: o total depende de outras
-linhas, e uma compra nova pode mudar o estado exibido sem alterar o registro.
-Serviço controla pagamento <= total no momento do comando, total acumulado
-substitutivo, reversão e paid_at. Timestamps legados não são prova de quitação.
+Constraints adicionais a E:
 
-### 5.14 financial_months
+- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (btrim(name) <> '')`
 
-H, `month M`, `current_closure_id uuid?`, T.
-PK(household_id, month). Linha criada sob demanda em mutação/fechamento, não por
-mera navegação; ausência ou ponteiro NULL representa mês aberto.
-FK(household_id, month, current_closure_id) →
-month_closures(household_id, month, id), RESTRICT, com coluna opcional usando
-MATCH SIMPLE. Não criar flag closed redundante.
+### 5.8 recurring_definitions
 
-### 5.15 month_closures
+Definição permanente; não contém valor mensal. Inclui **E**.
 
-H, `id uuid`, `month M`, `revision integer`, `closed_at timestamptz`,
-`schema_version integer`, `rules_version text`, `payload jsonb`,
-`recorded_at timestamptz`, `source_import_id uuid?`.
-PK(household_id, month, id); UNIQUE(household_id, month, revision).
-FK(household_id, month) → financial_months; FK(household_id, source_import_id)
-→ import_batches(household_id, id). CHECK revision/schema_version >= 1,
-rules_version não vazio e jsonb_typeof(payload) = 'object'.
-Revisão cresce sob lock, nunca reutilizada. Payload contém o ClosedMonthSnapshot
-integral (`month`, `closedAt`, `accounts`, `summary`), validado pelo serviço
-conforme schema_version, incluindo correspondência com month/closed_at externos.
-Snapshots legados não recebem validações financeiras novas retroativamente.
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| name | text | Não | — |
+| category_id | uuid | Sim | — |
+| start_month | month_key | Não | — |
+| is_active | boolean | Não | `true` |
+| notes | text | Sim | — |
 
-A FK circular com financial_months é montável em duas fases: mês com ponteiro
-NULL, fechamento e depois ponteiro, tudo na mesma transação. O DDL futuro deverá
-declarar a FK do ponteiro após criar as duas tabelas. Não exige uma linha de
-fechamento fictícia nem FKs desligadas durante uso normal.
+Constraints adicionais a E:
 
-### 5.16 month_reopenings
+- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (btrim(name) <> '')`
 
-H, `month M`, `closure_id uuid`, `reopened_at timestamptz?`,
-`recorded_at timestamptz`, `source text`.
-PK(household_id, month, closure_id), FK composta para month_closures.
-CHECK source IN ('command','legacy_import'); source=command exige reopened_at.
-O localStorage não registra instante da reabertura: importação usa NULL e
-source=legacy_import, sem confundir closedAt com reopenedAt. Evento append-only.
+### 5.9 recurring_monthly_records
 
-### 5.17 import_batches
+Ocorrência mensal independente; sem cópia automática de valores. Inclui **E**.
 
-H, `id uuid`, `source_key text`, `source_sha256 text`, `source_payload jsonb`,
-`imported_at timestamptz`, `importer_version text`.
-PK(household_id, id); UNIQUE(household_id, source_sha256).
-CHECK hash com 64 caracteres hexadecimais, payload objeto, textos não vazios.
-Uma linha só representa importação concluída na mesma transação dos dados.
-Backup bruto externo preserva os bytes; JSONB preserva o conteúdo, não sua
-formatação. Não guardar falha como sucesso nem inserir parcialmente o lote.
-Política de retenção desse backup financeiro será definida antes da implantação.
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| definition_id | uuid | Não | — |
+| month | month_key | Não | — |
+| amount | money_amount | Não | `0` |
+| is_value_set | boolean | Não | `false` |
+| status | payment_status | Não | `'pendente'` |
+| notes | text | Sim | — |
 
-## 6. PKs, FKs, constraints e índices
+Constraints adicionais a E:
 
-Todas as FKs entre entidades financeiras incluem household_id, impedindo que uma
-conta de A referencie um cartão de B. IDs textuais não vazios; nomes/descrições
-obrigatórios não vazios após trim. Relações opcionais usam NULL, não string vazia.
-Não criar unicidade para nomes, cores ou valores monetários.
+- `FOREIGN KEY (household_id, definition_id) REFERENCES finance_v2.recurring_definitions (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `UNIQUE (household_id, definition_id, month)`
+- `CHECK (is_value_set OR (amount = 0 AND status = 'pendente'))`
 
-PKs e UNIQUE já cobrem consultas por identidade, registro mensal por definição,
-estado/snapshot por compra e fatura por cartão/mês. Índices adicionais propostos:
+### 5.10 installment_purchases
 
-| Tabela | Índice B-tree | Motivo |
+Configuração vigente; fim e parcela corrente são derivados. Inclui **E**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| description | text | Não | — |
+| total_amount | money_amount | Não | — |
+| installments_count | integer | Não | — |
+| start_month | month_key | Não | — |
+| effective_from_month | month_key | Sim | — |
+| base_installment_number | integer | Sim | — |
+| credit_card_id | uuid | Sim | — |
+| category_id | uuid | Sim | — |
+| notes | text | Sim | — |
+
+Constraints adicionais a E:
+
+- `FOREIGN KEY (household_id, credit_card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (btrim(description) <> '')`
+- `CHECK (installments_count >= 1)`
+- `CHECK (base_installment_number BETWEEN 1 AND installments_count)`
+
+### 5.11 installment_month_states
+
+Estado e valor corrigido mensal; não é um snapshot. Inclui **T**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| purchase_id | uuid | Não | — |
+| month | month_key | Não | — |
+| status | payment_status | Sim | — |
+| amount_override | money_amount | Sim | — |
+
+Constraints:
+
+- `PRIMARY KEY (household_id, purchase_id, month)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, purchase_id) REFERENCES finance_v2.installment_purchases (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (status IS NOT NULL OR amount_override IS NOT NULL)`
+
+### 5.12 installment_month_snapshots
+
+Ocorrência histórica imutável e esparsa.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| purchase_id | uuid | Não | — |
+| month | month_key | Não | — |
+| current_installment | integer | Não | — |
+| total_installments | integer | Não | — |
+| remaining_installments | integer | Não | — |
+| installment_amount | money_amount | Não | — |
+| end_month | month_key | Não | — |
+| description | text | Sim | — |
+| category_id_snapshot | text | Sim | — |
+| total_amount | money_amount | Sim | — |
+| card_id_snapshot | text | Sim | — |
+| card_assignment_known | boolean | Não | `false` |
+| schema_version | integer | Não | — |
+| captured_at | timestamptz | Sim | — |
+| recorded_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
+
+Constraints:
+
+- `PRIMARY KEY (household_id, purchase_id, month)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, purchase_id) REFERENCES finance_v2.installment_purchases (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (total_installments >= 1)`
+- `CHECK (current_installment BETWEEN 1 AND total_installments)`
+- `CHECK (remaining_installments = total_installments - current_installment)`
+- `CHECK (end_month >= month)`
+- `CHECK (schema_version IN (1, 2))`
+- `CHECK (card_assignment_known OR card_id_snapshot IS NULL)`
+- `CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND captured_at IS NOT NULL))`
+
+### 5.13 card_expenses
+
+Componente interno, sem pagamento próprio. Inclui **E**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| card_id | uuid | Não | — |
+| description | text | Não | — |
+| amount | money_amount | Não | — |
+| month | month_key | Não | — |
+| category_id | uuid | Sim | — |
+
+Constraints adicionais a E:
+
+- `FOREIGN KEY (household_id, card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (btrim(description) <> '')`
+
+### 5.14 card_monthly_invoices
+
+Total pago acumulado substitutivo, não total da fatura. Inclui **E**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| card_id | uuid | Não | — |
+| month | month_key | Não | — |
+| recorded_status | payment_status | Não | `'pendente'` |
+| paid_amount | money_amount | Sim | — |
+| manual_adjustment | signed_money_amount | Sim | — |
+| paid_at | timestamptz | Sim | — |
+
+Constraints adicionais a E:
+
+- `FOREIGN KEY (household_id, card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `UNIQUE (household_id, card_id, month)`
+- `CHECK (paid_amount IS NULL OR recorded_status <> 'pendente' OR paid_amount = 0)`
+- `CHECK (paid_amount IS NULL OR recorded_status <> 'parcial' OR paid_amount > 0)`
+
+### 5.15 financial_months
+
+Ponteiro vigente; ausência de ponteiro representa mês aberto. Inclui **T**.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| month | month_key | Não | — |
+| current_closure_id | uuid | Sim | — |
+
+Constraints:
+
+- `PRIMARY KEY (household_id, month)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+
+FK adicional declarada após criação de month_closures: (household_id, month,
+current_closure_id) → month_closures(household_id, month, id), MATCH SIMPLE,
+ON UPDATE RESTRICT, ON DELETE RESTRICT. Não há flag closed redundante.
+
+### 5.16 month_closures
+
+Snapshot completo imutável, com versão e autoria opcional.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| id | uuid | Não | — |
+| month | month_key | Não | — |
+| revision | integer | Não | — |
+| closed_at | timestamptz | Sim | — |
+| schema_version | integer | Não | — |
+| rules_version | text | Não | — |
+| payload | jsonb | Não | — |
+| recorded_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
+| source_import_id | uuid | Sim | — |
+| actor_user_id | uuid | Sim | — |
+
+Constraints:
+
+- `PRIMARY KEY (household_id, month, id)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, month) REFERENCES finance_v2.financial_months (household_id, month) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, source_import_id) REFERENCES finance_v2.import_batches (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (actor_user_id) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `UNIQUE (household_id, month, revision)`
+- `CHECK (revision >= 1)`
+- `CHECK (schema_version IN (1, 2))`
+- `CHECK (btrim(rules_version) <> '')`
+- `CHECK (source_import_id IS NOT NULL OR closed_at IS NOT NULL)`
+- `CHECK (jsonb_typeof(payload) = 'object')`
+- `CHECK ((jsonb_typeof(payload -> 'accounts') = 'array') IS TRUE)`
+- `CHECK ((jsonb_typeof(payload -> 'summary') = 'object') IS TRUE)`
+- `CHECK ((jsonb_typeof(payload -> 'closedAt') = 'string') IS TRUE)`
+- `CHECK ((payload ->> 'month' = to_char(month, 'YYYY-MM')) IS TRUE)`
+- `CHECK ((payload -> 'summary' ->> 'month' = to_char(month, 'YYYY-MM')) IS TRUE)`
+
+### 5.17 month_reopenings
+
+Evento de arquivamento imutável; uma reabertura por revisão.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| month | month_key | Não | — |
+| closure_id | uuid | Não | — |
+| reopened_at | timestamptz | Sim | — |
+| recorded_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
+| source | text | Não | — |
+| actor_user_id | uuid | Sim | — |
+
+Constraints:
+
+- `PRIMARY KEY (household_id, month, closure_id)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, month, closure_id) REFERENCES finance_v2.month_closures (household_id, month, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (actor_user_id) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (source IN ('command', 'legacy_import'))`
+- `CHECK (source = 'legacy_import' OR reopened_at IS NOT NULL)`
+
+## 6. Índices e fronteira de integridade
+
+| Índice adicional | Colunas | Justificativa |
 | --- | --- | --- |
-| simple_accounts | (household_id, month) | Grade e consultas anuais por intervalo |
-| recurring_monthly_records | (household_id, month) | Carregar todos os registros do mês |
-| card_expenses | (household_id, card_id, month) | Compor fatura e histórico do cartão |
-| card_monthly_invoices | (household_id, month) | Carregar pagamentos do mês |
-| installment_purchases | (household_id, credit_card_id) | Parcelamentos de cada cartão |
-| household_memberships | (user_id, household_id) | Núcleos acessíveis ao usuário |
+| simple_accounts_month_idx | household_id, month | Grade e faixa anual |
+| recurring_records_month_idx | household_id, month | Todas as ocorrências do mês |
+| card_expenses_card_month_idx | household_id, card_id, month | Composição e cadeia do cartão |
+| card_invoices_month_idx | household_id, month | Pagamentos de todos os cartões no mês |
+| installments_card_idx | household_id, credit_card_id | Configurações por cartão |
+| memberships_user_idx | user_id, household_id | Núcleos acessíveis ao usuário |
 
-Categorias/definições/parcelamentos inicialmente são pequenos e carregados por
-household; índices por status, cor, booleano, JSONB/GIN ou cada FK opcional não
-têm justificativa inicial. Avaliar EXPLAIN e volume na futura implementação.
-As PKs de fechamentos e meses cobrem histórico anual por faixa de month; UNIQUE
-das revisões cobre ordenação de versões. Não duplicar índices automáticos de PK.
+PK/UNIQUE já cobrem cartão+mês na fatura, definição+mês, compra+período nos states/
+snapshots, mês+revisão de fechamento e meses por household para histórico anual.
+Não criar índice isolado de status: filtros são aplicados ao conjunto mensal
+pequeno, e status exibido do cartão é derivado. Não criar índice de mês final
+calculado, GIN de snapshots, cor/booleanos ou duplicatas de PK/UNIQUE. A avaliação
+de planos reais será posterior, sem EXPLAIN ou banco nesta etapa.
 
-CHECKs são locais à linha; não resolvem soma de compras, autorização, mês fechado
-ou imutabilidade. Essa fronteira segue os mecanismos de integridade do
-[PostgreSQL](https://www.postgresql.org/docs/current/ddl-constraints.html).
+| Garantia | Responsável na proposta |
+| --- | --- |
+| Tipos exatos, mês válido, estados locais, ausência vs zero | Domains, NOT NULL e CHECK |
+| Identidade, unicidade mensal e referências dentro do núcleo | PK, UNIQUE e FKs compostas |
+| Snapshot/lote/evento não atualizado, excluído ou truncado | 4 triggers statement chamando reject_history_mutation |
+| Payload possui accounts/summary/closedAt e mês correspondente | CHECKs estruturais em month_closures |
+| Conteúdo profundo, versões, precisão JSON e total coerente | Validador futuro antes de inserir snapshot |
+| Elegibilidade, mutação em mês fechado, total pago <= fatura no comando | Domínio futuro sob transação e lock |
+| Ponteiro nunca aponta revisão reaberta, revisão crescente, evento de arquivo obrigatório | Comandos transacionais futuros |
+| Só membros autorizados leem/escrevem | Serviço e permissões/RLS futuros; FKs não autorizam acesso |
 
-## 7. Exclusões e integridade transacional
+A função no draft apenas lança erro para UPDATE/DELETE/TRUNCATE das quatro tabelas
+imutáveis (snapshots de parcela, fechamentos, reaberturas e lotes); não implementa
+pagamento nem ciclo mensal. É SECURITY INVOKER, search_path=pg_catalog e não
+executa SQL dinâmico. Triggers não substituem privilégios: owner pode desabilitá-los.
+[CREATE TRIGGER](https://www.postgresql.org/docs/current/sql-createtrigger.html).
 
-Proposta conservadora: todas as FKs com ON DELETE RESTRICT e ON UPDATE RESTRICT;
-nenhum cascade genérico. IDs/household são imutáveis. Comandos futuros removem
-ou desvinculam dependências explicitamente e validam meses afetados antes disso.
+CHECKs não consultam outras linhas para calcular saldo. O SQL sozinho não bloqueia
+toda edição em mês fechado ou transição indevida do ponteiro. A aplicação atual
+continua protegida pelo domínio existente; a integração futura NÃO poderá ser
+publicada sem implementar e testar os protocolos abaixo. A proposta não afirma
+que um DDL isolado substitui essas regras.
 
-- Categoria: zerar FKs opcionais vivas e excluir cadastro na mesma transação.
-  Exceção já existente permite retirar categoria de linha mensal fechada;
-  payloads e IDs históricos permanecem intactos.
-- Simples/despesa: só excluir se o mês da ocorrência estiver aberto.
-- Fixa: o código remove definição e todos os registros. Havendo registro em mês
-  fechado, assertFinancialMutation bloqueia a operação inteira. Reproduzir essa
-  checagem; se permitida, remover registros antes da definição.
-- Cartão: o código remove despesas/faturas e desvincula parcelamentos (viram
-  avulsos). Registros mensais fechados envolvidos bloqueiam a operação. No banco,
-  validar antes e desvincular/remover dependentes explicitamente, nunca propagar
-  exclusão para snapshots de fechamento.
-- Parcelamento: exclusão atual remove a compra inteira, inclusive maps e snapshots
-  internos, mas não fechamentos oficiais. Proposta para preservar também o histórico
-  de parcelas: RESTRICT quando houver snapshots; exclusão lógica/versão de
-  cancelamento exige decisão prévia (seção 18), não alteração silenciosa da regra.
-- Household, importações e fechamentos: nenhuma exclusão ordinária; eventual
-  expurgo será operação administrativa separada, fora deste projeto.
+## 7. Exclusão, arquivamento e leitura compatível
+
+Todas as FKs são RESTRICT; exclusão ordinária das oito entidades E usa archived_at
+sob transação, mantendo IDs legados e dependentes para auditoria. O adaptador
+futuro monta o store apenas com linhas não arquivadas, e também filtra filhos de
+pais arquivados. Esse filtro deve ser aplicado antes de cálculos e saldos.
+
+| Entidade | Comando futuro que reproduz a exclusão atual |
+| --- | --- |
+| Categoria | Limpar category_id nas entidades vivas e arquivar categoria; snapshot não muda |
+| Conta simples | Arquivar somente a ocorrência, se mês aberto |
+| Definição fixa | Arquivar definição e registros dependentes; bloquear se algum registro mensal afetado é fechado |
+| Registro fixo | Arquivo junto da definição; UNIQUE continua reservado e impede duplicação da ocorrência |
+| Compra parcelada | Arquivar compra; conservar states/snapshots, omitidos do store operacional; nenhuma parcela histórica física apagada |
+| Cartão | Arquivar cartão, despesas e faturas; desvincular compras parceladas vivas como no código; bloquear registros mensais fechados afetados |
+| Despesa de cartão | Arquivar ocorrência se mês aberto |
+| Fatura mensal | Reversão altera pagamento; arquivo só no comando de remoção de cartão permitido |
+| Usuário/membership | Remoção de participação explícita; autoria não é removida; FK de usuário RESTRICT |
+| Household/fechamento/snapshot/lote | Sem exclusão ordinária; nenhum cascade ou expurgo nesta etapa |
+
+Arquivo não é um novo estado de pagamento e não é “cancelar a partir deste mês”.
+A projeção aberta perde a entidade como hoje quando ela sai do array. Fechamentos
+oficiais permanecem integralmente congelados. Para futuras restaurações de linhas,
+reusar a ocorrência reservada, nunca contornar UNIQUE; restauração não faz parte
+da funcionalidade atual. Archive de definições/compras não autoriza reescrever
+snapshots oficiais. Referências históricas de cartão/categoria são texto descritivo,
+sem FK que obrigue apagar ou atualizar história quando o cadastro mudar.
+
+Categoria retirada de linha mensal fechada continua sendo a exceção de
+assertFinancialMutation; os demais atributos financeiros dessa linha não mudam.
+No futuro, não dar DELETE/TRUNCATE indiscriminado à role da aplicação. Backups e
+retenção poderão exigir expurgo administrativo separado, nunca em cascade.
 
 ## 8. Persistidos, derivados e congelados
 
@@ -475,169 +764,232 @@ o resolver futuro terá de respeitar card_assignment_known dos novos snapshots.
 Isso preserva associação histórica; não deve ser habilitado disfarçado de simples
 troca de armazenamento, pois o resolver atual filtra pelo cartão vigente.
 
-## 13. Snapshots e imutabilidade
+## 13. Snapshots, versões e instantes desconhecidos
 
-Fechamento guarda uma cópia integral e autossuficiente: nomes/categorias/cores,
-valores, status, notas, metadados de parcelas, itens internos, pagamentos, saldos,
-contadores e resumo. Nenhum join com cadastros atuais para reconstruir a tela
-histórica. IDs embutidos servem à rastreabilidade e não exigem cadastro ainda vivo.
+Fechamento é autossuficiente: payload guarda month, closedAt, accounts e summary
+integrais, com nomes, categorias/cores, notas, parcelas, itens internos, valores,
+pagamentos, saldo, contadores e percentuais. Sem joins com cadastro vivo para
+reconstruir o retrato. Payloads importados schema_version=1 retêm chaves ausentes,
+valores e IDs originais. rules_version='legacy-unknown' quando desconhecida.
+Não exigir que resumo antigo satisfaça regras posteriores de saldo.
 
-Payload legado schema_version=1 mantém chaves e ausências originais, em especial
-paidAmount. rules_version identifica o algoritmo da captura; quando desconhecido,
-usar marcador 'legacy-unknown', sem atribuir certeza indevida. Para novas capturas,
-versão 2 usa representação decimal canônica para campos monetários; adaptador
-explícito devolve as interfaces atuais. Campos não monetários continuam números.
-Backup do lote preserva dados originais durante qualquer transformação.
+Para novas capturas, schema_version=2 usa strings decimais canônicas nos campos
+monetários do JSON; contadores e percentuais continuam números. O adaptador da
+versão converte uma cópia para o domínio atual, com validação de faixa/precisão.
+Não converter payload versão 1 no lugar. Datas internas closedAt válidas devem
+corresponder a closed_at; serviço valida sem perder texto original. Importado com
+data vazia/inválida mantém closed_at NULL, evidência no lote e payload original.
+Nova captura sem source_import_id exige closed_at preenchido no SQL.
 
-Imutabilidade futura precisa ser executável: papel da aplicação sem UPDATE/DELETE
-em month_closures, month_reopenings e installment_month_snapshots; trigger de
-rejeição como defesa adicional. Novas capturas são INSERT controlado pelo serviço.
-Não basta documentar append-only nem confiar no React. Nenhum desses privilégios
-ou triggers foi instalado nesta etapa. Administrador continua tecnicamente capaz
-de alterar o banco; permissões operacionais devem separá-lo da aplicação.
+Snapshot de parcela preserva occurrence month, número, quantidade, restante,
+valor mensal e fim, além dos opcionais históricos. category_id_snapshot e
+card_id_snapshot são IDs textuais sem FK: versão 1 usa namespace legado; versão 2
+usa UUID serializado. Versão 1 permite nome/total ausentes e captured_at NULL.
+Versão 2 exige nome/total, associação conhecida e captured_at; categoria NULL
+significa explicitamente sem categoria, não fallback vivo. card_assignment_known
+true + card_id_snapshot NULL significa avulso conhecido; false significa dado
+histórico não disponível. recorded_at marca gravação/importação, não captura.
+Os snapshots legados de parcela são rastreáveis pelo lote da compra.
 
-## 14. Fechamento, reabertura e concorrência
+Month_reopenings usa source=legacy_import e reopened_at NULL quando apenas a
+posição no array histórico existe. Novos eventos exigem reopened_at. Não inferir
+hora de reabertura a partir de closedAt. Actor é opcional, e não se inventa autoria
+para dado anterior à autenticação. O importador validará coerência entre source,
+lote do fechamento e natureza legada, além das constraints locais do draft.
 
-Proposta inicial de serialização: cada comando obtém lock da linha households
-antes de ler os dados financeiros, valida revision esperada, lê um estado coerente,
-aplica domínio, persiste e incrementa revision. Todas as rotas de escrita devem
-obedecer ao mesmo protocolo, inclusive categorias/importação. Esse lock mais amplo
-é deliberadamente simples e cobre dependências entre meses/cartões; poderá ser
-refinado somente com testes de concorrência. Reads multiconsulta precisam de
-snapshot transacional consistente. Impedir DML direto que contorne o serviço.
+## 14. Operações transacionais futuras
 
-Fechar, na mesma transação:
+Nenhuma API ou transação foi implementada nesta etapa. Protocolo recomendado:
+obter lock de households, validar membership e revision esperada, ler estado
+financeiro coerente, aplicar as funções do domínio, persistir o conjunto, atualizar
+updated_at pertinente e incrementar revision uma vez no commit. Todos os comandos
+de escrita usam o mesmo lock, inclusive categoria, arquivamento e importação.
+READ COMMITTED após obter o lock permite ler o último commit; leituras compostas
+fora de escrita precisam de snapshot consistente. Conflito de revisão exige
+recarregar/recalcular; não sobrescrever silenciosamente comando concorrente.
 
-1. Obter lock, conferir revisão e que mês não tem current_closure_id.
-2. Calcular contas e resumo no estado bloqueado. Todas as contas devem estar
-   pagas, e todas as fixas devem ter isValueSet=true. Parcial bloqueia. Mês sem
-   contas é elegível (`every` vazio); não adicionar restrição de data/calendário.
-3. Criar financial_months se necessário, inserir month_closures com próxima
-   revision, payload validado e instante de fechamento; apontar current_closure_id.
-4. Confirmar transação inteira. Qualquer falha desfaz tudo.
-
-Reabrir: bloquear, exigir ponteiro vigente, inserir month_reopenings para esse
-fechamento e limpar somente o ponteiro. Não alterar contas, pagamentos, snapshot
-ou outros meses. Novo fechamento insere nova revisão e torna-se vigente.
-Um evento de reabertura não pode coexistir com ponteiro ativo para a mesma
-revisão; garantir no comando transacional e em trigger futuro. Proibir remoção ou
-troca do ponteiro fora desses comandos. Duplicatas de fechamento/reabertura
-retornam erro de estado, como no domínio atual.
-
-Pagamentos/edições/exclusões mensais fechadas são rejeitados. Exceção para retirada
-de categoria não autoriza alterar demais campos. Alterações globais de definição,
-cartão ou compra não podem reescrever payloads. `assertFinancialMutation` hoje
-verifica diretamente só quatro coleções mensais e os snapshots oficiais; não
-confundir essa proteção com versionamento completo das definições.
-
-Reabrir agosto não reabre setembro automaticamente. Meses fechados posteriores
-continuam usando seus snapshots autoritativos, mesmo quando a revisão anterior
-muda; meses abertos são recalculados pela cadeia. Uma política de reconciliação
-de dependências entre fechamentos é decisão de produto, não migração automática.
-
-## 15. Household e usuários futuros
-
-Dados pertencem ao household; usuários acessam via memberships. Um usuário pode
-participar de vários núcleos, vários usuários podem compartilhar um núcleo.
-O backend futuro deve resolver o household autorizado pela identidade autenticada,
-nunca confiar somente no ID recebido do navegador. FKs compostas asseguram
-integridade, mas não autorização de leitura/escrita. Políticas RLS ou camada de
-autorização equivalente serão requisito antes de disponibilizar endpoints.
-
-Nenhum login, provedor ou autenticação foi implementado. Não expor temporariamente
-um endpoint público com household fixo. A criação inicial do núcleo e a associação
-do primeiro owner ocorrerão no processo autorizado de integração/importação.
-
-## 16. Estratégia futura de migração do localStorage
-
-Plano apenas; nada foi exportado de navegador, importado ou enviado ao banco.
-
-1. Exportar JSON bruto de cada origem/navegador com confirmação do núcleo de
-   destino; guardar backup e SHA-256. Defaults repetem IDs em máquinas distintas,
-   portanto não unir automaticamente origens no mesmo household.
-2. Validar shape completo, arrays, IDs e relações, meses, dinheiro, status, datas,
-   cardinalidades e chaves de maps. Encontrar duplicatas que hoje `.find()` pode
-   esconder. Gerar relatório de órfãos e inconsistências; bloquear o lote até
-   revisão, sem descartar itens nem substituir por demonstração.
-3. Tratar timestamps vazios/inválidos (inclusive closedAt) explicitamente: guardar
-   original no backup, exigir decisão de reparo ou modelo de data desconhecida.
-   Não atribuir a hora atual como se fosse a hora histórica. Preservar opcionais.
-4. Executar simulação local futura: construir modelo e reconstruir FinanceDataStore,
-   comparando projeções em todos os meses relevantes, vigências até o término,
-   saldos até após a última quitação, anuais e fechamento/reabertura. Comparar
-   snapshots estruturalmente e valores em centavos, incluindo campos ausentes.
-5. Importar em transação futura autorizada: household, lote, cadastros, ocorrências,
-   maps e snapshots; criar meses e revisões antigas na ordem do array de histórico,
-   eventos legacy_import, depois revisão vigente e ponteiro. closedAt não é chave:
-   duas revisões podem ter mesmo timestamp. Não reconstruir snapshot do passado
-   a partir dos cadastros atuais. Arquivos legados incompletos não são inventados.
-6. UNIQUE(household, hash) torna reenvio do mesmo lote idempotente. Se household
-   já tem dados, rejeitar mistura até existir política de merge. Hash diferente
-   não autoriza duplicar o mesmo universo financeiro. Nenhum seed automático.
-7. Comparar totais, contagens e conteúdo após leitura. Só então escolher o novo
-   armazenamento, mantendo backup local e caminho de retorno. Não manter duas
-   fontes graváveis simultaneamente. Rollback de importação falha é transacional;
-   rollback após uso real exige exportar novas alterações antes de voltar ao local.
-
-## 17. Riscos encontrados
-
-| Evidência atual | Risco e tratamento proposto |
+| Operação | Registros que devem mudar atomicamente |
 | --- | --- |
-| Validação de carga só inspeciona categories | Dados inválidos/órfãos podem existir; importar com relatório, sem apagar |
-| paidAmount opcional e snapshots legados | NULL não equivale a zero; preservar caminho legado e snapshots originais |
-| manualAdjustment declarado mas não calculado | Não ativar ajuste inadvertidamente |
-| Snapshots de parcelas sem cartão e com campos opcionais | Não é possível recuperar sempre associação/nome/categoria históricos; preservar desconhecido |
-| Fallback de categoryId/description para cadastro vivo | Snapshot parcial não é totalmente autossuficiente; versão completa precisa de semântica de ausência explícita |
-| applyInstallmentUpdate captura no máximo 120 meses | Histórico anterior pode faltar em contratos longos; revisar antes de integrar |
-| Edição retroativa com snapshot já existente | Snapshot tem prioridade sobre nova configuração; conflitos precisam de política explícita |
-| Exclusão inteira de compra/fixa/cartão | Pode alterar meses abertos anteriores; definir cancelamento prospectivo separadamente |
-| Pagamento acima do total após redução/edição posterior | Hoje saldo é truncado a zero sem crédito; não inventar estorno ou crédito |
-| Definições globais e cartão vigente mutáveis | Histórico aberto pode mudar; fechado depende do snapshot, não das FKs vivas |
-| Reabertura anterior a outro mês fechado | Fechamento posterior conserva fotografia antiga; não reconciliar silenciosamente |
-| Arredondamento JS e parcela uniforme | Diferenças de centavos ao usar decimal; exigir testes de paridade antes da troca |
-| Filtros visuais/ordem dos arrays | SQL não tem ordem implícita; adaptador deve definir ordem estável antes da integração |
-| Sem concorrência/identidade no cliente atual | Lock/revision, autorização e importação por núcleo são requisitos futuros |
+| Criar fixa | recurring_definitions + registro inicial do mês + revision |
+| Registrar/corrigir pagamento simples | simple_accounts.amount/status/updated_at + revision |
+| Registrar/corrigir pagamento fixa | upsert único de recurring_monthly_records (amount, is_value_set=true, status, ordem) + revision |
+| Registrar/corrigir pagamento avulso | installment_month_states.status/amount_override + revision; configuração não redistribuída |
+| Parcial de cartão | Recalcular cadeia sob lock, validar total, substituir card_monthly_invoices.paid_amount/recorded_status/paid_at/ordem + revision |
+| Integral de cartão | Mesma fatura: substituir acumulado pelo total incluindo saldo anterior, nunca inserir “pagamento do saldo” separado + revision |
+| Reversão | Estado pendente; cartão zera pago e limpa paid_at; demais preservam amount/override + revision |
+| Fechar mês | Validar todas pagas e fixas informadas; financial_months, novo month_closures e ponteiro + revision |
+| Reabrir | month_reopenings para revisão vigente + limpar ponteiro de financial_months + revision; dados/payload não mudam |
+| Novo fechamento | Novo month_closures com próxima revision + novo ponteiro + revision do household; anteriores/eventos intocados |
+| Editar parcelamento | Capturar somente snapshots anteriores necessários ainda ausentes + atualizar configuração/vigência/base + revision; states intocados |
+| Arquivar/remover cadastro | Todas as linhas/desvinculações da seção 7 + revision, depois de validar meses afetados |
+| Importar localStorage | import_batches, cadastros/mapeamentos UUID, filhos, states/snapshots, meses/revisões/eventos/ponteiros + revision |
 
-## 18. Decisões antes da implementação e validação desta etapa
+Primeiro fechar cria mês com ponteiro NULL, insere fechamento, depois aponta para
+ele; FKs circulares não exigem desabilitar integridade. Revision do fechamento é
+monotônica por núcleo/mês sob lock; não é timestamp. O serviço só aponta para a
+nova revisão criada e só limpa ponteiro ao registrar a reabertura correspondente.
+Nunca selecionar vigente por MAX(revision). Evento de reabertura e ponteiro para
+a mesma revisão não podem coexistir após commit. Essas invariantes entre linhas
+são responsabilidade do protocolo futuro; a FK garante identidade/núcleo/mês.
 
-O modelo acima é a recomendação de partida. Antes de transformar o projeto em
-migration aplicável, decidir e registrar:
+Mês vazio pode ser fechado, fatura zero não paga automaticamente e parcial
+bloqueia fechamento, como hoje. Clique repetido deve respeitar idempotência de
+pagamento; fechar/reabrir em estado inválido continua falhando. Retentativa após
+resultado de commit incerto deve consultar revisão/estado antes de reaplicar.
+Não usar updated_at como chave de idempotência.
 
-1. Política de exclusão de parcelamentos com snapshots: restrição proposta versus
-   cancelamento prospectivo/versionamento; impactos nos meses abertos anteriores.
-2. Política de alterações retroativas, troca de cartão e lacunas além de 120 meses;
-   aprovar separadamente ajustes de domínio, sem incorporá-los à troca de storage.
-3. Manter exatamente as inferências legadas ou normalizar faturas abertas em
-   processo explícito auditado. Recomendação inicial: preservar NULL e fallback.
-4. Limites monetários, arredondamento decimal e tratamento de inconsistências
-   importadas; nenhuma redistribuição automática de centavos.
-5. Reconciliação após reabrir mês anterior, excesso de pagamento decorrente de
-   edição e eventual efeito de manualAdjustment. Recomendação inicial: paridade.
-6. Ordenação estável: se a ordem original das listas precisar ser idêntica,
-   acrescentar posição de origem persistida no modelo antes da integração.
-7. Provedor de identidade, papéis efetivos, RLS, primeiro owner, retenção de backups,
-   papel de migration e papel restrito da aplicação; sem acesso financeiro público.
-8. Versão PostgreSQL do destino, futura migration DDL, triggers de imutabilidade,
-   validação dos payloads e testes reais de isolamento em ambiente autorizado.
+Alterações mensais fechadas continuam bloqueadas. Reabrir agosto não reabre
+setembro: seu snapshot permanece autoritativo. Meses abertos posteriores recalculam
+cadeia; fechados posteriores não são reescritos. Reconciliação entre revisões
+fechadas exige decisão de produto separada, não uma “correção” da migração.
 
-O arquivo SQL de proposta era opcional nesta tarefa e não foi criado: o dicionário,
-as constraints e os protocolos acima constituem o projeto para revisão. Nenhum
-DDL está conectado a scripts, build, deploy ou runner de migrations. A futura
-migration deverá começar com `-- DRAFT ONLY` e
-`-- DO NOT EXECUTE WITHOUT REVIEW` enquanto for apenas proposta.
+## 15. Household, usuários e permissões futuras
 
-Validação em 23/09/2026:
+Dados são do household, usuários entram por memberships N:N. Identidade externa
+usa UNIQUE(auth_issuer,auth_subject), sem senha/Clerk/login nesta etapa. A tabela
+pode ficar vazia até existir autenticação; núcleo não exige usuário fictício.
 
-- `npm test`: 36 testes passaram, zero falhas.
-- `npm run lint`: passou; executa TypeScript frontend/configuração e backend
-  (`tsc --noEmit && tsc -p tsconfig.server.json`), sem ESLint separado no projeto.
-- `npm run build`: passou, 1.701 módulos. Primeira tentativa bloqueada por leitura
-  de diretório pelo sandbox; nova execução autorizada concluiu sem alterar código.
-- Scripts complementares de navegador não foram executados nesta mudança
-  exclusivamente documental; não fazem parte de `npm test`.
-- Revisão do diff: somente este documento novo; regras, interfaces TypeScript,
-  componentes, persistência, dependências e configurações não foram alterados.
+Planejar role específica, por exemplo contas_tatu_app, **sem owner, superuser,
+BYPASSRLS, CREATEDB, CREATEROLE, DDL ou TRUNCATE**. Role de migration separada,
+mantida fora da aplicação. Nenhuma role/permissão foi criada ou alterada, nem
+credencial foi usada nesta tarefa.
 
-Nenhum banco foi acessado ou alterado. Nenhum SQL, migration ou seed foi executado.
-Nenhuma estrutura de `public`, inclusive `public.Contas` e
-`public.Controle_Contas`, foi tocada. A etapa termina no projeto para revisão.
+Privilégios futuros: CONNECT ao banco necessário; USAGE somente em finance_v2 e
+tipos necessários; SELECT e DML mínimo nas tabelas operacionais; somente SELECT/
+INSERT nos fechamentos, eventos e snapshots; import_batches acessível ao processo
+de importação autorizado, sem permitir ao cliente sobrescrever evidência.
+Atualização de identidade, memberships, IDs, origem de importação e ponteiros deve
+passar por comandos internos autorizados, não endpoint genérico de tabela.
+A role não terá grants nas tabelas legadas de public, nem membership herdada de
+role que os possua; revisar também privilégios efetivos recebidos via PUBLIC.
+Não revogar ou alterar permissões de tabelas legadas como efeito desta migration.
+
+Antes de expor API: autorização por membership em toda operação e RLS com
+contexto definido pelo backend, sem aceitar household_id do cliente como prova
+de acesso; isolamento testado entre dois núcleos. Ausência de contexto deve negar
+acesso. Nunca compartilhar conexão/session context entre usuários sem escopo
+transacional controlado. Este draft não cria policies, grants ou conexão. A função
+de imutabilidade é invoker e sua permissão será restrita no provisionamento futuro.
+Chave composta protege integridade, não sigilo. Não expor API pública temporária
+com household global.
+
+## 16. Plano refinado de migração do localStorage
+
+A chave é organizacao_financeira_store_v1. O carregador atual cria demo quando não
+encontra dado utilizável: o importador deverá ler a chave bruta ANTES de chamar
+loadFinanceStore/resetFinanceStore. Nada de migração ou coleta de dados reais foi
+executado nesta etapa. Os testes de navegador usam perfis descartáveis próprios.
+
+| Situação detectada | Classificação/evidência | Decisão futura antes de importar |
+| --- | --- | --- |
+| Chave ausente | Instalação sem dado | Não chamar seed nem criar lote financeiro; iniciar núcleo vazio se solicitado |
+| JSON válido com coleções vazias | empty | Mostrar resumo vazio, confirmar intenção; não tratar como falha |
+| Conteúdo igual a um default conhecido | demo_match + versão/hash do default | Informar correspondência, solicitar escolha manter/importar ou iniciar vazio |
+| IDs/defaults presentes com alterações | modified_demo + diferenças | Tratar como potencial dado real; mostrar o conjunto inteiro e não descartar “restos de demo” automaticamente |
+| Dado sem origem comprovável | unknown | Validar e pedir classificação/decisão; desconhecido nunca significa descartável |
+| Usuário confirma dados próprios | user_confirmed + evidência da confirmação | Importar somente após validar e revisar contagens/totais |
+| JSON inválido/incompleto | Falha pré-importação | Preservar bytes, emitir relatório, não resetar, não inserir lote de sucesso |
+
+Não é possível provar intenção de uso apenas por nomes/IDs ou igualdade com seed.
+Comparar com versões conhecidas de defaults, mantendo distinção entre observação
+automática e escolha do usuário. classification_evidence registra classificador/
+versão, default comparado, resumo das diferenças, decisão e instante; estrutura
+profunda é validada pelo importador, não por um CHECK genérico de JSON.
+Campos/valores alterados no demo podem ser reais. Nada é removido automaticamente.
+
+Sequência futura:
+
+1. Exportar bytes originais e SHA-256 para backup seguro; revisar household destino.
+   Criar hash canônico do JSON validado (ordem de chaves normalizada, arrays e
+   distinções de ausente/NULL preservados). SHA bruto preserva origem; canônico
+   evita reimportar o mesmo conteúdo apenas reformatado.
+2. Validar todos os arrays/maps, status, meses, dinheiro, timestamps, FKs e duplicatas.
+   Checar contagens mensais únicas, chaves de fechamento/summary coerentes e
+   snapshots. Dados inválidos ficam em relatório/backup até resolução aprovada.
+   Datas desconhecidas de fechamentos importados têm caminho NULL documentado;
+   createdAt inválido operacional exige decisão explícita, não data histórica falsa.
+3. Classificar origem com resumo revisável de contagens, valores pagos/pendentes,
+   meses e diferenças do demo. Se optar por começar vazio, manter backup e não
+   registrar conteúdo ignorado como importado.
+4. Planejar UUIDs e mapa por entidade/lote, traduzir somente FKs operacionais e
+   preservar IDs textuais de snapshots. Guardar sort_order dos oito arrays.
+5. Simular sem banco e reconstruir store comparável: projeções mensais até término
+   de parcelas/última quitação, anuais, snapshots e reabertura. Canonicalizar somente
+   para comparação, sem esconder diferenças de paidAmount ausente vs zero.
+6. Importar numa única transação autorizada. Criar recibo de sucesso e todos os
+   registros juntos. Histórico do array recebe revisões na ordem original; o
+   fechamento vigente, se houver, recebe a revisão seguinte e o ponteiro.
+   Se só há histórico, ponteiro fica NULL. Não deduplicar revisões por closedAt
+   ou por payload igual: são eventos distintos.
+7. UNIQUE(household,source_sha256) e UNIQUE(household,canonical_sha256) tornam
+   reenvio do mesmo lote idempotente. Repetição retorna recibo/mapa existente.
+   Hash diferente não autoriza merge: importação inicial em núcleo não vazio deve
+   ser bloqueada até existir plano explícito de conciliação. IDs de defaults
+   repetidos em navegadores distintos não autorizam unir famílias.
+8. Ler e conferir contagens, conteúdo e totais; só depois trocar fonte ativa.
+   Backup local permanece. Evitar duas fontes graváveis. Falha pré-commit desfaz
+   lote inteiro; rollback depois de uso real exige exportar alterações posteriores.
+
+source_payload é cópia JSONB imutável para auditoria, sem ser fonte viva; bytes
+originais ficam no backup externo para conferir source_sha256, pois JSONB não
+preserva formatação. imported_at é instante do recibo. importer_version torna
+transformações reproduzíveis. Nenhum dado demo é inserido pelo draft SQL.
+
+## 17. Riscos e decisões ainda necessárias
+
+- Snapshots legados de parcela não guardam cartão e podem omitir nome/categoria/
+  total. Preservar desconhecido; não inferir história que não existe.
+- A edição atual captura no máximo 120 meses; há teste de saldo com 130 parcelas.
+  O schema não impõe teto 60/120. Corrigir captura ou associação histórica será
+  alteração de domínio separada, com testes, não disfarçada de migração.
+- Edição retroativa com snapshot existente dá prioridade ao snapshot; troca de
+  cartão usa vínculo vigente no resolver atual. O modelo guarda contexto futuro,
+  mas não ativa outra regra nesta etapa.
+- paidAmount ausente infere pagamento só das compras próprias quando pago.
+  manualAdjustment segue inerte. Não normalizar NULL em zero.
+- Reduzir compras após pagar pode deixar pagamento maior que total, com saída zero.
+  Não inventar crédito/estorno; CHECK não compara com soma mutável.
+- Reabertura anterior a mês fechado posterior preserva fotografia posterior.
+  Reconciliação exige decisão independente.
+- Arredondamento decimal pode divergir de number em casos limítrofes; paridade de
+  centavos precisa ser comprovada antes da integração.
+- Arquivamento requer filtro completo de pais/filhos e recomposição do store;
+  esquecer linhas arquivadas pode ressuscitar dívidas. Validar em integração futura.
+- Restam implementação/revisão de autenticação/autorização, RLS/grants, transações,
+  validadores profundos, política de retenção/expurgo e testes de concorrência.
+- A versão PostgreSQL real não foi consultada. O draft usa recursos documentados,
+  sem UUID v7, extensão ou dependência de provedor. Execução e teste em banco só
+  numa etapa futura explicitamente autorizada.
+
+## 18. Validação e escopo da entrega
+
+O SQL é revisado apenas como texto: dependências, tipos das FKs, alvos PK/UNIQUE,
+nulabilidade, constraints, índices, schema exclusivo e correspondência com este
+dicionário. Nenhum parser conectado a PostgreSQL, psql, migration runner, container
+de banco ou conexão Neon foi usado.
+
+Resultados da etapa 2 em 23/09/2026:
+
+- `npm test`: 36 testes, 36 aprovados, zero falhas.
+- `npm run lint`: aprovado; TypeScript frontend/configuração e backend
+  (`tsc --noEmit && tsc -p tsconfig.server.json`). Não existe ESLint separado.
+- `npm run build`: aprovado; 1.701 módulos transformados.
+- `tests/browser-validation.cjs`: aprovado; 7 grupos de fluxos, 4 resoluções,
+  incluindo pagamentos, bloqueios, fechamento, reabertura, reload e histórico anual.
+- `tests/accounts-browser-validation.cjs`: aprovado; 5 grupos de fluxos, 4
+  resoluções, incluindo o exemplo 1.000/900 → 2.000/1.500 → saldo 500 e legado.
+- Scripts de navegador executados com Playwright já disponível no runtime,
+  Edge headless e perfis descartáveis contra Vite local; nenhuma dependência
+  instalada. Relatórios/capturas ficam fora do repositório, na área de artefatos.
+- Vite precisou de execução autorizada fora do sandbox por bloqueio de leitura
+  do esbuild; isso não envolveu API, conexão ou credenciais de banco.
+- Revisão estática/manual: 17 tabelas, 4 domains, 41 FKs (40 inline e 1 do
+  ponteiro), tipos/alvos e ordem de dependências conferidos; 6 índices adicionais
+  sem duplicação de PK/UNIQUE; 4 triggers de imutabilidade e cabeçalhos conferidos.
+  Inspeção textual auxiliar não é execução SQL nem validação pelo motor PostgreSQL.
+- `git diff --check`: sem erros. Diff restrito aos dois arquivos desta etapa.
+
+A entrega altera apenas este documento e cria o SQL draft. Nenhum arquivo de
+runtime financeiro, interface visual, dependência ou configuração foi alterado.
+Nenhuma estrutura de public, inclusive public.Contas e public.Controle_Contas,
+foi acessada ou tocada. A etapa encerra no draft revisável, antes da Etapa 3.
