@@ -17,11 +17,8 @@ export function computeAnnualHistory(year: number, store: FinanceDataStore) {
 export function computeActiveInstallments(month: string, store: FinanceDataStore) {
   return store.installmentPurchases.flatMap(purchase => {
     const validMonth = (value: string) => /^\d{4}-(0[1-9]|1[0-2])$/.test(value);
-    if (!validMonth(purchase.effectiveFromMonth || purchase.startMonth) ||
-      !Number.isInteger(purchase.installmentsCount) || purchase.installmentsCount < 1 ||
-      !Number.isFinite(purchase.totalAmount) || purchase.totalAmount < 0 ||
-      (purchase.creditCardId && !store.creditCards.some(card => card.id === purchase.creditCardId))) return [];
     const status = getInstallmentStatusForMonth(purchase, month);
+    if (status.creditCardId && !store.creditCards.some(card => card.id === status.creditCardId)) return [];
     if (!status.isActive || !validMonth(status.endMonth) || status.endMonth < month ||
       !Number.isInteger(status.currentInstallment) || status.currentInstallment < 1 ||
       !Number.isInteger(status.totalInstallments) || status.currentInstallment > status.totalInstallments ||

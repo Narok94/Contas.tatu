@@ -30,92 +30,8 @@ export interface FinanceDataStore {
   cardMonthlyInvoices: CreditCardMonthlyInvoice[];
 }
 
-/**
- * Calcula o valor exato da parcela mensal
- */
-export function calculateInstallmentValue(totalAmount: number, installmentsCount: number): number {
-  if (installmentsCount <= 0) return 0;
-  return Math.round((totalAmount / installmentsCount) * 100) / 100;
-}
-
-/**
- * Verifica se uma compra parcelada está ativa em um mês específico
- * e retorna os detalhes da parcela naquele mês.
- * RESPEITA HISTÓRICO:
- * - Se o mês possui snapshot congelado, retorna os dados históricos imutáveis daquele mês.
- * - Caso contrário, calcula conforme a vigência ativa daquele ponto em diante.
- */
-export function getInstallmentStatusForMonth(
-  purchase: InstallmentPurchase,
-  targetMonth: string
-): {
-  isActive: boolean;
-  currentInstallment: number;
-  totalInstallments: number;
-  remainingInstallments: number;
-  installmentAmount: number;
-  endMonth: string;
-  description?: string;
-  categoryId?: string;
-  totalAmount: number;
-} {
-  // 1. Snapshot histórico imutável para meses passados anteriores a edições
-  if (purchase.monthlySnapshots && purchase.monthlySnapshots[targetMonth]) {
-    const snap = purchase.monthlySnapshots[targetMonth];
-    return {
-      isActive: true,
-      currentInstallment: snap.currentInstallment,
-      totalInstallments: snap.totalInstallments,
-      remainingInstallments: snap.remainingInstallments,
-      installmentAmount: snap.installmentAmount,
-      endMonth: snap.endMonth,
-      description: snap.description || purchase.description,
-      categoryId: snap.categoryId !== undefined ? snap.categoryId : purchase.categoryId,
-      totalAmount:
-        snap.totalAmount !== undefined
-          ? snap.totalAmount
-          : snap.installmentAmount * snap.totalInstallments,
-    };
-  }
-
-  // 2. Cálculo regular a partir do mês de vigência (effectiveFromMonth ou startMonth)
-  const effectiveFrom = purchase.effectiveFromMonth || purchase.startMonth;
-  if (compareMonths(targetMonth, effectiveFrom) < 0) {
-    // Mês anterior à vigência e sem snapshot gravado -> inativo neste mês
-    return {
-      isActive: false,
-      currentInstallment: 0,
-      totalInstallments: purchase.installmentsCount,
-      remainingInstallments: 0,
-      installmentAmount: 0,
-      endMonth: '',
-      description: purchase.description,
-      categoryId: purchase.categoryId,
-      totalAmount: purchase.totalAmount,
-    };
-  }
-
-  const baseNumber = purchase.baseInstallmentNumber || 1;
-  const diff = getMonthDifference(effectiveFrom, targetMonth);
-  const currentInstallment = baseNumber + diff;
-  const totalInstallments = purchase.installmentsCount;
-  const remainingInstallments = Math.max(0, totalInstallments - currentInstallment);
-  const endMonth = addMonths(effectiveFrom, totalInstallments - baseNumber);
-  const isActive = currentInstallment >= 1 && currentInstallment <= totalInstallments;
-  const installmentAmount = calculateInstallmentValue(purchase.totalAmount, totalInstallments);
-
-  return {
-    isActive,
-    currentInstallment,
-    totalInstallments,
-    remainingInstallments,
-    installmentAmount,
-    endMonth,
-    description: purchase.description,
-    categoryId: purchase.categoryId,
-    totalAmount: purchase.totalAmount,
-  };
-}
+export { calculateInstallmentValue, getInstallmentStatusForMonth } from './installmentTimeline';
+import { getInstallmentStatusForMonth, installmentMonthsBefore, appendInstallmentVersion, InstallmentChange } from './installmentTimeline';
 
 const money = (value: number) => Math.round(value * 100) / 100;
 
@@ -138,25 +54,11 @@ export function getPreviousPendingCardInvoices(
   }
 
   // Parcelas do cartão ativas em meses anteriores
-  const cardPurchases = store.installmentPurchases.filter((p) => p.creditCardId === cardId);
+  const cardPurchases = store.installmentPurchases;
   for (const p of cardPurchases) {
-    if (p.monthlySnapshots) {
-      for (const m of Object.keys(p.monthlySnapshots)) {
-        if (compareMonths(m, targetMonth) < 0) {
-          pastMonthsSet.add(m);
-        }
-      }
-    }
-    let curM = p.effectiveFromMonth || p.startMonth;
-    let limit = 0;
-    const remainingOccurrences = p.installmentsCount - (p.baseInstallmentNumber || 1) + 1;
-    while (compareMonths(curM, targetMonth) < 0 && limit < remainingOccurrences) {
-      const st = getInstallmentStatusForMonth(p, curM);
-      if (st.isActive) {
-        pastMonthsSet.add(curM);
-      }
-      curM = addMonths(curM, 1);
-      limit++;
+    for (const m of installmentMonthsBefore(p, targetMonth)) {
+      const st = getInstallmentStatusForMonth(p, m);
+      if (st.isActive && st.creditCardId === cardId) pastMonthsSet.add(m);
     }
   }
 
@@ -184,7 +86,7 @@ export function getPreviousPendingCardInvoices(
 
     for (const p of cardPurchases) {
       const st = getInstallmentStatusForMonth(p, m);
-      if (st.isActive) {
+      if (st.isActive && st.creditCardId === cardId) {
         mTotal += st.installmentAmount;
       }
     }
@@ -297,9 +199,7 @@ export function computeMonthlyAccounts(
     );
 
     // Parcelas ativas deste cartão neste mês
-    const cardInstallments = store.installmentPurchases.filter(
-      (p) => p.creditCardId === card.id
-    );
+    const cardInstallments = store.installmentPurchases;
 
     const internalItems: CardInternalItem[] = [];
 
@@ -318,14 +218,14 @@ export function computeMonthlyAccounts(
 
     for (const installment of cardInstallments) {
       const installmentStatus = getInstallmentStatusForMonth(installment, targetMonth);
-      if (installmentStatus.isActive) {
+      if (installmentStatus.isActive && installmentStatus.creditCardId === card.id) {
         internalItems.push({
           id: `card_item_${installment.id}_${targetMonth}`,
           description: installmentStatus.description || installment.description,
           amount: installmentStatus.installmentAmount,
-          categoryId: installmentStatus.categoryId || installment.categoryId,
-          category: (installmentStatus.categoryId || installment.categoryId)
-            ? categoryMap.get((installmentStatus.categoryId || installment.categoryId)!)
+          categoryId: installmentStatus.categoryId,
+          category: (installmentStatus.categoryId)
+            ? categoryMap.get((installmentStatus.categoryId)!)
             : undefined,
           isInstallment: true,
           installmentInfo: {
@@ -380,20 +280,20 @@ export function computeMonthlyAccounts(
   }
 
   // 4. Compras Parceladas Avulsas (não vinculadas a nenhum cartão)
-  const standaloneInstallments = store.installmentPurchases.filter((p) => !p.creditCardId);
+  const standaloneInstallments = store.installmentPurchases;
   for (const purchase of standaloneInstallments) {
     const installmentStatus = getInstallmentStatusForMonth(purchase, targetMonth);
-    if (installmentStatus.isActive) {
-      const monthStatus = purchase.statusByMonth?.[targetMonth] || 'pendente';
+    if (installmentStatus.isActive && !installmentStatus.creditCardId) {
+      const monthStatus = installmentStatus.operation === 'payoff' ? 'pago' : purchase.statusByMonth?.[targetMonth] || 'pendente';
       results.push({
         id: purchase.id,
         type: 'installment',
         name: installmentStatus.description || purchase.description,
-        amount: purchase.paymentAmountsByMonth?.[targetMonth] ?? installmentStatus.installmentAmount,
+        amount: installmentStatus.operation === 'payoff' ? installmentStatus.installmentAmount : purchase.paymentAmountsByMonth?.[targetMonth] ?? installmentStatus.installmentAmount,
         status: monthStatus,
-        categoryId: installmentStatus.categoryId || purchase.categoryId,
-        category: (installmentStatus.categoryId || purchase.categoryId)
-          ? categoryMap.get((installmentStatus.categoryId || purchase.categoryId)!)
+        categoryId: installmentStatus.categoryId,
+        category: (installmentStatus.categoryId)
+          ? categoryMap.get((installmentStatus.categoryId)!)
           : undefined,
         notes: purchase.notes,
         installmentInfo: {
@@ -485,10 +385,10 @@ export function computeFinancialSummary(
   for (const purchase of store.installmentPurchases) {
     const status = getInstallmentStatusForMonth(purchase, targetMonth);
     if (status.isActive && status.remainingInstallments <= 3) {
-      const card = purchase.creditCardId ? cardsMap.get(purchase.creditCardId) : undefined;
+      const card = status.creditCardId ? cardsMap.get(status.creditCardId) : undefined;
       activeEndingInstallments.push({
         purchaseId: purchase.id,
-        description: purchase.description,
+        description: status.description,
         currentInstallment: status.currentInstallment,
         totalInstallments: status.totalInstallments,
         remaining: status.remainingInstallments,
@@ -569,74 +469,9 @@ export function computeFutureMonthsForecast(
   return result;
 }
 
-/**
- * Atualiza uma compra parcelada preservando rigorosamente o histórico dos meses anteriores.
- * REGRA CRÍTICA:
- * - Todos os meses estritamente anteriores a currentMonth que já ocorreram são congelados como snapshots imutáveis.
- * - Registros de meses anteriores (especialmente pagos) não sofrem alterações automáticas.
- * - A nova configuração tem vigência exclusiva a partir de currentMonth para a frente.
- */
-export function applyInstallmentUpdate(
-  purchases: InstallmentPurchase[],
-  purchaseId: string,
-  currentMonth: string,
-  data: {
-    description: string;
-    totalAmount: number;
-    installmentsCount: number;
-    currentInstallment?: number;
-    categoryId?: string;
-    creditCardId?: string;
-  }
-): InstallmentPurchase[] {
-  return purchases.map((p) => {
-    if (p.id !== purchaseId) return p;
-
-    // 1. Preservar histórico imutável:
-    // Congelar meses anteriores a currentMonth que estiveram ativos sob a configuração vigente anterior
-    const snapshots = { ...(p.monthlySnapshots || {}) };
-
-    let mCursor = p.startMonth;
-    let guard = 0;
-    while (compareMonths(mCursor, currentMonth) < 0 && guard < 120) {
-      if (!snapshots[mCursor]) {
-        const oldStatus = getInstallmentStatusForMonth(p, mCursor);
-        if (oldStatus.isActive) {
-          snapshots[mCursor] = {
-            currentInstallment: oldStatus.currentInstallment,
-            totalInstallments: oldStatus.totalInstallments,
-            remainingInstallments: oldStatus.remainingInstallments,
-            installmentAmount: oldStatus.installmentAmount,
-            endMonth: oldStatus.endMonth,
-            description: p.description,
-            categoryId: p.categoryId,
-            totalAmount: oldStatus.totalAmount,
-          };
-        }
-      }
-      mCursor = addMonths(mCursor, 1);
-      guard++;
-    }
-
-    // 2. Definir nova vigência a partir de currentMonth para a frente
-    const baseInstallmentNumber =
-      typeof data.currentInstallment === 'number' && data.currentInstallment >= 1
-        ? data.currentInstallment
-        : 1;
-
-    return {
-      ...p,
-      description: data.description.trim(),
-      totalAmount: data.totalAmount,
-      installmentsCount: data.installmentsCount,
-      effectiveFromMonth: currentMonth,
-      baseInstallmentNumber,
-      categoryId: data.categoryId,
-      creditCardId:
-        data.creditCardId !== undefined
-          ? data.creditCardId || undefined
-          : p.creditCardId,
-      monthlySnapshots: snapshots,
-    };
-  });
+/** Existing edit entry point: append a forward boundary, never capture a bounded calendar. */
+export function applyInstallmentUpdate(purchases: InstallmentPurchase[], purchaseId: string,
+  currentMonth: string, data: InstallmentChange): InstallmentPurchase[] {
+  return purchases.map(p => p.id === purchaseId
+    ? appendInstallmentVersion(p, currentMonth, 'change', data, 'Alteração a partir do mês selecionado') : p);
 }

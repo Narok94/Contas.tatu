@@ -1,12 +1,13 @@
-# Projeto do banco finance_v2 — etapa 2
+# Projeto do banco finance_v2 — resolução temporal pré-Etapa 3
 
 **DRAFT ONLY — DO NOT EXECUTE WITHOUT REVIEW.** Proposta revisada sobre
-`1d7a038236825c6fff6b9d6d7b7db750b1d88cbf`, em 23/09/2026, branch main.
+`bdeff1e99b6181169a0dd60b23a73d4d27c7feec`, em 23/09/2026, branch main.
+A solução atual de parcelamentos está na seção 22. As seções 18, 19 e 21 são registros históricos de validações anteriores.
 O SQL correspondente é [001_finance_v2_draft.sql](../database/migrations/001_finance_v2_draft.sql).
 Nenhum banco foi acessado; nenhum SQL foi executado, sequer localmente.
 
-O draft contém **17 tabelas, 4 domains, 6 índices adicionais, 1 função de proteção
-e 4 triggers de imutabilidade**, todos em finance_v2. A única instrução ALTER
+O draft contém **18 tabelas, 4 domains, 7 índices adicionais, 1 função de proteção
+e 5 triggers de imutabilidade**, todos em finance_v2. A única instrução ALTER
 completa a FK circular entre duas tabelas novas do próprio schema. Não há role,
 GRANT, seed, driver, conexão, API financeira ou execução automática de migration.
 O arquivo falha se o schema já existir; não usa IF NOT EXISTS para ocultar divergências.
@@ -51,7 +52,8 @@ Fontes do levantamento:
 
 ## 2. Revisão da Etapa 2
 
-Nenhuma tabela removida ou combinada: as 17 foram reavaliadas abaixo. O ganho de
+As 17 tabelas da Etapa 2 foram mantidas; installment_purchases foi simplificada
+e installment_versions foi acrescentada para resolver os bloqueios (seção 22). O ganho de
 simplicidade está em não materializar projeções, saldos ou parcelas futuras e em
 não acrescentar um ledger de pagamentos fictícios. Cada tabela mantém uma
 responsabilidade e um ciclo de vida verificável.
@@ -66,7 +68,8 @@ responsabilidade e um ciclo de vida verificável.
 | simple_accounts | Ocorrência, valor e estado do mês | Uma linha por conta, sem tabela de pagamento redundante |
 | recurring_definitions | Identidade, início, atividade e metadados | Misturar valor aqui copiaria indevidamente o mês anterior |
 | recurring_monthly_records | Valor informado e estado de uma ocorrência | Independência mensal; ausência é zero virtual, não nova linha automática |
-| installment_purchases | Configuração vigente | Não persistir calendário futuro inteiro nem mês final calculável |
+| installment_purchases | Identidade estável, origem e início original | Configuração saiu desta tabela para não concorrer com versões |
+| installment_versions | Configuração completa por fronteira e eventos de ciclo de vida | Histórico append-only; nenhuma geração de calendário futuro |
 | installment_month_states | Estado e override mensal | Combina os dois maps atuais; não combinar com snapshot imutável |
 | installment_month_snapshots | Fato histórico esparso congelado | Separado de pagamentos reversíveis; duplicação histórica deliberada |
 | card_expenses | Componentes da fatura | Sem estado pago próprio; somá-los ao pago da fatura duplicaria despesa |
@@ -97,8 +100,8 @@ Mudanças relevantes em relação à Etapa 1:
   inclusive para TRUNCATE. Não foi instalada em banco algum.
 - Estados impossíveis locais de fatura explícita são restringidos, mantendo NULL
   legado e sem CHECK contra total derivado de outras linhas.
-- Não foram adicionadas tabelas de saldo, resumo mensal, visão unificada,
-  transações bancárias ou versões completas de configuração.
+- Não foram adicionadas tabelas de saldo, resumo mensal, visão unificada ou
+  transações bancárias. Versões de configuração foram acrescentadas nesta revisão.
 
 ## 3. Matriz de mapeamento e relações
 
@@ -109,7 +112,7 @@ Mudanças relevantes em relação à Etapa 1:
 | simpleAccounts | simple_accounts | Persistido | value → amount; mês, categoria opcional e status |
 | recurringDefinitions | recurring_definitions | Persistido | Sem valor padrão mensal |
 | recurringMonthlyRecords | recurring_monthly_records | Persistido | UNIQUE definição/mês; ausente continua virtual zero |
-| installmentPurchases | installment_purchases | Persistido | Configuração vigente, início, vigência e base |
+| installmentPurchases | installment_purchases + installment_versions | Persistido | Identidade + configuração inicial/alterações/correções/encerramento; campos principais do objeto são compatibilidade de leitura |
 | installmentPurchases.statusByMonth / paymentAmountsByMonth | installment_month_states | Persistido | União das chaves dos maps; NULL preserva ausência individual |
 | installmentPurchases.monthlySnapshots | installment_month_snapshots | Snapshot | Esparsos; não gerar meses futuros ou preencher histórico desconhecido |
 | cardExpenses | card_expenses | Persistido | Compra interna sem pagamento próprio |
@@ -123,11 +126,11 @@ Mudanças relevantes em relação à Etapa 1:
 app_users 1 ── N household_memberships N ── 1 households
 households 1 ── N entidades financeiras e import_batches
 categories 1 ── N simple_accounts / recurring_definitions /
-                  installment_purchases / card_expenses (FKs opcionais)
+                  installment_versions / card_expenses (FKs opcionais)
 credit_cards 1 ── N card_expenses / card_monthly_invoices
-credit_cards 1 ── N installment_purchases (opcional; NULL = avulso)
+credit_cards 1 ── N installment_versions (opcional por versão; NULL = avulso)
 recurring_definitions 1 ── N recurring_monthly_records
-installment_purchases 1 ── N installment_month_states / installment_month_snapshots
+installment_purchases 1 ── N installment_versions / installment_month_states / installment_month_snapshots
 financial_months 1 ── N month_closures
 financial_months ── aponta para zero ou um month_closures do mesmo núcleo/mês
 month_closures 1 ── 0..1 month_reopenings
@@ -381,27 +384,15 @@ Constraints adicionais a E:
 
 ### 5.10 installment_purchases
 
-Configuração vigente; fim e parcela corrente são derivados. Inclui **E**.
+Identidade estável da compra. Inclui **E** e suas constraints comuns.
+Configuração, cartão e categoria pertencem exclusivamente a installment_versions.
 
 | Campo | Tipo | NULL | Default |
 | --- | --- | --- | --- |
-| description | text | Não | — |
-| total_amount | money_amount | Não | — |
-| installments_count | integer | Não | — |
 | start_month | month_key | Não | — |
-| effective_from_month | month_key | Sim | — |
-| base_installment_number | integer | Sim | — |
-| credit_card_id | uuid | Sim | — |
-| category_id | uuid | Sim | — |
 | notes | text | Sim | — |
 
-Constraints adicionais a E:
-
-- `FOREIGN KEY (household_id, credit_card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
-- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
-- `CHECK (btrim(description) <> '')`
-- `CHECK (installments_count >= 1)`
-- `CHECK (base_installment_number BETWEEN 1 AND installments_count)`
+O início original não é alterado ao acrescentar uma versão. Sem CHECK adicional.
 
 ### 5.11 installment_month_states
 
@@ -441,6 +432,7 @@ Ocorrência histórica imutável e esparsa.
 | total_amount | money_amount | Sim | — |
 | card_id_snapshot | text | Sim | — |
 | card_assignment_known | boolean | Não | `false` |
+| category_assignment_known | boolean | Não | `false` |
 | schema_version | integer | Não | — |
 | captured_at | timestamptz | Sim | — |
 | recorded_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
@@ -457,7 +449,7 @@ Constraints:
 - `CHECK ((EXTRACT(YEAR FROM end_month) - EXTRACT(YEAR FROM month)) * 12 + EXTRACT(MONTH FROM end_month) - EXTRACT(MONTH FROM month) = remaining_installments)`
 - `CHECK (schema_version IN (1, 2))`
 - `CHECK (card_assignment_known OR card_id_snapshot IS NULL)`
-- `CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND captured_at IS NOT NULL))`
+- `CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND category_assignment_known AND captured_at IS NOT NULL))`
 
 ### 5.13 card_expenses
 
@@ -577,6 +569,58 @@ Constraints:
 - `CHECK (source IN ('command', 'legacy_import'))`
 - `CHECK (source = 'legacy_import' OR reopened_at IS NOT NULL)`
 
+### 5.18 installment_versions
+
+Fonte única de configuração temporal e eventos de encerramento. Sem E/T:
+imutável, sem archived_at, updated_at ou ID próprio; origem legada via compra.
+
+| Campo | Tipo | NULL | Default |
+| --- | --- | --- | --- |
+| household_id | uuid | Não | — |
+| purchase_id | uuid | Não | — |
+| revision | integer | Não | — |
+| operation | text | Não | — |
+| effective_from_month | month_key | Não | — |
+| description | text | Não | — |
+| total_amount | money_amount | Não | — |
+| installments_count | integer | Não | — |
+| base_installment_number | integer | Não | — |
+| credit_card_id | uuid | Sim | — |
+| category_id | uuid | Sim | — |
+| rounding_rule | text | Não | — |
+| payoff_amount | money_amount | Sim | — |
+| reason | text | Não | — |
+| occurred_at | timestamptz | Sim, somente initial | — |
+| recorded_at | timestamptz | Não | `CURRENT_TIMESTAMP` |
+| actor_user_id | uuid | Sim | — |
+
+Constraints e integridade:
+
+- `PRIMARY KEY (household_id, purchase_id, revision)`
+- `FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, purchase_id) REFERENCES finance_v2.installment_purchases (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, credit_card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `FOREIGN KEY (actor_user_id) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT`
+- `CHECK (revision >= 1)`
+- `CHECK (operation IN ('initial', 'change', 'correction', 'cancel', 'payoff'))`
+- `CHECK ((operation = 'initial') = (revision = 1))`
+- `CHECK (btrim(description) <> '')`
+- `CHECK (btrim(reason) <> '')`
+- `CHECK (installments_count >= 1)`
+- `CHECK (base_installment_number BETWEEN 1 AND installments_count)`
+- `CHECK ((EXTRACT(YEAR FROM effective_from_month) - 1) * 12 + EXTRACT(MONTH FROM effective_from_month) - 1 + installments_count - base_installment_number <= 119987)`
+- `CHECK (rounding_rule = 'legacy_uniform')`
+- `CHECK ((operation = 'payoff') = (payoff_amount IS NOT NULL))`
+- `CHECK (operation = 'initial' OR occurred_at IS NOT NULL)`
+
+Trigger installment_versions_immutable rejeita UPDATE/DELETE/TRUNCATE. Os dois
+índices adicionais constam na seção 6. Não há UNIQUE só por mês: revisões no
+mesmo mês são decisões sucessivas, preservadas e ordenadas pela PK, nunca duas
+configurações vigentes simultaneamente. Existência obrigatória da initial,
+revision anterior + 1, sequência temporal, regra da quitação e guardas de mês
+fechado são invariantes transacionais do serviço, não CHECKs entre linhas.
+
 ## 6. Índices e fronteira de integridade
 
 | Índice adicional | Colunas | Justificativa |
@@ -585,7 +629,8 @@ Constraints:
 | recurring_records_month_idx | household_id, month | Todas as ocorrências do mês |
 | card_expenses_card_month_idx | household_id, card_id, month | Composição e cadeia do cartão |
 | card_invoices_month_idx | household_id, month | Pagamentos de todos os cartões no mês |
-| installments_card_idx | household_id, credit_card_id | Configurações por cartão |
+| installment_versions_month_idx | household_id, purchase_id, effective_from_month, revision | Resolver fronteira e correção exata, com desempate por revisão |
+| installment_versions_card_idx | household_id, credit_card_id, effective_from_month | Localizar compras que tiveram vínculo com cartão; depois resolver versão do mês |
 | memberships_user_idx | user_id, household_id | Núcleos acessíveis ao usuário |
 
 PK/UNIQUE já cobrem cartão+mês na fatura, definição+mês, compra+período nos states/
@@ -599,15 +644,15 @@ de planos reais será posterior, sem EXPLAIN ou banco nesta etapa.
 | --- | --- |
 | Tipos exatos, mês válido, estados locais, ausência vs zero | Domains, NOT NULL e CHECK |
 | Identidade, unicidade mensal e referências dentro do núcleo | PK, UNIQUE e FKs compostas |
-| Snapshot/lote/evento não atualizado, excluído ou truncado | 4 triggers statement chamando reject_history_mutation |
+| Snapshot/lote/evento/versão não atualizado, excluído ou truncado | 5 triggers statement chamando reject_history_mutation |
 | Payload possui accounts/summary/closedAt e mês correspondente | CHECKs estruturais em month_closures |
 | Conteúdo profundo, versões, precisão JSON e total coerente | Validador futuro antes de inserir snapshot |
 | Elegibilidade, mutação em mês fechado, total pago <= fatura no comando | Domínio futuro sob transação e lock |
 | Ponteiro nunca aponta revisão reaberta, revisão crescente, evento de arquivo obrigatório | Comandos transacionais futuros |
 | Só membros autorizados leem/escrevem | Serviço e permissões/RLS futuros; FKs não autorizam acesso |
 
-A função no draft apenas lança erro para UPDATE/DELETE/TRUNCATE das quatro tabelas
-imutáveis (snapshots de parcela, fechamentos, reaberturas e lotes); não implementa
+A função no draft apenas lança erro para UPDATE/DELETE/TRUNCATE das cinco tabelas
+imutáveis (versões, snapshots de parcela, fechamentos, reaberturas e lotes); não implementa
 pagamento nem ciclo mensal. É SECURITY INVOKER, search_path=pg_catalog e não
 executa SQL dinâmico. Triggers não substituem privilégios: owner pode desabilitá-los.
 [CREATE TRIGGER](https://www.postgresql.org/docs/current/sql-createtrigger.html).
@@ -627,12 +672,12 @@ pais arquivados. Esse filtro deve ser aplicado antes de cálculos e saldos.
 
 | Entidade | Comando futuro que reproduz a exclusão atual |
 | --- | --- |
-| Categoria | Limpar category_id nas entidades vivas e arquivar categoria; snapshot não muda |
+| Categoria | Limpar referências operacionais mutáveis e arquivar; nunca modificar categoria das versões ou snapshots antigos |
 | Conta simples | Arquivar somente a ocorrência, se mês aberto |
 | Definição fixa | Arquivar definição e registros dependentes; bloquear se algum registro mensal afetado é fechado |
 | Registro fixo | Arquivo junto da definição; UNIQUE continua reservado e impede duplicação da ocorrência |
-| Compra parcelada | Arquivar compra; conservar states/snapshots, omitidos do store operacional; nenhuma parcela histórica física apagada |
-| Cartão | Arquivar cartão, despesas e faturas; desvincular compras parceladas vivas como no código; bloquear registros mensais fechados afetados |
+| Compra parcelada | Arquivo administrativo conserva versões/states/snapshots; cancelamento financeiro usa evento temporal e mantém meses anteriores consultáveis |
+| Cartão | Se referenciado por versões, impedir remoção ordinária que ocultaria história; transferência temporal preserva A no passado e B no futuro. Sem versões, regra legada de remoção permanece |
 | Despesa de cartão | Arquivar ocorrência se mês aberto |
 | Fatura mensal | Reversão altera pagamento; arquivo só no comando de remoção de cartão permitido |
 | Usuário/membership | Remoção de participação explícita; autoria não é removida; FK de usuário RESTRICT |
@@ -657,7 +702,7 @@ retenção poderão exigir expurgo administrativo separado, nunca em cascade.
 | --- | --- | --- |
 | Persistido operacional | Cadastros, compras, valores mensais informados, overrides e pagamentos acumulados | Colunas relacionais |
 | Derivado aberto | UnifiedMonthlyAccount, CardInternalItem, MonthFinancialSummary, previsão, anual, status exibido do cartão, saldo transportado | Funções do domínio; sem tabelas normais |
-| Derivado de parcela | Número atual, restante, valor mensal e mês final | Calcular da vigência, salvo snapshot prioritário |
+| Derivado de parcela | Número atual, restante, valor mensal e mês final | Resolver versão por mês; exceções/correções explícitas; snapshot legado sobre baseline |
 | Histórico congelado | Contas e resumo completos no fechamento; parcelas anteriores a edição | JSONB versionado e linhas de snapshot |
 
 `previousPendingInvoices` é atualmente zero ou um item sintético associado ao mês
@@ -745,26 +790,17 @@ somar menos que totalExpected, que inclui saldo transportado.
 
 ## 12. Parcelamentos e preservação anterior à edição
 
-Ordem atual: snapshot do mês, se existe, tem prioridade; senão effectiveFromMonth
-ou startMonth define início da vigência, e baseInstallmentNumber ou 1 define base.
+A configuração é resolvida pela linha do tempo imutável da seção 22; correção
+exata de mês prevalece apenas naquele mês. Snapshot legado tem prioridade sobre
+a configuração inicial, com fallback congelado na versão inicial. Alterações
+futuras criam fronteiras e não capturam calendário nem modificam versões anteriores.
+Cartão/categoria são resolvidos pela versão do mês, inclusive ausência explícita.
+
 Atual = base + diferença mensal; ativo entre 1 e total; término = vigência +
-(total-base) meses; parcela = arredondar(totalAmount/quantidade, 2).
-Não distribuir automaticamente resíduos de centavos: 100/3 gera 33,33 por mês,
-e não uma última parcela de 33,34. Corrigir uma ocorrência paga também não
-redistribui diferença às demais.
-
-Edição deve congelar ocorrências ativas anteriores ao mês alvo que ainda não têm
-snapshot, preservar snapshots existentes e maps de pagamento, e só então gravar
-nova vigência/configuração. Tudo na mesma transação. O código atual limita o laço
-de captura a 120 meses; não transformar esse limite acidental em CHECK no banco.
-
-O modelo mantém a configuração corrente com snapshots mensais esparsos, sem
-materializar todas as parcelas futuras. Uma tabela de versões completas seria
-alternativa para alterações retroativas complexas, mas não é necessária para
-reproduzir a estratégia atual. Antes de liberar alterações de associação a cartão,
-o resolver futuro terá de respeitar card_assignment_known dos novos snapshots.
-Isso preserva associação histórica; não deve ser habilitado disfarçado de simples
-troca de armazenamento, pois o resolver atual filtra pelo cartão vigente.
+(total-base) meses; parcela = arredondar(totalAmount/quantidade, 2), regra
+legacy_uniform. 100/3 segue 33,33 por mês. A perda de centavo é um problema de
+domínio conhecido, caracterizado por teste específico, sem mudança de valores
+nesta tarefa. Cancelamento e quitação têm semânticas próprias da seção 22.
 
 ## 13. Snapshots, versões e instantes desconhecidos
 
@@ -787,7 +823,7 @@ Snapshot de parcela preserva occurrence month, número, quantidade, restante,
 valor mensal e fim, além dos opcionais históricos. category_id_snapshot e
 card_id_snapshot são IDs textuais sem FK: versão 1 usa namespace legado; versão 2
 usa UUID serializado. Versão 1 permite nome/total ausentes e captured_at NULL.
-Versão 2 exige nome/total, associação conhecida e captured_at; categoria NULL
+Versão 2 exige nome/total, ambas as associações conhecidas e captured_at; categoria NULL
 significa explicitamente sem categoria, não fallback vivo. card_assignment_known
 true + card_id_snapshot NULL significa avulso conhecido; false significa dado
 histórico não disponível. recorded_at marca gravação/importação, não captura.
@@ -822,7 +858,7 @@ recarregar/recalcular; não sobrescrever silenciosamente comando concorrente.
 | Fechar mês | Validar todas pagas e fixas informadas; financial_months, novo month_closures e ponteiro + revision |
 | Reabrir | month_reopenings para revisão vigente + limpar ponteiro de financial_months + revision; dados/payload não mudam |
 | Novo fechamento | Novo month_closures com próxima revision + novo ponteiro + revision do household; anteriores/eventos intocados |
-| Editar parcelamento | Capturar somente snapshots anteriores necessários ainda ausentes + atualizar configuração/vigência/base + revision; states intocados |
+| Editar/corrigir/encerrar parcelamento | Acrescentar installment_versions; validar meses e pagamentos afetados; na quitação de cartão, atualizar fatura na mesma transação; incrementar revision |
 | Arquivar/remover cadastro | Todas as linhas/desvinculações da seção 7 + revision, depois de validar meses afetados |
 | Importar localStorage | import_batches, cadastros/mapeamentos UUID, filhos, states/snapshots, meses/revisões/eventos/ponteiros + revision |
 
@@ -941,12 +977,11 @@ transformações reproduzíveis. Nenhum dado demo é inserido pelo draft SQL.
 
 - Snapshots legados de parcela não guardam cartão e podem omitir nome/categoria/
   total. Preservar desconhecido; não inferir história que não existe.
-- A edição atual captura no máximo 120 meses; há teste de saldo com 130 parcelas.
-  O schema não impõe teto 60/120. Corrigir captura ou associação histórica será
-  alteração de domínio separada, com testes, não disfarçada de migração.
-- Edição retroativa com snapshot existente dá prioridade ao snapshot; troca de
-  cartão usa vínculo vigente no resolver atual. O modelo guarda contexto futuro,
-  mas não ativa outra regra nesta etapa.
+- Limite de captura de 120 meses removido do domínio; versões não materializam
+  calendário. O atributo max=120 do formulário existente é limite de entrada visual
+  separado e permanece intocado, conforme escopo sem frontend.
+- Correção retroativa é evento de um único mês, exige reabertura quando fechado
+  e não altera o snapshot antigo. Cartão/categoria agora são resolvidos por mês.
 - paidAmount ausente infere pagamento só das compras próprias quando pago.
   manualAdjustment segue inerte. Não normalizar NULL em zero.
 - Reduzir compras após pagar pode deixar pagamento maior que total, com saída zero.
@@ -996,7 +1031,11 @@ runtime financeiro, interface visual, dependência ou configuração foi alterad
 Nenhuma estrutura de public, inclusive public.Contas e public.Controle_Contas,
 foi acessada ou tocada. A etapa encerra no draft revisável, antes da Etapa 3.
 
-## 19. Auditoria técnica final pré-Etapa 3
+## 19. Registro histórico da auditoria anterior (bdeff1e)
+
+Os achados A1/A2 e os inventários desta seção descrevem a versão de 17 tabelas
+auditada anteriormente. Foram superados pela resolução da seção 22 e pelo
+checklist atualizado da seção 20; não são o dicionário do draft atual.
 
 Revisão estática de 23/09/2026 sobre o commit
 `e11a66ba19994dbcfc9b23033262829e6025badc`. Foram relidos integralmente o SQL,
@@ -1279,45 +1318,34 @@ efeito colateral. Nenhuma role, grant ou policy foi criada.
 
 ## 20. Checklist de prontidão para Etapa 3
 
-Os itens assinalam revisão efetivamente realizada, não aprovação de todos os
-requisitos nem validação em banco. A1/A2 permanecem pendentes apesar de revisados.
+Itens reavaliados após a resolução temporal. Revisão estática não é teste em banco.
 
-- [x] Schema revisado
-- [x] Isolamento por household revisado
-- [x] Cartões revisados
-- [x] Parcelamentos revisados
-- [x] Contas fixas revisadas
-- [x] Fechamento/reabertura revisado
-- [x] Histórico anual revisado
-- [x] Importação revisada
-- [x] Dinheiro revisado
-- [x] Meses revisados
-- [x] Constraints revisadas
-- [x] FKs revisadas
-- [x] Índices revisados
+- [x] Schema revisado — 18 tabelas
+- [x] Isolamento por household revisado — 44 FKs, vínculos de versão compostos
+- [x] Cartões revisados — vínculo temporal e saldo consolidado
+- [x] Parcelamentos revisados — versões, cancelamento, quitação e correção mensal
+- [x] Contas fixas revisadas — regras e defaults preservados
+- [x] Fechamento/reabertura revisado — reabertura obrigatória; V1 preservada
+- [x] Histórico anual revisado — somente efetivamente pago uma vez
+- [x] Importação revisada — baseline, snapshots e desconhecidos preservados
+- [x] Dinheiro revisado — legacy_uniform explícito, sem alterar centavos
+- [x] Meses revisados — domínio date e término limitado pela faixa, sem teto 120
+- [x] Constraints revisadas — operações, revisão, valores e instantes
+- [x] FKs revisadas — mesma compra e mesmo household
+- [x] Índices revisados — 39 no total, 7 explícitos
 - [x] SQL revisado estaticamente
-- [x] Permissões futuras definidas
+- [x] Permissões futuras definidas — versão append-only e autorização transacional
 - [x] Nenhum acesso ao Neon realizado
 
-**NOT READY FOR ETAPA 3**, considerando integralmente os requisitos desta auditoria.
-Não foi encontrada inviabilidade estática do DDL para o domínio básico atual,
-mas faltam dois contratos de projeto antes de aprovar sua implementação:
+**READY FOR ETAPA 3** no âmbito do projeto e da revisão estática do schema.
+A1 e A2 estão resolvidos por regras explícitas, persistência e testes de domínio.
+A perda de centavo legada continua classificada MÉDIA, explicitamente versionada;
+a tarefa permite documentá-la sem recalcular histórico. Não há bloqueio ALTO ou
+CRÍTICO identificado para avançar à próxima etapa autorizada. Não significa
+aprovação de deploy nem implementação de API/RLS/importador. Nenhum SQL foi
+executado. Iniciar a Etapa 3 exige autorização separada.
 
-1. **A1:** definir representação e regras de cancelamento prospectivo/quitação
-   antecipada, ou explicitamente retirar essas capacidades do escopo inicial.
-   O draft atual não as suporta como operações temporais auditáveis.
-2. **A2:** definir política do adaptador para associação histórica de parcelas,
-   captura além de 120 meses e edições retroativas. Reproduzir os limites atuais
-   e prometer preservação completa do passado aberto são compromissos distintos.
-
-O pedido de centavos foi resolvido nesta revisão pela prioridade do comportamento
-atual: manter arredondamento uniforme. Não se afirma distribuição exata. Se esta
-última passar a ser obrigatória, haverá decisão adicional de regra versionada.
-Autorização/RLS, protocolos transacionais, validação profunda e ensaios de banco
-continuam entregáveis futuros, não funcionalidades implementadas por este draft.
-Mesmo após resolver os bloqueios, esta auditoria **não autoriza execução SQL**.
-
-## 21. Validação desta auditoria
+## 21. Registro histórico da validação da auditoria anterior
 
 Resultados obtidos novamente nesta revisão, sem executar SQL:
 
@@ -1351,3 +1379,283 @@ Estes testes comprovam o comportamento atual e a ausência de alterações no
 runtime; **não testam as constraints em um PostgreSQL**. A revisão do DDL é
 estática. Nenhum SQL foi executado, nenhum acesso ao Neon ocorreu e nenhuma
 tabela legada, inclusive public.Contas/public.Controle_Contas, foi tocada.
+
+## 22. Resolução dos bloqueios de parcelamentos
+
+### 22.1 Problema e escolha
+
+A1 exigia distinguir cancelamento futuro, quitação efetivamente paga e término
+natural. A2 expunha perda de contexto ao sobrescrever creditCardId/configuração e
+ao capturar apenas 120 meses. A solução agora usa **18 tabelas**, com
+installment_versions append-only, uma linha por decisão completa, e não por
+parcela. installment_purchases mantém apenas identidade, início original, notas,
+ordem, arquivo e origem. Nenhuma configuração concorrente permanece nessa tabela.
+
+effective_end_month na linha mutável não guardaria alterações anteriores nem
+motivos/pagamentos. Só snapshots exigiriam capturar todos os meses, inclusive
+abertos antigos, e continuariam exigindo exceções para correção retroativa.
+Intervalos armazenados com effective_to exigiriam editar/encerrar linhas antigas
+ou duplicar intervalos em cada revisão. Fronteiras imutáveis mais exceção de um
+mês preservam a auditoria e dispensam extensão GiST ou calendário materializado.
+
+### 22.2 Regra única de resolução e exclusividade
+
+Uma versão contém configuração completa, nunca patch parcial. Para compra e mês M:
+
+1. Fechamento oficial vigente de M continua soberano para a consulta financeira.
+2. Para a projeção operacional aberta, selecionar a maior revision de operation
+   correction cujo effective_from_month = M, se existir. Seu efeito termina em M.
+3. Senão, selecionar entre initial/change/cancel/payoff a maior fronteira
+   effective_from_month <= M; empates escolhem a maior revision.
+4. Se o vencedor é initial e existe snapshot legado de M, resolver o snapshot
+   com fallback congelado na initial, nunca na projeção corrente da compra.
+5. initial/change calculam número, valor, restante e término. cancel não gera
+   ocorrência desde sua fronteira. payoff gera uma única ocorrência paga na
+   fronteira e nenhuma depois. Antes da initial, sem snapshot, não há ocorrência.
+
+Sem effective_to físico: a próxima fronteira distinta encerra o intervalo
+anterior de forma exclusiva, [início, próxima fronteira). Revisões da mesma
+fronteira são supersessões auditáveis, não intervalos independentes. PK única de
+revision elimina empate final. As correções não entram na sucessão de fronteiras:
+há exatamente um vencedor por mês, mesmo se existirem várias correções históricas.
+Uma consulta de auditoria pode aplicar a mesma regra limitada a revision <= R.
+Esse histórico de decisões não substitui payload de fechamento.
+
+Exemplo: initial em janeiro, change em julho, change em outubro. Março encontra
+initial, agosto encontra julho, novembro encontra outubro. Corrigir setembro
+acrescenta correction de setembro; agosto e outubro não mudam. Duas alterações
+em outubro conservam as duas revisões, e a última é selecionada em outubro em diante.
+
+### 22.3 Alteração futura, cartões e categoria
+
+changeInstallmentFromMonth e o entry point existente applyInstallmentUpdate
+acrescentam change. Antes da primeira alteração, o objeto legado ganha em memória
+uma initial completa para congelar sua interpretação anterior. Nenhum snapshot
+mensal novo é gerado. Resolver cartão antes de agrupar: A até setembro, B desde
+outubro; avulso até setembro e A desde outubro; A até setembro e avulso desde
+outubro. NULL/ausência de cartão na versão é avulso explícito. Categoria ausente
+é ausente, sem fallback para categoria de uma versão futura.
+
+Isso foi aplicado à grade mensal, composição da fatura, cadeia de saldos,
+previsão e lista de parcelamentos ativos. O saldo que nasceu no cartão A continua
+no cartão A; transferir a compra não transfere dívida já ocorrida. Os cadastros
+de cartões necessários para essas versões não podem ser apagados pela operação
+ordinária. Versões mantêm FK composta mesmo que o cadastro seja arquivado no
+futuro; o adaptador deve conservar acesso histórico ao agregador.
+
+Alteração prospectiva precisa ser no mês ativo, não pode anteceder fronteira
+já registrada, encobrir correção/snapshot no período ou reativar encerramento.
+Se existe uma alteração posterior, usar correção explícita de mês; replanejamento
+de vários intervalos é outra operação, nunca um efeito silencioso. Alteração
+de dono com pagamento/override afetado é recusada até conciliação explícita.
+Também se recusa comando que mudaria configuração de mês fechado posterior:
+reabrir somente o mês alvo não libera todos os meses atingidos.
+
+### 22.4 Cancelamento futuro
+
+cancelInstallmentFromMonth registra operation=cancel, mês inicial sem ocorrência,
+motivo e instante. Cópia completa da configuração registra o que foi encerrado.
+Não cria valor pago, não zera pagamentos e não apaga compra. Janeiro–junho
+continuam iguais; cancelamento em julho torna julho e agosto inativos, com causa
+consultável na versão. Parcelas vencidas anteriores e eventual saldo de cartão
+continuam existindo. Término natural é diferente: a sequência simplesmente
+excede installments_count, sem evento cancel/payoff fictício.
+
+Não cancelar período contendo pagamento, override ou fatura paga/parcial
+afetada. Versão cancel não tem payoff_amount, conforme CHECK. Encerramentos não
+podem ser sobrescritos por mudança normal; uma futura anulação de encerramento
+exigirá comando compensatório específico. A recusa é explícita, sem editar
+evento antigo nem fingir reabertura de compra através de archived_at.
+
+### 22.5 Quitação antecipada
+
+payoffInstallment é um comando explícito de **quitação confirmada**, não previsão
+ou promessa. Em julho, depois de seis parcelas de 100 de um plano de dez, a
+cotação é 400: soma das quatro ocorrências restantes do plano vigente, incluindo
+julho. Registrar amount=400, operation=payoff, motivo, instante e configuração.
+Julho substitui sua parcela normal pelo valor quitado; agosto em diante fica
+inativo. Meses anteriores não mudam. Não adicionar juros, desconto, taxa ou
+resíduo de centavo que não pertence à regra legada.
+
+O valor fornecido deve coincidir com installmentPayoffQuote; dinheiro é validado
+em centavos e faixa. Sem plano posterior/correções/snapshots futuros ambíguos,
+sem pagamento/override no período afetado. Esses casos são recusados para
+conciliação, não ignorados. A operação liquida as ocorrências do mês alvo em
+diante; não declara quitadas dívidas de meses anteriores. Não cria parcelas pagas
+retroativas nem altera faturas antigas. Ausência de juros/desconto não significa
+que o total inicial seja redistribuído depois de alterações de configuração.
+
+**Avulso:** payoff_amount do evento é a fonte da ocorrência efetivamente paga;
+status exibido pago é derivado desse evento. Não duplicar em installment_month_states
+nem criar conta simples. A projeção marca ocorrência final com restante zero e
+término no mês de quitação, mantendo número/base originais no evento para auditoria.
+
+**Cartão:** payoff_amount representa a compra liquidada antecipadamente e compõe
+um único item da fatura naquele mês. Na mesma transação, registrar esse pagamento
+na fatura. Só invoice.paid_amount entra no total anual; o item/evento não é somado
+novamente. Outras despesas e saldo anterior permanecem abertos se não pagos.
+Para evitar alocação inventada, esta operação exige que ainda não haja pagamento
+na fatura alvo; se houver, recusa e solicita conciliação. Depois, pagamento comum
+pode completar a fatura, mas não pode reduzir seu total abaixo das quitações
+confirmadas do mês. Avulso quitado também recusa reversão comum. Reabertura de
+mês não desfaz o evento de quitação nem autoriza estorno implícito.
+
+O banco exige payoff_amount apenas para payoff e >=0. O valor correto depende
+do plano e é verificado no comando sob lock, não por soma em CHECK. A persistência
+conserva o fato de quitação e o fechamento oficial independentemente de alterações
+futuras de código. Correção/estorno de um encerramento confirmado fica bloqueado
+até um comando compensatório revisado; não faz parte dos fluxos solicitados.
+
+### 22.6 Correção retroativa e fechamento
+
+correctInstallmentMonth exige motivo e mês aberto. É uma exceção completa para
+aquele mês, com revision nova e referências temporais próprias. Snapshot legado
+original não é atualizado; correction o sobrepõe na leitura aberta do mês exato.
+Correção repetida mantém todas as versões; maior revision vence. Não estende
+automaticamente a correção para o mês seguinte nem reescreve fronteiras futuras.
+
+Mês fechado precisa de reopenMonth: V1 entra no histórico, dados são corrigidos,
+pagamentos podem ser tratados pelos comandos existentes e novo fechamento V2 é
+criado. V1 permanece idêntica. Configuração corrigida não modifica silenciosamente
+um amount_override pago; para corrigir esse pagamento, realizar reversão e novo
+pagamento explícitos no mês reaberto. Troca de vínculo com dinheiro já registrado
+é recusada, inclusive no caminho de edição existente. Alterar configuração em
+mês anterior pode recalcular saldos de meses abertos posteriores, como hoje;
+fechamentos posteriores permanecem checkpoints oficiais, sem regravação.
+
+### 22.7 Limite de 120 meses e compatibilidade
+
+O limite vinha do guard < 120 em applyInstallmentUpdate, que capturava meses
+desde startMonth antes de substituir a linha atual. Foi eliminado junto com
+essa captura. Uma edição guarda a initial (se ausente) e uma nova versão;
+130 ou 1.000 parcelas não geram 130/1.000 registros de calendário. Consulta
+individual usa aritmética de meses. Consolidação do cartão enumera meses passados
+relevantes apenas em memória, sem corte arbitrário e com consulta da versão correta.
+O limite de datas é o representável 0001–9999, validado sem laço proporcional ao
+número de parcelas para calcular término. O max=120 visual existente não foi
+alterado e não limita leitura/importação ou armazenamento de planos longos.
+
+Sem versions no localStorage, initial é derivada em memória de effectiveFromMonth
+ou startMonth, baseInstallmentNumber ou 1, configuração atual e legacy_uniform.
+Nenhuma escrita ocorre ao consultar. monthlySnapshots, statusByMonth e
+paymentAmountsByMonth permanecem intactos. Sem evento não se presume cancelamento
+ou quitação. Datas e troca de cartão desconhecidas não são inventadas.
+
+Snapshots legados sem cartão/categoria completos continuam usando a interpretação
+legada disponível, congelada na initial na primeira alteração. Isso preserva o
+que é observável, mas não recupera informação já perdida antes desta tarefa.
+Na futura importação, registrar tal incerteza no lote. Snapshot v2 usa
+card_assignment_known e category_assignment_known verdadeiros; NULL passa a ser
+ausência explícita. Snapshot v1 conserva flags falsas e campos originais.
+
+Importador futuro cria compra + initial + snapshots/states e demais versões na
+mesma transação, com IDs da compra/lote e revision estável. Se já houver versions,
+validar ordem, initial única, operações, meses, referências e pagamentos, e
+importar todas; não substituir por uma initial dos campos de compatibilidade.
+Timestamps TS recordedAt válidos mapeiam occurred_at; initial legada com instante
+desconhecido usa NULL; recorded_at SQL é o instante real de inserção. Novos
+comandos exigem occurred_at, razão e autoria autenticada no serviço futuro.
+Nenhum importador ou escrita no localStorage real foi executado nesta tarefa.
+
+### 22.8 Fontes de verdade
+
+| Informação | Fonte / regra |
+| --- | --- |
+| Identidade, início original, ordem e origem | installment_purchases |
+| totalAmount, installmentsCount, base e descrição | versão completa selecionada para o mês |
+| creditCardId e categoryId | versão selecionada, ausência explícita; snapshot legado segue compatibilidade congelada |
+| installmentAmount | cálculo legacy_uniform; snapshot legado ou payoff_amount quando aplicável |
+| currentInstallment, remainingInstallments, endMonth | derivados da versão/mês, com ocorrência final no payoff; fatos congelados nos snapshots existentes |
+| Status avulso ordinário e correção de valor pago | installment_month_states; ausência resolve pendente/valor calculado |
+| Status avulso quitado | derivado do evento payoff; sem segundo registro de pagamento |
+| Valor pago de fatura | card_monthly_invoices.paid_amount; nunca somar pagamento do item separadamente |
+| Cancelamento e quitação | installment_versions.operation + mês + reason + occurred_at; payoff_amount somente na quitação |
+| Término natural | cálculo, sem evento artificial |
+| Fechamento oficial | month_closures.payload apontado por financial_months; outras versões são auditoria |
+| Campos principais do objeto TS após versions | projeção de compatibilidade para editores existentes, jamais fonte das consultas financeiras |
+
+O SQL removeu total/count/base/vigência/cartão/categoria/descrição da compra,
+portanto não possui duas cópias operacionais concorrentes. O adaptador futuro
+reconstrói a projeção TS; writes só inserem versões. Snapshots antigos são fatos
+históricos deliberadamente duplicados, não atualização da configuração viva.
+
+### 22.9 Centavos: evidência e decisão
+
+Na base bdeff1e, calculateInstallmentValue usa Math.round(total/count*100)/100.
+O histórico Git disponível mostra essa fórmula desde ee9f6cf; o commit 3954709
+modificou consulta anual/previsão, sem distribuição de parcelas. A busca nas
+referências locais disponíveis não encontrou implementação de rateio de resíduo.
+Isso não afirma nada sobre código externo ou commits não presentes no repositório.
+A documentação da auditoria estava correta sobre o código efetivamente executado.
+
+O teste específico fixa 100/3 → [33,33; 33,33; 33,33], soma 99,99: **problema
+MÉDIO de domínio legado**, não propriedade financeira desejável. Preservado pelo
+caminho permitido no teste 8 desta tarefa; não corrigir silenciosamente valores
+já usados. rounding_rule='legacy_uniform' torna a decisão persistida. Uma futura
+regra de resíduo exigirá outra versão explícita e testes por ordem de parcelas,
+sem reescrever initial/snapshots nem recalcular quitações anteriores.
+
+### 22.10 Integridade, índices e futura API
+
+Final: **18 tabelas, 44 FKs, 4 domains, 39 índices (18 PK + 14 UNIQUE + 7
+explícitos), 1 função e 5 triggers imutáveis**. Mantidas 13 colunas mensais:
+effective_from_month saiu da compra para versão e agora é NOT NULL. Dinheiro
+passa a 10 colunas: total_amount saiu da compra para versão, payoff_amount foi
+adicionado. Só ajuste manual admite negativo; payoff admite zero como o domínio.
+Sem extensão nova; UUID continua gerado pelo servidor futuro.
+
+O inventário histórico da seção 19.5 muda somente assim: acrescentar PK
+installment_versions(H,purchase_id,revision); retirar installments_card_idx da
+compra; acrescentar os dois índices de versões descritos na seção 6. Índice
+mensal começa por núcleo/compra e serve busca de fronteira/correção; índice de
+cartão começa por núcleo/cartão e descobre candidatos históricos, nunca assume
+que todas as versões do candidato pertencem ao cartão no mês consultado. PK não
+substitui esse acesso por mês. Nenhum índice de parcelas futuras materializadas.
+
+FKs novas para compra, cartão e categoria incluem household_id. Autoria global
+permanece validada por membership no comando. IDs históricos de snapshots são
+descritivos como antes. A role da aplicação só recebe SELECT/INSERT em versões,
+sem UPDATE/DELETE/TRUNCATE; trigger statement também protege tentativas sem
+linhas afetadas. RLS, validação de usuário, FK/NOT NULL e transações continuam
+requisitos da integração futura. A initial deve existir e revisions precisam
+ser sequenciais sob lock; o DDL não substitui essas invariantes de protocolo.
+
+Transações necessárias: criação (compra + initial); alteração/correção
+(validar revisões/meses/pagamentos + inserir versão + incrementar revisão do
+household); cancelamento (mesmos guardas); quitação avulsa (evento + revisão);
+quitação de cartão (evento + pagamento acumulado da fatura + revisão);
+importação (lote + todo o grafo); fechamento/reabertura (protocolo existente).
+Usar revision esperada sob lock do household; retry com resultado incerto consulta
+estado/revisão antes de tentar outra inserção. Não incrementar pagamento nem
+inserir outro evento de quitação em retry. No domínio, repetição de encerramento
+é erro explícito sem mutação; a API futura deve devolver o resultado já confirmado.
+
+Nenhum endpoint, botão, autenticação, driver, importador ou integração SQL foi
+criado. As funções novas são comandos puros de domínio, testados em memória;
+o fluxo visual não oferece cancelamento/quitação/correção retroativa nesta etapa.
+
+O comando de mutação também recusa remover uma compra que já possui versões:
+isso apagaria a trilha temporal e poderia fazer desaparecer uma quitação real.
+Encerramento futuro usa cancelamento; remoção física não substitui esse evento.
+
+### 22.11 Validação desta revisão
+
+Foram adicionados 23 testes de temporalidade, incluindo os dez cenários exigidos,
+quitação no cartão sem dupla contagem, proteção de pagamentos, imutabilidade,
+compatibilidade legada e bloqueio de remoção de histórico. A suíte completa
+totaliza 59 testes, todos aprovados. `npm run lint` (TypeScript do aplicativo e
+servidor) e `npm run build` também passaram; build com 1.702 módulos. Os scripts
+de navegador validaram sete grupos de fluxos
+gerais e cinco de contas, ambos em quatro resoluções, sem falhas: saldo
+consolidado, pagamentos, fechamento/reabertura e histórico anual preservados.
+
+A revisão estática conferiu ordem de criação, alvos/tipos/chaves das 44 FKs,
+isolamento financeiro por household, constraints, inventário de índices e
+concordância do dicionário com o draft. SQL não foi executado: essa evidência
+não equivale a uma validação em PostgreSQL. Os marcadores DRAFT ONLY e DO NOT
+EXECUTE WITHOUT REVIEW continuam nas duas primeiras linhas.
+
+Nenhuma alteração em componentes, layout, FinanceContext, financeStorage,
+dependências, endpoints ou autenticação. Testes de navegador utilizaram perfis
+isolados, sem migrar o localStorage real. Nenhum acesso a Neon, credenciais ou
+tabelas legadas. Etapa 3 continua aguardando autorização separada.

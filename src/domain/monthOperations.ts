@@ -1,8 +1,42 @@
 import { FinanceDataStore, computeMonthlyAccounts, computeFinancialSummary } from './financeRules';
 import { AccountType, PaymentStatus } from '../types/finance';
+import { getInstallmentStatusForMonth } from './installmentTimeline';
 
 // Commands can target a month different from the one currently displayed.
 export function assertFinancialMutation(previous: FinanceDataStore, next: FinanceDataStore) {
+  for (const p of previous.installmentPurchases) {
+    const updated = next.installmentPurchases.find(item => item.id === p.id);
+    if (p.versions?.length && !updated) {
+      throw new Error('Parcelamento com versões históricas não pode ser removido; use cancelamento futuro.');
+    }
+    if (p.versions?.length && updated) {
+      if (JSON.stringify(p.versions) !== JSON.stringify(updated.versions?.slice(0, p.versions.length)) ||
+          JSON.stringify(p.monthlySnapshots) !== JSON.stringify(updated.monthlySnapshots)) {
+        throw new Error('Versões e snapshots anteriores do parcelamento são imutáveis.');
+      }
+    }
+    if (updated?.versions?.length) {
+      const paymentMonths = new Set([...Object.keys(p.statusByMonth ?? {}),
+        ...Object.keys(p.paymentAmountsByMonth ?? {}), ...previous.cardMonthlyInvoices.map(i => i.month)]);
+      for (const m of paymentMonths) {
+        const before = getInstallmentStatusForMonth(p, m), after = getInstallmentStatusForMonth(updated, m);
+        if (before.isActive && (!after.isActive || before.creditCardId !== after.creditCardId)) {
+          const ownPayment = (p.statusByMonth?.[m] && p.statusByMonth[m] !== 'pendente') || p.paymentAmountsByMonth?.[m] !== undefined;
+          const cardPayment = previous.cardMonthlyInvoices.some(i => i.month === m &&
+            (i.cardId === before.creditCardId || i.cardId === after.creditCardId) && ((i.paidAmount ?? 0) > 0 || i.status === 'pago'));
+          if (ownPayment || cardPayment) throw new Error('Há pagamentos no período afetado; concilie antes de transferir ou encerrar.');
+        }
+      }
+      for (const m of Object.keys(previous.closedMonths ?? {})) {
+        if (JSON.stringify(getInstallmentStatusForMonth(p, m)) !== JSON.stringify(getInstallmentStatusForMonth(updated, m))) {
+          assertMonthOpen(previous, m);
+        }
+      }
+      if (updated.versions.some(v => v.creditCardId && !next.creditCards.some(c => c.id === v.creditCardId))) {
+        throw new Error('Cartão referenciado por versão histórica não pode ser removido.');
+      }
+    }
+  }
   if (JSON.stringify(previous.closedMonthHistory ?? {}) !== JSON.stringify(next.closedMonthHistory ?? {})) {
     throw new Error('Os fechamentos anteriores não podem ser alterados.');
   }
@@ -62,6 +96,12 @@ export function recordPayment(store: FinanceDataStore, month: string, id: string
   assertMonthOpen(store, month);
   const account = computeMonthlyAccounts(month, store).find(a => a.id === id && a.type === type);
   if (!account) throw new Error('Esta conta não está mais disponível neste mês.');
+  if (type === 'installment') {
+    const purchase = store.installmentPurchases.find(p => p.id === id)!;
+    if (getInstallmentStatusForMonth(purchase, month).operation === 'payoff') {
+      throw new Error('Quitação antecipada é um evento auditável; pagamento comum não pode alterá-la.');
+    }
+  }
   if (account.status === status && (type !== 'credit_card' || amount === undefined)) return store;
   const value = amount ?? account.amount;
   if (!Number.isFinite(value) || value < 0 || !Number.isSafeInteger(Math.round(value * 100)) || Math.abs(value * 100 - Math.round(value * 100)) > 0.00001) {
@@ -71,6 +111,11 @@ export function recordPayment(store: FinanceDataStore, month: string, id: string
     if (value > account.amount) throw new Error('O pagamento não pode superar o total da fatura.');
     if (status === 'parcial' && value <= 0) throw new Error('Informe um pagamento maior que zero.');
     const paidAmount = status === 'pendente' ? 0 : value;
+    const payoffFloor = store.installmentPurchases.reduce((sum, p) => {
+      const st = getInstallmentStatusForMonth(p, month);
+      return sum + (st.isActive && st.operation === 'payoff' && st.creditCardId === id ? Math.round(st.installmentAmount * 100) : 0);
+    }, 0) / 100;
+    if (paidAmount < payoffFloor) throw new Error('O pagamento não pode desfazer uma quitação antecipada registrada.');
     const invoiceStatus: PaymentStatus = status === 'pendente' ? 'pendente'
       : paidAmount >= account.amount ? 'pago' : paidAmount > 0 ? 'parcial' : 'pendente';
     const existing = store.cardMonthlyInvoices.find(i => i.cardId === id && i.month === month);

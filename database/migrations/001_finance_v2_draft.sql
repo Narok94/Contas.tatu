@@ -223,7 +223,7 @@ CREATE TABLE finance_v2.recurring_monthly_records (
     CHECK (is_value_set OR (amount = 0 AND status = 'pendente'))
 );
 
--- Current configuration plus sparse immutable past snapshots; archive instead of deleting history.
+-- Stable purchase identity only. All schedule and ownership facts live in immutable versions.
 CREATE TABLE finance_v2.installment_purchases (
     household_id uuid NOT NULL,
     id uuid NOT NULL,
@@ -233,26 +233,56 @@ CREATE TABLE finance_v2.installment_purchases (
     archived_at timestamptz,
     created_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    description text NOT NULL,
-    total_amount finance_v2.money_amount NOT NULL,
-    installments_count integer NOT NULL,
     start_month finance_v2.month_key NOT NULL,
-    effective_from_month finance_v2.month_key,
-    base_installment_number integer,
-    credit_card_id uuid,
-    category_id uuid,
     notes text,
     PRIMARY KEY (household_id, id),
     FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
     FOREIGN KEY (household_id, source_import_id) REFERENCES finance_v2.import_batches (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT,
     UNIQUE (household_id, source_import_id, legacy_id),
     CHECK ((source_import_id IS NULL) = (legacy_id IS NULL)),
-    CHECK (legacy_id IS NULL OR btrim(legacy_id) <> ''),
+    CHECK (legacy_id IS NULL OR btrim(legacy_id) <> '')
+);
+
+-- Append-only boundaries and one-month corrections. No overlapping stored intervals.
+-- Resolve correction for the exact month first; otherwise latest (effective_from_month, revision).
+-- Forward periods end at the next distinct boundary. Revision totally orders same-month decisions.
+CREATE TABLE finance_v2.installment_versions (
+    household_id uuid NOT NULL,
+    purchase_id uuid NOT NULL,
+    revision integer NOT NULL,
+    operation text NOT NULL,
+    effective_from_month finance_v2.month_key NOT NULL,
+    description text NOT NULL,
+    total_amount finance_v2.money_amount NOT NULL,
+    installments_count integer NOT NULL,
+    base_installment_number integer NOT NULL,
+    credit_card_id uuid,
+    category_id uuid,
+    rounding_rule text NOT NULL,
+    payoff_amount finance_v2.money_amount,
+    reason text NOT NULL,
+    occurred_at timestamptz,
+    recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    actor_user_id uuid,
+    PRIMARY KEY (household_id, purchase_id, revision),
+    FOREIGN KEY (household_id) REFERENCES finance_v2.households (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    FOREIGN KEY (household_id, purchase_id) REFERENCES finance_v2.installment_purchases (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT,
     FOREIGN KEY (household_id, credit_card_id) REFERENCES finance_v2.credit_cards (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT,
     FOREIGN KEY (household_id, category_id) REFERENCES finance_v2.categories (household_id, id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    FOREIGN KEY (actor_user_id) REFERENCES finance_v2.app_users (id) ON UPDATE RESTRICT ON DELETE RESTRICT,
+    CHECK (revision >= 1),
+    CHECK (operation IN ('initial', 'change', 'correction', 'cancel', 'payoff')),
+    CHECK ((operation = 'initial') = (revision = 1)),
     CHECK (btrim(description) <> ''),
+    CHECK (btrim(reason) <> ''),
     CHECK (installments_count >= 1),
-    CHECK (base_installment_number BETWEEN 1 AND installments_count)
+    CHECK (base_installment_number BETWEEN 1 AND installments_count),
+    CHECK ((EXTRACT(YEAR FROM effective_from_month) - 1) * 12
+        + EXTRACT(MONTH FROM effective_from_month) - 1
+        + installments_count - base_installment_number <= 119987),
+    CHECK (rounding_rule = 'legacy_uniform'),
+    CHECK ((operation = 'payoff') = (payoff_amount IS NOT NULL)),
+    CHECK (operation = 'initial' OR occurred_at IS NOT NULL)
 );
 
 -- Union of statusByMonth and paymentAmountsByMonth; override survives payment reversal.
@@ -285,6 +315,7 @@ CREATE TABLE finance_v2.installment_month_snapshots (
     total_amount finance_v2.money_amount,
     card_id_snapshot text,
     card_assignment_known boolean NOT NULL DEFAULT false,
+    category_assignment_known boolean NOT NULL DEFAULT false,
     schema_version integer NOT NULL,
     captured_at timestamptz,
     recorded_at timestamptz NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -302,7 +333,7 @@ CREATE TABLE finance_v2.installment_month_snapshots (
     ),
     CHECK (schema_version IN (1, 2)),
     CHECK (card_assignment_known OR card_id_snapshot IS NULL),
-    CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND captured_at IS NOT NULL))
+    CHECK (schema_version = 1 OR (description IS NOT NULL AND btrim(description) <> '' AND total_amount IS NOT NULL AND card_assignment_known AND category_assignment_known AND captured_at IS NOT NULL))
 );
 
 -- Invoice component only; no independent payment or carryover rows.
@@ -432,7 +463,8 @@ CREATE INDEX simple_accounts_month_idx ON finance_v2.simple_accounts (household_
 CREATE INDEX recurring_records_month_idx ON finance_v2.recurring_monthly_records (household_id, month);
 CREATE INDEX card_expenses_card_month_idx ON finance_v2.card_expenses (household_id, card_id, month);
 CREATE INDEX card_invoices_month_idx ON finance_v2.card_monthly_invoices (household_id, month);
-CREATE INDEX installments_card_idx ON finance_v2.installment_purchases (household_id, credit_card_id);
+CREATE INDEX installment_versions_month_idx ON finance_v2.installment_versions (household_id, purchase_id, effective_from_month, revision);
+CREATE INDEX installment_versions_card_idx ON finance_v2.installment_versions (household_id, credit_card_id, effective_from_month);
 CREATE INDEX memberships_user_idx ON finance_v2.household_memberships (user_id, household_id);
 
 -- Draft integrity protection only, not financial transaction/business logic.
@@ -448,6 +480,10 @@ BEGIN
         USING ERRCODE = '55000';
 END;
 $finance_v2_history$;
+
+CREATE TRIGGER installment_versions_immutable
+    BEFORE UPDATE OR DELETE OR TRUNCATE ON finance_v2.installment_versions
+    FOR EACH STATEMENT EXECUTE FUNCTION finance_v2.reject_history_mutation();
 
 CREATE TRIGGER installment_month_snapshots_immutable
     BEFORE UPDATE OR DELETE OR TRUNCATE ON finance_v2.installment_month_snapshots

@@ -101,6 +101,26 @@ export interface InstallmentPurchaseSnapshot {
   description?: string;
   categoryId?: string;
   totalAmount?: number;
+  creditCardId?: string;
+  cardAssignmentKnown?: boolean;
+  categoryAssignmentKnown?: boolean;
+}
+
+/** Append-only configuration/event. Corrections affect exactly one open month. */
+export interface InstallmentVersion {
+  revision: number;
+  operation: 'initial' | 'change' | 'correction' | 'cancel' | 'payoff';
+  effectiveFromMonth: string;
+  description: string;
+  totalAmount: number;
+  installmentsCount: number;
+  baseInstallmentNumber: number;
+  creditCardId?: string;
+  categoryId?: string;
+  roundingRule: 'legacy_uniform';
+  payoffAmount?: number;
+  recordedAt: string;
+  reason: string;
 }
 
 /**
@@ -125,6 +145,8 @@ export interface InstallmentPurchase {
   monthlySnapshots?: Record<string, InstallmentPurchaseSnapshot>;
   effectiveFromMonth?: string;
   baseInstallmentNumber?: number;
+  /** When present, versions are authoritative; top-level configuration is a UI compatibility projection. */
+  versions?: InstallmentVersion[];
 }
 
 /**
