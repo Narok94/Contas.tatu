@@ -14,21 +14,28 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
 
 ## Backend e secrets
 
-- `api/`: pontos de entrada HTTP; somente o health check está implementado.
-- `server/neon.ts`: local reservado para o futuro cliente Neon. Exporta apenas
-  uma leitura de configuração sob demanda; importar o módulo não lê secrets,
-  inicializa clientes ou abre conexões. Nenhum código chama essa função hoje.
+- `api/`: pontos de entrada HTTP para `/api/health` e `/api/db-health`.
+  O diagnóstico do banco aceita GET/HEAD e consulta somente metadados em uma
+  transação read-only. Confirma `neondb`, `finance_v2` e 18 tabelas; falhas
+  retornam HTTP 500 com mensagem genérica, sem detalhes de conexão.
+- `server/neon.ts`: fonte única do cliente HTTP Neon server-side. `getNeonClient()`
+  valida a configuração e cria/reutiliza o cliente por instância do runtime.
+  Importar o módulo não lê secrets; criar o cliente não executa consultas.
+  `/api/db-health` utiliza esse cliente; `/api/health` permanece independente.
 - `tsconfig.server.json`: valida o backend separadamente, com tipos Node.js.
 - O Vite rejeita imports de `api/` e `server/` e bloqueia o acesso direto a essas
   pastas pelo servidor de desenvolvimento. O frontend não importa esses módulos.
-- No futuro, configure `NEON_READONLY_DATABASE_URL` ou `DATABASE_URL` no ambiente
-  server-side da Vercel. A primeira tem precedência; o nome não garante permissões:
-  o usuário do banco deverá ter privilégios efetivamente restritos.
+- Configure exclusivamente `CONTAS_TATU_DATABASE_URL` no ambiente server-side
+  das Vercel Functions. Não há fallback para variáveis de outras integrações.
+  Localmente, o processo Node deve carregar `.env.local` (por exemplo, com
+  `node --env-file=.env.local` ao executar um script server-side). O módulo
+  lê `process.env` sob demanda e não abre arquivos de ambiente.
 - Nunca use prefixo `VITE_` para secrets: esse prefixo disponibiliza valores ao
   navegador. Não adicione secrets ao `define` do Vite, respostas HTTP ou logs.
-  Somente o módulo server-side usa `node:process` para ler essas duas variáveis.
+  O cliente fica restrito ao servidor; não retorne erros brutos do driver em APIs.
 - Arquivos `.env*` (exceto o exemplo) e `.vercel/` são ignorados pelo Git.
-  Nenhuma credencial precisa ser configurada para esta etapa.
+  Lint, build, testes e `/api/health` não precisam de credenciais do banco.
+  `/api/db-health` exige a variável configurada no ambiente server-side.
 
 ## Desenvolvimento e validação
 
@@ -54,8 +61,9 @@ sozinhos não executam Vercel Functions. A CLI pode solicitar vinculação a um
 projeto Vercel; não é necessário configurar banco. Não baixe secrets de produção
 para testar o health check.
 
-Antes de integrar o Neon: definir autenticação/autorização para endpoints de
-dados, privilégios do banco, driver, tratamento seguro de erros e política de
-conexões. Não existem driver Neon, SQL, schema, tabelas ou migrations nesta etapa.
+O driver Neon e a migration inicial de `finance_v2` estão disponíveis. Antes de
+criar endpoints de dados, definir autenticação/autorização, privilégios do banco
+e tratamento seguro de erros. O frontend e o localStorage permanecem independentes
+do banco; esta camada não cria CRUD nem executa migrations automaticamente.
 
 Referência: https://vercel.com/docs/functions/runtimes/node-js
