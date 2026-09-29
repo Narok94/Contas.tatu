@@ -1,3 +1,4 @@
+import { InstallmentLifecycle } from './InstallmentLifecycle';
 import React, { useState, useEffect } from 'react';
 import { X, CreditCard as CardIcon, ShoppingBag, Layers } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -19,6 +20,7 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
   editingItem,
 }) => {
   const {
+    busy,
     currentMonth,
     categories,
     creditCards,
@@ -31,14 +33,19 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
 
   const currentCard = creditCards.find((c) => c.id === cardId);
 
+  const [targetCardId, setTargetCardId] = useState(cardId);
   const [purchaseType, setPurchaseType] = useState<'simple' | 'installment'>('simple');
   const [description, setDescription] = useState('');
   const [amount, setAmount] = useState('');
   const [installmentsCount, setInstallmentsCount] = useState('3');
   const [currentInstallmentNumber, setCurrentInstallmentNumber] = useState('1');
+  const [operation, setOperation] = useState<'change' | 'correct'>('change');
+  const [reason, setReason] = useState('');
   const [categoryId, setCategoryId] = useState(categories.length > 0 ? categories[0].id : '');
 
   useEffect(() => {
+    setTargetCardId(cardId);
+    setOperation('change'); setReason('');
     if (editingItem) {
       setDescription(editingItem.description);
       setCategoryId(editingItem.categoryId || '');
@@ -86,17 +93,19 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
       setCurrentInstallmentNumber('1');
       setCategoryId(categories.length > 0 ? categories[0].id : '');
     }
-  }, [editingItem, isOpen, categories, store.installmentPurchases]);
+  }, [editingItem, isOpen, currentMonth]);
 
   if (!isOpen || !currentCard) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    let result: void | boolean;
     const numAmount = parseFloat(amount.replace(',', '.')) || 0;
 
     if (editingItem) {
       if (editingItem.sourceType === 'simple_expense') {
-        updateCardExpense(editingItem.sourceId, {
+        result = await updateCardExpense(editingItem.sourceId, {
           description: description.trim(),
           amount: numAmount,
           categoryId: categoryId || undefined,
@@ -104,22 +113,22 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
       } else {
         const count = parseInt(installmentsCount, 10) || 1;
         const curr = parseInt(currentInstallmentNumber, 10) || 1;
-        updateInstallmentPurchase(editingItem.sourceId, {
+        result = await updateInstallmentPurchase(editingItem.sourceId, {
           description: description.trim(),
           totalAmount: numAmount,
           installmentsCount: count,
-          currentInstallment: curr,
+          currentInstallment: curr, operation, reason,
           categoryId: categoryId || undefined,
-          creditCardId: cardId,
+          creditCardId: targetCardId,
         });
       }
-      onClose();
+      if (result !== false) onClose();
       return;
     }
 
     // Criação nova
     if (purchaseType === 'simple') {
-      createCardExpense({
+      result = await createCardExpense({
         cardId,
         description: description.trim(),
         amount: numAmount,
@@ -128,7 +137,7 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
       });
     } else {
       const count = parseInt(installmentsCount, 10) || 1;
-      createInstallmentPurchase({
+      result = await createInstallmentPurchase({
         description: description.trim(),
         totalAmount: numAmount,
         installmentsCount: count,
@@ -138,7 +147,7 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
       });
     }
 
-    onClose();
+    if (result !== false) onClose();
   };
 
   const parsedTotal = parseFloat(amount.replace(',', '.')) || 0;
@@ -342,6 +351,8 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
             </select>
           </div>
 
+{editingItem?.sourceType === 'installment' && <label className="block text-sm">Local de lançamento<select aria-label="Local de lançamento" value={targetCardId} onChange={e => setTargetCardId(e.target.value)}><option value="">Parcelamento avulso</option>{creditCards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}</select></label>}
+{editingItem?.sourceType === 'installment' && <InstallmentLifecycle id={editingItem.sourceId} operation={operation} setOperation={setOperation} reason={reason} setReason={setReason} onDone={onClose} />}
           <div className="flex items-center justify-end gap-3 pt-3 border-t border-stone-200">
             <button
               type="button"
@@ -352,7 +363,7 @@ export const CardPurchaseModal: React.FC<CardPurchaseModalProps> = ({
             </button>
             <button
               id="btn-save-card-purchase"
-              type="submit"
+              type="submit" disabled={busy}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand hover:bg-brand-strong rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.98]"
             >
               {editingItem ? 'Salvar Alteração' : 'Lançar no Cartão'}

@@ -5,7 +5,7 @@ import {fileURLToPath} from 'node:url';
 import {defineConfig, normalizePath} from 'vite';
 
 const projectRoot = fileURLToPath(new URL('.', import.meta.url));
-const serverDirectories = ['api', 'server'].map((directory) =>
+const serverDirectories = ['api', 'server', 'scripts'].map((directory) =>
   normalizePath(path.resolve(projectRoot, directory)) + '/',
 );
 
@@ -32,7 +32,7 @@ export default defineConfig(() => {
     },
     server: {
       fs: {
-        deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/server/**', '**/api/**'],
+        deny: ['.env', '.env.*', '*.{crt,pem}', '**/.git/**', '**/server/**', '**/api/**', '**/scripts/**'],
       },
       // HMR is disabled in AI Studio via DISABLE_HMR env var.
       // Do not modifyâfile watching is disabled to prevent flickering during agent edits.

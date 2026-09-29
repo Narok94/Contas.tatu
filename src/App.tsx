@@ -18,20 +18,21 @@ const AppContent: React.FC = () => {
     isAccountModalOpen,
     closeAccountModal,
     editingAccount,
-    operationError, clearOperationError,
+    operationError, clearOperationError, loading, busy, mode, refresh, hasCurrentView,
   } = useFinance();
 
   return (
     <div className="app-shell min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20">
       {/* Persistent sidebar and shared toolbar */}
       <Header />
+      {(loading || busy) && <div role="status" className="fixed bottom-6 right-6 z-40 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm shadow-sm">{busy ? 'Salvando…' : 'Carregando dados…'}</div>}
 
       {/* Main Content Area */}
       <main className="app-main flex-1 pb-10">
-        {activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <AccountsPage /> : <HistoryPage />}
+        {mode === 'neon' && !hasCurrentView ? <div className="p-6 text-sm">{loading ? 'Aguarde o carregamento do mês.' : <><p>Não foi possível carregar os dados.</p><button onClick={refresh}>Tentar novamente</button></>}</div> : activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <AccountsPage /> : <HistoryPage />}
       </main>
       <PaymentDialog />
-      {operationError && <div className="operation-error" role="alert"><span>{operationError}</span><button onClick={clearOperationError} aria-label="Fechar aviso">×</button></div>}
+      {operationError && <div className="operation-error" role="alert"><span>{operationError}</span>{refresh && <button onClick={refresh}>Atualizar</button>}<button onClick={clearOperationError} aria-label="Fechar aviso">×</button></div>}
 
       {/* Account Modal (Create / Edit) */}
       <AccountModal

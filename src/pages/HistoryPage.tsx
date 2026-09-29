@@ -83,6 +83,6 @@ export function HistoryPage() {
         </div>)}</div>
       </div>}
     </section>}
-    <ConfirmDialog isOpen={view === 'monthly' && confirmation?.month === currentMonth} title={`${reopening ? 'Reabrir' : 'Fechar'} ${formatMonthYear(currentMonth)}?`} message={reopening ? 'Você poderá adicionar ou corrigir contas deste mês novamente.' : 'Todas as contas estão pagas. Você poderá reabrir este mês depois, se precisar fazer alguma correção.'} confirmLabel={reopening ? 'Reabrir mês' : 'Fechar mês'} isDestructive={false} onCancel={() => setConfirmation(null)} onConfirm={() => { if ((reopening ? reopenCurrentMonth : closeCurrentMonth)()) setConfirmation(null); }} />
+    <ConfirmDialog isOpen={view === 'monthly' && confirmation?.month === currentMonth} title={`${reopening ? 'Reabrir' : 'Fechar'} ${formatMonthYear(currentMonth)}?`} message={reopening ? 'Você poderá adicionar ou corrigir contas deste mês novamente.' : 'Todas as contas estão pagas. Você poderá reabrir este mês depois, se precisar fazer alguma correção.'} confirmLabel={reopening ? 'Reabrir mês' : 'Fechar mês'} isDestructive={false} onCancel={() => setConfirmation(null)} onConfirm={async () => { if (await (reopening ? reopenCurrentMonth : closeCurrentMonth)()) setConfirmation(null); }} />
   </section>;
 }

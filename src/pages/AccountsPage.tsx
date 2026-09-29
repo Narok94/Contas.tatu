@@ -23,6 +23,7 @@ type AccountTypeFilter = 'all' | 'simple' | 'recurring' | 'installment' | 'credi
 
 export const AccountsPage: React.FC = () => {
   const {
+    mode,
     currentMonth,
     categories,
     monthlyAccounts,
@@ -97,16 +98,16 @@ export const AccountsPage: React.FC = () => {
     };
   }, [monthlyAccounts]);
 
-  const handleConfirmDeleteAccount = () => {
+  const handleConfirmDeleteAccount = async () => {
     if (accountToDelete) {
-      deleteAccount(accountToDelete);
+      if (await deleteAccount(accountToDelete) === false) return;
       setAccountToDelete(null);
     }
   };
 
-  const handleConfirmDeleteCardItem = () => {
+  const handleConfirmDeleteCardItem = async () => {
     if (cardItemToDelete) {
-      deleteCardItem(cardItemToDelete.sourceType, cardItemToDelete.sourceId);
+      if (await deleteCardItem(cardItemToDelete.sourceType, cardItemToDelete.sourceId) === false) return;
       setCardItemToDelete(null);
     }
   };
@@ -365,8 +366,8 @@ export const AccountsPage: React.FC = () => {
       {/* Diálogo de confirmação obrigatória para exclusão de conta */}
       <ConfirmDialog
         isOpen={Boolean(accountToDelete)}
-        title="Excluir Conta"
-        message="Tem certeza de que deseja excluir esta conta? Esta operação não pode ser desfeita."
+        title={mode === 'neon' && accountToDelete?.type === 'installment' ? 'Cancelar parcelamento futuro' : 'Excluir Conta'}
+        message={mode === 'neon' && accountToDelete?.type === 'installment' ? 'Cancelar a partir do mês selecionado, preservando as parcelas dos meses anteriores?' : 'Tem certeza de que deseja excluir esta conta? Esta operação não pode ser desfeita.'}
         itemName={accountToDelete?.name}
         confirmLabel="Sim, excluir conta"
         onConfirm={handleConfirmDeleteAccount}
@@ -377,7 +378,7 @@ export const AccountsPage: React.FC = () => {
       <ConfirmDialog
         isOpen={Boolean(cardItemToDelete)}
         title="Remover Compra da Fatura"
-        message="Tem certeza de que deseja remover esta compra da fatura do cartão?"
+        message={mode === 'neon' && cardItemToDelete?.sourceType === 'installment' ? 'Cancelar as parcelas a partir do mês selecionado, preservando os meses anteriores?' : 'Tem certeza de que deseja remover esta compra da fatura do cartão?'}
         itemName={cardItemToDelete?.description}
         confirmLabel="Sim, remover"
         onConfirm={handleConfirmDeleteCardItem}

@@ -25,15 +25,15 @@ Rotas nativas Vercel preparadas:
 
 As rotas estão **bloqueadas na Vercel e em NODE_ENV=production**. Para uso local,
 exigem `CONTAS_TATU_ENABLE_LOCAL_API=true`, conexão loopback, Host local, ausência
-de Origin e de X-Forwarded-For. Não ofereça proxy público para esse serviço local.
+de cabeçalhos de encaminhamento e Origin ausente ou exatamente igual à origem HTTP local. Não ofereça proxy público para esse serviço local.
 Essa restrição temporária não é login/autorização e não é adequada a um produto
-multiusuário. O frontend não utiliza essas rotas. Vercel dev/proxies que adicionem
+multiusuário. O frontend agora utiliza essas rotas no runner controlado descrito em
+[FRONTEND-PERSISTENCE.md](FRONTEND-PERSISTENCE.md). Vercel dev/proxies que adicionem
 X-Forwarded-For serão recusados por segurança.
 
-Antes de liberar rotas remotas ou integrar contas/cartões/parcelamentos, definir
+Antes de liberar rotas remotas, definir
 identidade autenticada, membership, autorização e guardas de mês fechado. O
-arquivamento atual não desvincula referências financeiras: nenhuma dessas entidades
-foi integrada nesta etapa. Não usar a identidade fixa como seleção multi-household.
+arquivamento não desvincula referências financeiras históricas. Não usar a identidade fixa como seleção multi-household.
 
 Testes usam um double em memória da fronteira SQL e serviços simulados de HTTP;
 não carregam `.env.local` nem dependem de Production. A validação administrativa

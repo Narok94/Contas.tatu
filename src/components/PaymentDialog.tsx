@@ -10,12 +10,13 @@ export function PaymentDialog() {
 
 const PaymentForm: React.FC<{
   request: NonNullable<ReturnType<typeof useFinance>['paymentRequest']>;
-  cancel: () => void; confirm: (amount: number) => boolean;
+  cancel: () => void; confirm: (amount: number) => boolean | Promise<boolean>;
 }> = ({ request, cancel, confirm }) => {
   const [value, setValue] = useState(request.account.type === 'credit_card'
     ? (request.account.cardInfo?.paidAmount ? request.account.cardInfo.paidAmount.toFixed(2).replace('.', ',') : '')
     : request.account.amount.toFixed(2).replace('.', ','));
   const [error, setError] = useState('');
+  const { busy } = useFinance();
   const card = request.account.type === 'credit_card';
   return <div className="finance-overlay" onKeyDown={event => { if (event.key === 'Escape') cancel(); }}>
     <form role="dialog" aria-modal="true" aria-labelledby="payment-title" className="finance-dialog" onSubmit={event => {
@@ -33,7 +34,7 @@ const PaymentForm: React.FC<{
       <input id="payment-value" autoFocus inputMode="decimal" value={value} onChange={event => { setValue(event.target.value); setError(''); }} />
       <p>{card ? `Fatura: ${formatBRL(request.account.amount)}. Informe o total já pago neste mês, incluindo pagamentos anteriores. O restante segue para o próximo mês.` : 'A correção vale somente para esta conta neste mês.'}</p>
       {error && <p role="alert">{error}</p>}
-      <div className="finance-actions"><button type="button" onClick={cancel}>Cancelar</button><button className="finance-primary" type="submit">Confirmar pagamento</button></div>
+      <div className="finance-actions"><button type="button" onClick={cancel}>Cancelar</button><button className="finance-primary" type="submit" disabled={busy}>Confirmar pagamento</button></div>
     </form>
   </div>;
 }

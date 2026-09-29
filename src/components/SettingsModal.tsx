@@ -17,6 +17,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
   onClose,
 }) => {
   const {
+    mode, busy,
     categories,
     addCategory,
     updateCategory,
@@ -60,29 +61,30 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
     setDescription('');
   };
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || busy) return;
 
     if (editingCategory) {
-      updateCategory({
+      const result = await updateCategory({
         ...editingCategory,
         name: name.trim(),
         color,
         description: description.trim() || undefined,
       });
+      if (result === false) return;
       setEditingCategory(null);
     } else {
-      addCategory(name.trim(), color, description.trim() || undefined);
+      if (await addCategory(name.trim(), color, description.trim() || undefined) === false) return;
       setIsCreating(false);
     }
     setName('');
     setDescription('');
   };
 
-  const handleConfirmDelete = () => {
+  const handleConfirmDelete = async () => {
     if (categoryToDelete) {
-      deleteCategory(categoryToDelete.id);
+      if (await deleteCategory(categoryToDelete.id) === false) return;
       setCategoryToDelete(null);
     }
   };
@@ -209,7 +211,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                       Cancelar
                     </button>
                     <button
-                      type="submit"
+                      type="submit" disabled={busy}
                       className="px-4 py-1.5 text-xs font-semibold text-white bg-brand hover:bg-brand-strong rounded-md shadow-xs transition-colors cursor-pointer"
                     >
                       {editingCategory ? 'Salvar' : 'Criar Categoria'}
@@ -264,7 +266,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
             </div>
 
             {/* Separador e Opção de Resetar Demonstração */}
-            <div className="pt-4 border-t border-stone-200">
+            {mode !== 'neon' && <div className="pt-4 border-t border-stone-200">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                 <div>
                   <h4 className="text-xs font-semibold text-stone-700">
@@ -283,7 +285,7 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                   Restaurar Exemplo
                 </button>
               </div>
-            </div>
+            </div>}
           </div>
         </div>
       </div>

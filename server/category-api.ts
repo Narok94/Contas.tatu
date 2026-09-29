@@ -9,7 +9,9 @@ export function localAccess(request: Request) {
   return !process.env.VERCEL && process.env.NODE_ENV !== 'production' &&
     process.env.CONTAS_TATU_ENABLE_LOCAL_API === 'true' &&
     ['127.0.0.1', '::1', '::ffff:127.0.0.1'].includes(request.socket?.remoteAddress ?? '') &&
-    !request.headers.origin && !request.headers['x-forwarded-for'] &&
+    (!request.headers.origin || request.headers.origin === `http://${request.headers.host}`) &&
+    !request.headers['x-forwarded-for'] && !request.headers.forwarded &&
+    (!request.headers['sec-fetch-site'] || request.headers['sec-fetch-site'] === 'same-origin' || request.headers['sec-fetch-site'] === 'none') &&
     /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(request.headers.host ?? '');
 }
 export async function readBody(request: Request) {

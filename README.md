@@ -2,10 +2,11 @@
 
 ## Arquitetura
 
-O frontend React/TypeScript usa Vite e continua utilizando exclusivamente o
-armazenamento local existente. Nenhum fluxo financeiro chama a API nesta etapa.
+O frontend React/TypeScript usa a API como fonte de persistência financeira no
+ambiente local controlado. Dados locais antigos não são importados ou apagados.
 
-Arquitetura preparada: **React/Vite → Vercel Function → Neon (futuro)**.
+Arquitetura: **React/Vite → API server-side → Neon**. As rotas financeiras
+continuam bloqueadas na Vercel/Production até autenticação e autorização definitivas.
 Na Vercel, `dist/` contém o frontend e `api/health.ts` é executado sob demanda
 no runtime Node.js em `/api/health`. Não há processo Express nem `listen()`.
 O health check é público: GET retorna `200 {"status":"ok"}`, HEAD retorna 200
@@ -42,7 +43,9 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
 Após instalar as dependências com `npm install`:
 
 ```sh
-npm run dev    # frontend Vite existente, porta 3000
+npm run dev:isolated   # UI + API + PGlite em memória, porta 3100
+npm run dev:controlled # UI + API + Neon real; ações persistem no banco
+npm run dev           # somente Vite, sem handlers financeiros
 npm run build
 npm run lint   # TypeScript do frontend/configuração e backend
 ```
@@ -61,9 +64,11 @@ sozinhos não executam Vercel Functions. A CLI pode solicitar vinculação a um
 projeto Vercel; não é necessário configurar banco. Não baixe secrets de produção
 para testar o health check.
 
-O driver Neon e a migration inicial de `finance_v2` estão disponíveis. Antes de
-criar endpoints de dados, definir autenticação/autorização, privilégios do banco
-e tratamento seguro de erros. O frontend e o localStorage permanecem independentes
-do banco; esta camada não cria CRUD nem executa migrations automaticamente.
+A integração financeira está documentada em [FRONTEND-PERSISTENCE.md](docs/FRONTEND-PERSISTENCE.md).
+O modo controlado usa apenas a variável dedicada de `.env.local` no servidor.
+Não executa migration nem importa dados locais/demo. O modo isolado aplica a
+migration existente somente ao PGlite em memória e é o destino dos testes E2E.
+O rollback de localStorage exige `VITE_FINANCE_MODE=local` em desenvolvimento;
+não existe fallback automático nem provider legado no bundle de produção.
 
 Referência: https://vercel.com/docs/functions/runtimes/node-js

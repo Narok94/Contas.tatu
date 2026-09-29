@@ -1,3 +1,4 @@
+import { InstallmentLifecycle } from './InstallmentLifecycle';
 import React, { useState, useEffect } from 'react';
 import { X, Layers, Repeat, CreditCard as CardIcon, DollarSign, Tag, Calendar, Info } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -17,10 +18,12 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   editingAccount,
 }) => {
   const {
+    busy,
     currentMonth,
     categories,
     creditCards,
     store,
+    createCreditCard,
     createSimpleAccount,
     createRecurringAccount,
     createInstallmentPurchase,
@@ -32,6 +35,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   // Campos comuns
   const [name, setName] = useState('');
   const [value, setValue] = useState('');
+  const [operation, setOperation] = useState<'change' | 'correct'>('change');
+  const [reason, setReason] = useState('');
   const [categoryId, setCategoryId] = useState<string>('');
 
   // Campos específicos de parcelada
@@ -42,6 +47,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
 
   // Inicializa quando abre para editar ou criar
   useEffect(() => {
+    setOperation('change'); setReason('');
     if (editingAccount) {
       setName(editingAccount.name);
       setCategoryId(editingAccount.categoryId || '');
@@ -71,7 +77,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           setValue(String(historicalTotal));
           setInstallmentsCount(String(historicalCount));
           setCurrentInstallmentNumber(String(historicalCurrent));
-          setCreditCardId(purchase.creditCardId || '');
+          setCreditCardId(statusInMonth.creditCardId || '');
           setStartMonth(purchase.startMonth);
         } else {
           const totalInst = editingAccount.installmentInfo?.totalInstallments || 1;
@@ -97,7 +103,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       setCreditCardId('');
       setStartMonth(currentMonth);
     }
-  }, [editingAccount, isOpen, categories, creditCards, currentMonth, store.installmentPurchases]);
+  }, [editingAccount, isOpen, currentMonth]);
 
   if (!isOpen) return null;
 
@@ -105,8 +111,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   const parsedCount = parseInt(installmentsCount, 10) || 1;
   const calculatedInstallment = calculateInstallmentValue(parsedTotal, parsedCount);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (busy) return;
+    let result: void | boolean;
     const numValue = parseFloat(value.replace(',', '.')) || 0;
 
     if (editingAccount) {
@@ -114,39 +122,40 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         const totalInst = parseInt(installmentsCount, 10) || 1;
         const currInst = parseInt(currentInstallmentNumber, 10) || 1;
 
-        updateAccountValueAndDetails(
+        result = await updateAccountValueAndDetails(
           editingAccount,
           name.trim(),
           numValue,
           categoryId || undefined,
           {
+            operation, reason,
             installmentsCount: totalInst,
             currentInstallment: currInst,
-            creditCardId: creditCardId || undefined,
+            creditCardId,
           }
         );
       } else {
-        updateAccountValueAndDetails(
+        result = await updateAccountValueAndDetails(
           editingAccount,
           name.trim(),
           numValue,
           categoryId || undefined
         );
       }
-      onClose();
+      if (result !== false) onClose();
       return;
     }
 
     // Criação de nova conta
-    if (activeType === 'simple') {
-      createSimpleAccount({
+    if (activeType === 'credit_card') { result = await createCreditCard?.(name.trim()); } else if (activeType === 'simple') {
+      result = await createSimpleAccount({
         name: name.trim(),
         value: numValue,
         categoryId: categoryId || undefined,
         month: currentMonth,
       });
     } else if (activeType === 'recurring') {
-      createRecurringAccount({
+      result = await createRecurringAccount({
         name: name.trim(),
         initialValue: numValue,
         categoryId: categoryId || undefined,
@@ -154,7 +163,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       });
     } else if (activeType === 'installment') {
       const count = parseInt(installmentsCount, 10) || 1;
-      createInstallmentPurchase({
+      result = await createInstallmentPurchase({
         description: name.trim(),
         totalAmount: numValue,
         installmentsCount: count,
@@ -164,7 +173,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
       });
     }
 
-    onClose();
+    if (result !== false) onClose();
   };
 
   return (
@@ -208,6 +217,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 Tipo de Conta
               </label>
               <div className="grid grid-cols-3 gap-2">
+                {createCreditCard && <button type="button" onClick={() => setActiveType('credit_card')} aria-pressed={activeType === 'credit_card'} className={`p-2.5 rounded-lg border text-left ${activeType === 'credit_card' ? 'bg-brand text-white' : ''}`}><span className="text-xs font-semibold">Cartão</span></button>}
                 <button
                   type="button"
                   onClick={() => setActiveType('simple')}
@@ -278,7 +288,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
 
           {/* Valor */}
-          <div>
+          <div hidden={activeType === 'credit_card'}>
             <label className="block text-xs font-medium text-stone-700 mb-1">
               {activeType === 'installment'
                 ? 'Valor Total da Compra (R$)'
@@ -294,7 +304,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
                 type="number"
                 step="0.01"
                 min="0"
-                required
+                required={activeType !== 'credit_card'}
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
                 placeholder="0,00"
@@ -411,6 +421,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             </select>
           </div>
 
+{editingAccount?.type === 'installment' && <InstallmentLifecycle id={editingAccount.installmentInfo?.purchaseId ?? editingAccount.id} operation={operation} setOperation={setOperation} reason={reason} setReason={setReason} onDone={onClose} />}
           {/* Rodapé de Ações */}
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-200">
             <button
@@ -422,7 +433,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
             </button>
             <button
               id="btn-save-account-modal"
-              type="submit"
+              type="submit" disabled={busy}
               className="px-5 py-2 text-sm font-semibold text-white bg-brand hover:bg-brand-strong rounded-xl shadow-xs transition-colors cursor-pointer active:scale-[0.98]"
             >
               {editingAccount ? 'Salvar Alterações' : 'Cadastrar Conta'}

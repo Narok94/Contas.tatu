@@ -1,7 +1,7 @@
 # Persistência financeira controlada
 
-Implementação server-side, sem alteração do frontend/localStorage, autenticação
-ou importação de dados. `001_finance_v2.sql` permanece a fonte do schema.
+Implementação server-side sem autenticação definitiva ou importação de dados.
+A integração posterior do frontend está em [FRONTEND-PERSISTENCE.md](FRONTEND-PERSISTENCE.md). `001_finance_v2.sql` permanece a fonte do schema.
 
 ## Camadas
 
@@ -42,7 +42,8 @@ da fatura na mesma transação. Correção retroativa respeita reabertura e over
 ## Contrato HTTP
 
 Mesmas restrições locais da fundação: `CONTAS_TATU_ENABLE_LOCAL_API=true`, loopback,
-Host local, sem Origin/X-Forwarded-For; bloqueado quando VERCEL estiver presente
+Host local, sem cabeçalhos de encaminhamento, Origin ausente ou exatamente igual
+à origem HTTP local; bloqueado quando VERCEL estiver presente
 ou NODE_ENV=production. Isso NÃO é autenticação definitiva. Sem escrita remota
 anônima. Antes da integração pública, implementar identidade/membership/autorização.
 
