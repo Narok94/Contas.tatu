@@ -1,4 +1,5 @@
 import type { FinanceDataStore } from '../domain/financeRules';
+import { navigationHeaders } from '../auth/navigationSession';
 
 export interface FinanceView { revision: string; month: string; state: FinanceDataStore }
 export class ApiError extends Error {
@@ -13,7 +14,7 @@ export function createFinanceApi(fetcher: typeof fetch = globalThis.fetch.bind(g
   async function request<T>(url: string, method = 'GET', body?: unknown): Promise<T> {
     try {
       const response = await fetcher(url, { method, credentials: 'same-origin', cache: 'no-store',
-        headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
+        headers: { ...navigationHeaders(), ...(body === undefined ? {} : { 'Content-Type': 'application/json' }) },
         body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000) });
       if (!response.ok) {
         if (response.status===401 && typeof window!=='undefined') window.dispatchEvent(new Event('auth-expired'));

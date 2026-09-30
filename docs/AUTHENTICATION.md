@@ -22,11 +22,21 @@ Reexecutar provisionamento não redefine senhas existentes automaticamente.
 
 ## Sessão e limites
 
-Token aleatório de 256 bits; apenas seu SHA-256 fica no banco. Cookie HttpOnly,
+Token aleatório de 256 bits; apenas um digest SHA-256 fica no banco. Cookie HttpOnly,
 SameSite=Strict, Path=/ e, em Production, Secure com prefixo __Host-. Sem lembrar,
-cookie de navegador e limite de oito horas no servidor. Lembrar login usa cookie
-de 30 dias, renovação após um dia com rotação do token e máximo absoluto de
-90 dias. Logout exclui a sessão. password_version permite invalidar todas as
+cookie de navegador, limite de oito horas no servidor e chave de navegação de
+256 bits, mantida apenas na memória da página. O digest temporário vincula cookie
+e chave; a API exige ambos. Fechar/reabrir, restaurar uma aba ou recarregar a página
+exige novo login, mesmo se o navegador restaurar o cookie. Nenhuma chave entra
+em localStorage/sessionStorage. Sessões temporárias anteriores ao ajuste também
+não são restauradas automaticamente.
+
+Lembrar login usa cookie de 30 dias, renovação após um dia e máximo absoluto de
+90 dias. Cada login gera outro token. A renovação estende a validade no servidor
+sem trocar o token da sessão, para que logout possa revogá-lo mesmo quando outra
+aba está recebendo uma resposta atrasada de renovação. Logout exclui a sessão e
+expira o cookie; o frontend ignora respostas de sessão anteriores ao logout.
+password_version permite invalidar todas as
 sessões quando uma futura alteração de senha incrementar a versão.
 
 POST exige Origin exata e rejeita contextos cross-site. Limites de dez tentativas
@@ -67,10 +77,28 @@ fixtures. Validação visual automatizada inclui 393×852, 414×896 e 1440×1000
 teclado foi simulado por redução de viewport, sem alegar teste em Safari físico.
 
 Validação: seis testes de autenticação aprovados, cobrindo os dois logins,
-membership, hashes e tokens persistidos, credenciais inválidas, rotação,
+membership, hashes e tokens persistidos, credenciais inválidas, renovação,
 expiração, logout, password_version, cookie Production, CSRF e tentativas
 repetidas. Navegador focado confirmou login/logout, autores, mesma casa, sessão
 persistente, API protegida e ausência de tokens em localStorage. Scanner não
 encontrou a senha inicial nos fontes ou bundle. Lint e build aprovados.
 Health check atualizado para 21 tabelas (18 financeiras + 3 de autenticação),
 com seus testes específicos. Nenhum deploy manual: publicação pelo push normal.
+
+## Ajuste mobile de login e sessão
+
+Login usa a altura e o offset de visualViewport. Enquanto o login mobile está
+montado, documento e body não rolam; seus estilos anteriores são restaurados
+na saída. Safe areas entram no cálculo. Em áreas menores, o espaçamento se
+adapta; com teclado, a decoração é ocultada temporariamente e somente o card
+pode rolar quando necessário para alcançar campos/botão. Não se altera a arte.
+Tatu reposicionado em relação à borda do card, sem deslocar o card inteiro;
+logo deslocado oito pixels para baixo. Desktop mantém a composição original.
+
+Testes de navegador simulam reabertura com cookies restaurados: marcada permanece,
+desmarcada retorna ao login. Também conferem logout seguido de reload, proteção
+de rotas, os dois usuários, viewport 393×852/414×896 e desktop. Nenhuma alteração
+de usuários, household, migrations ou dados financeiros neste ajuste. Teclado
+validado por viewport reduzida; Safari em aparelho físico ainda requer conferência.
+O comportamento de restauração de cookies de sessão é documentado pela
+[MDN](https://developer.mozilla.org/en-US/docs/Web/HTTP/Reference/Headers/Set-Cookie#expiresdate).

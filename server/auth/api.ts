@@ -2,7 +2,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import { readBody } from '../category-api.js';
 import { FoundationError } from '../foundation.js';
 import { createAuthService } from './service.js';
-import { production, sameOrigin, sessionCookie, tokenFrom } from './access.js';
+import { production, sameOrigin, sessionCookie, tokenFrom, navigationFrom } from './access.js';
 export function authHandler(action: 'login'|'logout'|'session', auth = createAuthService()) {
   return async (request: IncomingMessage & { body?: unknown }, response: ServerResponse) => {
     response.setHeader('Cache-Control','no-store'); response.setHeader('Content-Type','application/json; charset=utf-8');
@@ -19,9 +19,9 @@ export function authHandler(action: 'login'|'logout'|'session', auth = createAut
         const result = await auth.login(await readBody(request),address,token);
         response.setHeader('Set-Cookie',sessionCookie(result.token,result.age)); send(200,{user:result.user});
       } else if (action === 'logout') {
-        await auth.logout(token); response.setHeader('Set-Cookie',sessionCookie('',0)); send(200,{ok:true});
+        await auth.logout(token,navigationFrom(request)); response.setHeader('Set-Cookie',sessionCookie('',0)); send(200,{ok:true});
       } else {
-        const result = await auth.session(token,true);
+        const result = await auth.session(token,true,navigationFrom(request));
         if (!result) { response.setHeader('Set-Cookie',sessionCookie('',0)); send(401,{error:'Entre para continuar.'}); return; }
         if (result.token) response.setHeader('Set-Cookie',sessionCookie(result.token,result.age));
         send(200,{user:result.user});

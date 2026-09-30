@@ -25,32 +25,38 @@ test('closed authentication, password hashes, sessions, access and household iso
   let token='';
   await t.test('both accounts authenticate and belong to the existing same household',async()=>{
     const h=await auth.login({login:'Henrique',password,remember:true},'test-1');
-    const j=await auth.login({login:'Jessica',password},'test-2');
+    const key=randomBytes(32).toString('hex');
+    const j=await auth.login({login:'Jessica',password,navigationKey:key},'test-2');
     assert.equal(h.user.name,'Henrique');assert.equal(j.user.name,'Jéssica');
     assert.equal(h.user.householdId,j.user.householdId);assert.notEqual(h.user.id,j.user.id);
     assert.equal(h.age,30*86400);assert.equal(j.age,undefined);token=h.token;
     const [stored]=await db.batch([q('SELECT password_hash FROM finance_v2.auth_credentials')],true);
     assert.ok(stored.every(r=>/^\$2b\$12\$/.test(String(r.password_hash))));
     assert.ok(stored.every(r=>r.password_hash!==password));assert.notEqual(stored[0].password_hash,stored[1].password_hash);
-    assert.deepEqual((await auth.session(j.token))?.user,j.user);
+    assert.deepEqual((await auth.session(j.token,false,key))?.user,j.user);
+    assert.equal(await auth.session(j.token),undefined);
+    assert.equal(await auth.session(j.token,false,randomBytes(32).toString('hex')),undefined);
+    await auth.logout(j.token,key);
+    assert.equal(await auth.session(j.token,false,key),undefined);
     assert.ok(!JSON.stringify(h.user).includes('hash'));
     const [sessions]=await db.batch([q('SELECT token_hash FROM finance_v2.auth_sessions')],true);
     assert.ok(sessions.every(r=>r.token_hash!==h.token&&r.token_hash!==j.token));
   });
   await t.test('invalid username and password share the same error; client identity rejected',async()=>{
-    for(const v of [{login:'Henrique',password:'wrong'},{login:'unknown',password},{login:'Jessica',password,householdId:'other'}]) {
+    for(const v of [{login:'Henrique',password:'wrong',remember:true},{login:'unknown',password,remember:true},{login:'Jessica',password,remember:true,householdId:'other'}]) {
       await assert.rejects(auth.login(v,'invalid'),{status:401,message:'Usuário ou senha incorretos.'});
     }
   });
-  await t.test('session renews by rotating token, logout and expiry revoke access',async()=>{
+  await t.test('renewal preserves absolute lifetime and cannot resurrect a logged-out session',async()=>{
     await db.batch([q("UPDATE finance_v2.auth_sessions SET renewed_at=CURRENT_TIMESTAMP-INTERVAL '2 days' WHERE token_hash=$1",[digest(token)])],false);
-    const renewed=await auth.session(token,true);assert.ok(renewed?.token);assert.notEqual(renewed.token,token);
-    assert.equal(await auth.session(token),undefined);token=renewed.token;
+    const renewed=await auth.session(token,true);assert.ok(renewed?.token);assert.equal(renewed.token,token);
+    assert.ok(renewed.age!<=30*86400);
     await auth.logout(token);assert.equal(await auth.session(token),undefined);
-    const expired=await auth.login({login:'Henrique',password},'expiry');
+    assert.equal(await auth.session(renewed.token),undefined);
+    const expired=await auth.login({login:'Henrique',password,remember:true},'expiry');
     await db.batch([q("UPDATE finance_v2.auth_sessions SET created_at=CURRENT_TIMESTAMP-INTERVAL '2 days',expires_at=CURRENT_TIMESTAMP-INTERVAL '1 day' WHERE token_hash=$1",[digest(expired.token)])],false);
     assert.equal(await auth.session(expired.token),undefined);
-    const version=await auth.login({login:'Jessica',password},'version');
+    const version=await auth.login({login:'Jessica',password,remember:true},'version');
     await db.batch([q("UPDATE finance_v2.auth_credentials SET password_version=password_version+1 WHERE login='jessica'")],false);
     assert.equal(await auth.session(version.token),undefined);
   });
@@ -72,7 +78,7 @@ test('closed authentication, password hashes, sessions, access and household iso
     }
   });
   await t.test('serverless-safe repeated-attempt limiter',async()=>{
-    for(let i=0;i<10;i++)await assert.rejects(auth.login({login:'nobody',password:'wrong'},'limited'),{status:401});
-    await assert.rejects(auth.login({login:'nobody',password:'wrong'},'limited'),{status:429});
+    for(let i=0;i<10;i++)await assert.rejects(auth.login({login:'nobody',password:'wrong',remember:true},'limited'),{status:401});
+    await assert.rejects(auth.login({login:'nobody',password:'wrong',remember:true},'limited'),{status:429});
   });
 });
