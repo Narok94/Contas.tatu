@@ -5,6 +5,7 @@ export interface Preview {
 export interface ChatMessage {
   id: string; authorId: string; authorName: string; role: 'user' | 'assistant'; text: string;
   createdAt: string; linkedFinancialOperationId?: string; preview?: Preview; saved?: boolean;
+  interactionAuthor?: { id: string; name: string };
 }
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 export function interpret(text: string, month: string, cards: { id: string; name: string }[], categories: { id: string; name: string }[]): Preview | null {
