@@ -93,7 +93,9 @@ na saída. Safe areas entram no cálculo. Em áreas menores, o espaçamento se
 adapta; com teclado, a decoração é ocultada temporariamente e somente o card
 pode rolar quando necessário para alcançar campos/botão. Não se altera a arte.
 Tatu reposicionado em relação à borda do card, sem deslocar o card inteiro;
-logo deslocado oito pixels para baixo. Desktop mantém a composição original.
+No ajuste fino, o logo sobe seis pixels em relação à versão anterior e o tatu
+desce três pixels, aproximando o matinho da borda sem deslocar ou redimensionar
+o card. Tamanhos e assets permanecem iguais. Desktop mantém a composição original.
 
 Testes de navegador simulam reabertura com cookies restaurados: marcada permanece,
 desmarcada retorna ao login. Também conferem logout seguido de reload, proteção
