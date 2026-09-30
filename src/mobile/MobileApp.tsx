@@ -27,7 +27,48 @@ export default function MobileApp() {
   const lock = useRef(false);
   const saved = useRef(new Set<string>());
   const end = useRef<HTMLDivElement>(null);
-  useEffect(() => { end.current?.scrollIntoView({ block: 'end' }); }, [messages, screen]);
+  useEffect(() => {
+    const stream = end.current?.parentElement;
+    stream?.scrollTo({ top: stream.scrollHeight, behavior: 'smooth' });
+  }, [messages, screen]);
+  useEffect(() => {
+    if (screen !== 'conversation') return;
+    const root = document.documentElement, body = document.body;
+    const properties = ['overflow', 'overscroll-behavior', 'position', 'width', 'height'] as const;
+    const previous = [root, body].map(element => properties.map(property => ({
+      property, value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property),
+    })));
+    const scrollY = window.scrollY;
+    root.style.overflow = 'hidden'; root.style.overscrollBehavior = 'none'; root.style.height = '100%';
+    body.style.overflow = 'hidden'; body.style.overscrollBehavior = 'none';
+    body.style.position = 'fixed'; body.style.width = '100%'; body.style.height = '100%';
+    const stream = end.current?.parentElement;
+    if (stream) stream.style.overscrollBehavior = 'none';
+    // Also contain edge drags on iOS versions that do not support overscroll-behavior.
+    let touchY = 0;
+    const start = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
+    const move = (event: TouchEvent) => {
+      if (event.touches.length !== 1 || !(event.target instanceof Element)) return;
+      if (event.target.closest('.mobile-sheet')) return;
+      const area = event.target.closest<HTMLElement>('.chat-stream');
+      const currentY = event.touches[0].clientY, delta = currentY - touchY;
+      touchY = currentY;
+      if (!area || area.scrollHeight <= area.clientHeight ||
+        (delta > 0 && area.scrollTop <= 0) ||
+        (delta < 0 && area.scrollTop + area.clientHeight >= area.scrollHeight - 1)) {
+        if (event.cancelable) event.preventDefault();
+      }
+    };
+    document.addEventListener('touchstart', start, { passive: true });
+    document.addEventListener('touchmove', move, { passive: false });
+    return () => {
+      document.removeEventListener('touchstart', start); document.removeEventListener('touchmove', move);
+      [root, body].forEach((element, index) => previous[index].forEach(({ property, value, priority }) => {
+        if (value) element.style.setProperty(property, value, priority); else element.style.removeProperty(property);
+      }));
+      window.scrollTo(0, scrollY);
+    };
+  }, [screen]);
   useEffect(() => {
     const v = window.visualViewport;
     const update = () => { document.documentElement.style.setProperty('--chat-height', `${v?.height ?? window.innerHeight}px`); document.documentElement.style.setProperty('--chat-top', `${v?.offsetTop ?? 0}px`); };
