@@ -6,6 +6,8 @@
 .login-tatu{top:-25px}
 @media(min-width:768px){.login-tatu{top:-37px}}
 @media(max-width:767px){
+  .login-logo{transform:translateY(-4px)}
+  .login-tatu{top:-22px}
   .login-page{position:fixed;inset:auto 0 auto;top:var(--login-top,0px);height:var(--login-height,100dvh);min-height:0;box-sizing:border-box;overscroll-behavior:none}
   .login-composition{max-height:100%;display:flex;flex-direction:column}
   .login-logo,.login-footer{flex-shrink:0}
@@ -13,7 +15,7 @@
   .login-page[data-tight=true]{padding-top:calc(12px + env(safe-area-inset-top));padding-bottom:calc(12px + env(safe-area-inset-bottom))}
   .login-page[data-tight=true] .login-logo{width:235px;margin-bottom:10px}
   .login-page[data-tight=true] .login-card-wrap{padding-top:104px}
-  .login-page[data-tight=true] .login-tatu{width:264px;height:176px;top:-43px}
+  .login-page[data-tight=true] .login-tatu{width:264px;height:176px;top:-40px}
   .login-page[data-tight=true] .login-card{padding-top:40px;padding-bottom:22px}
   .login-page[data-tight=true] .login-subtitle{margin-bottom:18px}
   .login-page[data-tight=true] .login-field{margin-top:12px}
