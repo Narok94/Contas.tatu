@@ -1,18 +1,20 @@
 import { randomUUID } from 'node:crypto';
 import type { FinanceDataStore } from '../../src/domain/financeRules.js';
-import { assertMonthOpen } from '../../src/domain/monthOperations.js';
-import { find, keys, money, ref, text } from './validation.js';
+import { assertMonthOpen, recordPayment } from '../../src/domain/monthOperations.js';
+import { find, invalid, keys, money, ref, text } from './validation.js';
 
 export function accountCommand(s: FinanceDataStore, action: string, m: string, d: Record<string, unknown>) {
   const now = new Date().toISOString();
   if (action === 'simple.create' || action === 'simple.edit') {
-    keys(d, ['id', 'name', 'value', 'categoryId', 'notes']);
+    keys(d, ['id', 'name', 'value', 'categoryId', 'notes', 'paid']);
+    if (d.paid !== undefined && typeof d.paid !== 'boolean') throw invalid();
     const old = action.endsWith('edit') ? find(s.simpleAccounts, d.id) : undefined;
     if (old) assertMonthOpen(s, old.month);
     const row = { id: old?.id ?? randomUUID(), name: text(d.name)!, value: money(d.value),
       categoryId: ref(d.categoryId, s.categories), notes: text(d.notes, true),
       month: old?.month ?? m, status: old?.status ?? 'pendente' as const, createdAt: old?.createdAt ?? now };
     s.simpleAccounts = old ? s.simpleAccounts.map(a => a.id === row.id ? row : a) : [row, ...s.simpleAccounts];
+    if (typeof d.paid === 'boolean') Object.assign(s, recordPayment(s, row.month, row.id, 'simple', d.paid ? 'pago' : 'pendente'));
   } else if (action === 'simple.archive') {
     keys(d, ['id']); const row = find(s.simpleAccounts, d.id); assertMonthOpen(s, row.month);
     s.simpleAccounts = s.simpleAccounts.filter(a => a.id !== row.id);

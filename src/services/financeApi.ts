@@ -31,7 +31,7 @@ export function createFinanceApi(fetcher: typeof fetch = globalThis.fetch.bind(g
 
 /** In-memory server snapshot only. No storage, demo bootstrap, optimistic writes or automatic retries. */
 export class FinanceSession {
-  snapshot: { month: string; view?: FinanceView; loading: boolean; busy: boolean; error: string; ready: boolean };
+  snapshot: { month: string; view?: FinanceView; loading: boolean; busy: boolean; error: string; errorStatus?: number; ready: boolean };
   private listeners = new Set<() => void>();
   private sequence = 0;
   constructor(month: string, readonly api = createFinanceApi()) {
@@ -50,8 +50,8 @@ export class FinanceSession {
       if (view?.month !== month || typeof view.revision !== 'string' || !/^\d+$/.test(view.revision) || !view.state ||
         !['categories', 'creditCards', 'simpleAccounts', 'recurringDefinitions', 'recurringMonthlyRecords',
           'installmentPurchases', 'cardExpenses', 'cardMonthlyInvoices'].every(key => Array.isArray(view.state[key as keyof FinanceDataStore]))) throw new ApiError(0);
-      this.patch({ view, ready: true }); return true;
-    } catch (error) { if (seq === this.sequence) this.patch({ error: error instanceof ApiError ? error.message : new ApiError(0).message }); return false; }
+      this.patch({ view, ready: true, errorStatus: undefined }); return true;
+    } catch (error) { if (seq === this.sequence) this.patch({ errorStatus: error instanceof ApiError ? error.status : 0, error: error instanceof ApiError ? error.message : new ApiError(0).message }); return false; }
     finally { if (seq === this.sequence) this.patch({ loading: false }); }
   }
   async mutate(operation: (revision: string) => Promise<unknown>) {

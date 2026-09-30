@@ -2,6 +2,8 @@ import { createContext, useContext } from 'react';
 import type { FinanceDataStore } from '../domain/financeRules';
 import type { Category, CreditCard, MonthFinancialSummary, UnifiedMonthlyAccount } from '../types/finance';
 export interface FinanceContextType {
+  apiErrorStatus?: number;
+  submitFinancialCommand?: (action: string, data?: object, month?: string) => Promise<boolean>;
   mode?: 'local' | 'neon';
   loading?: boolean;
   busy?: boolean;

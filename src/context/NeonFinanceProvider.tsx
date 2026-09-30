@@ -39,6 +39,7 @@ export function NeonFinanceProvider({ children }: { children: React.ReactNode })
     ? installmentAction(accountId(a), 'cancel', 'Cancelamento a partir do mês selecionado')
     : command(`${a.type === 'credit_card' ? 'card' : a.type}.archive`, { id: accountId(a) });
   const value: FinanceContextType = {
+    submitFinancialCommand: command, apiErrorStatus: state.errorStatus,
     mode: 'neon', loading: state.loading, busy: state.busy, ready: state.ready, hasCurrentView: state.view?.month === state.month,
     refresh: () => { session.clearError(); void session.load(); },
     currentMonth, setCurrentMonth: month => { if (!state.busy) { setPaymentRequest(null); void session.load(month); } },
