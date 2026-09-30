@@ -1,5 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import { createFoundation, FoundationError } from './foundation.js';
+import { authenticated } from './auth/access.js';
+import { createAuthService } from './auth/service.js';
 
 type Request = IncomingMessage & { body?: unknown; query?: Record<string, string | string[]> };
 type Foundation = ReturnType<typeof createFoundation>;
@@ -36,7 +38,7 @@ export async function readBody(request: Request) {
   return body;
 }
 
-export function categoryHandler(item: boolean, service: Foundation = createFoundation()) {
+export function categoryHandler(item: boolean, service: Foundation = createFoundation(), auth = createAuthService()) {
   return async (request: Request, response: ServerResponse) => {
     response.setHeader('Content-Type', 'application/json; charset=utf-8');
     response.setHeader('Cache-Control', 'no-store');
@@ -50,8 +52,8 @@ export function categoryHandler(item: boolean, service: Foundation = createFound
       response.setHeader('Allow', methods.join(', '));
       send(405, { error: 'Method not allowed' }); return;
     }
-    if (!localAccess(request)) { send(403, { error: 'Controlled local access only' }); return; }
     try {
+      if (!await authenticated(request,auth)) { send(401, { error: 'Entre para continuar.' }); return; }
       // No household selector is accepted, even as an ignored query parameter.
       if (Object.keys(request.query ?? {}).some(k => k !== 'id' || !item)) throw new FoundationError(400, 'Invalid query');
       if (!item) {

@@ -29,7 +29,7 @@ export function createFinanceService(repository = createRepository()) {
       try { return { revision: loaded.revision, amount: installmentPayoffQuote(loaded.store, uuid(id), m) }; }
       catch { throw new FoundationError(422, 'Payoff unavailable for this month'); }
     },
-    async execute(value: unknown) {
+    async execute(value: unknown, actorId?: string) {
       const cmd = object(value); keys(cmd, ['action', 'month', 'expectedRevision', 'data']);
       const m = month(cmd.month); const action = text(cmd.action)!; const data = object(cmd.data ?? {});
       if (typeof cmd.expectedRevision !== 'string' || !/^(0|[1-9]\d*)$/.test(cmd.expectedRevision)) throw invalid();
@@ -59,7 +59,7 @@ export function createFinanceService(repository = createRepository()) {
       for (const row of [...next.recurringMonthlyRecords, ...next.cardMonthlyInvoices]) {
         if (!/^[0-9a-f]{8}-/i.test(row.id)) row.id = randomUUID();
       }
-      const revision = await repository.save(before, next);
+      const revision = await repository.save(before, next, actorId);
       return { status: 'ok', revision, state: next };
     },
   };

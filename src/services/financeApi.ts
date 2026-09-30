@@ -15,7 +15,10 @@ export function createFinanceApi(fetcher: typeof fetch = globalThis.fetch.bind(g
       const response = await fetcher(url, { method, credentials: 'same-origin', cache: 'no-store',
         headers: body === undefined ? {} : { 'Content-Type': 'application/json' },
         body: body === undefined ? undefined : JSON.stringify(body), signal: AbortSignal.timeout(20000) });
-      if (!response.ok) throw new ApiError(response.status);
+      if (!response.ok) {
+        if (response.status===401 && typeof window!=='undefined') window.dispatchEvent(new Event('auth-expired'));
+        throw new ApiError(response.status);
+      }
       return await response.json();
     } catch (error) { throw error instanceof ApiError ? error : new ApiError(0); }
   }

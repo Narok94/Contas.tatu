@@ -38,7 +38,7 @@ export function createRepository(transport: Transport = neonTransport) {
       const tables = rows[0].tables as Record<string, SqlRow[]>;
       return { revision: String(rows[0].revision), tables, store: decodeState(tables) };
     },
-    async save(before: Loaded, next: FinanceDataStore): Promise<string> {
+    async save(before: Loaded, next: FinanceDataStore, actorId?: string): Promise<string> {
       const writes: Query[] = [];
       for (const [key, [table, map]] of Object.entries(mappings)) {
         const old = (before.store as any)[key] as SqlRow[]; const current = (next as any)[key] as SqlRow[];
@@ -53,7 +53,7 @@ export function createRepository(transport: Transport = neonTransport) {
       }
       for (const p of next.installmentPurchases) {
         const old = before.store.installmentPurchases.find(x => x.id === p.id);
-        for (const v of p.versions ?? []) if (!old?.versions?.some(x => x.revision === v.revision)) writes.push(insert('installment_versions', encodeVersion(p.id, v)));
+        for (const v of p.versions ?? []) if (!old?.versions?.some(x => x.revision === v.revision)) writes.push(insert('installment_versions', { ...encodeVersion(p.id, v), actor_user_id: actorId ?? null }));
         for (const m of new Set([...Object.keys(p.statusByMonth ?? {}), ...Object.keys(p.paymentAmountsByMonth ?? {})])) {
           const data = { purchase_id: p.id, month: `${m}-01`, status: p.statusByMonth?.[m] ?? null, amount_override: p.paymentAmountsByMonth?.[m] ?? null };
           if (!old || data.status !== (old.statusByMonth?.[m] ?? null) || data.amount_override !== (old.paymentAmountsByMonth?.[m] ?? null)) {
@@ -67,13 +67,13 @@ export function createRepository(transport: Transport = neonTransport) {
         const revision = 1 + Math.max(0, ...before.tables.month_closures.filter(c => c.month === date).map(c => c.revision));
         writes.push(q('INSERT INTO finance_v2.financial_months (household_id,month) VALUES ($1,$2) ON CONFLICT (household_id,month) DO NOTHING', [household, date]));
         writes.push(insert('month_closures', { id, month: date, revision, closed_at: snapshot.closedAt, schema_version: 2,
-          rules_version: 'finance-v2-temporal-1', payload: JSON.stringify(snapshot) }));
+          rules_version: 'finance-v2-temporal-1', payload: JSON.stringify(snapshot), actor_user_id: actorId ?? null }));
         writes.push(q('UPDATE finance_v2.financial_months SET current_closure_id=$3,updated_at=CURRENT_TIMESTAMP WHERE household_id=$1 AND month=$2', [household, date, id]));
       }
       for (const m of Object.keys(before.store.closedMonths ?? {})) {
         if (next.closedMonths?.[m]) continue;
         const id = before.tables.financial_months.find(r => r.month === `${m}-01`)!.current_closure_id;
-        writes.push(insert('month_reopenings', { month: `${m}-01`, closure_id: id, reopened_at: new Date().toISOString(), source: 'command' }));
+        writes.push(insert('month_reopenings', { month: `${m}-01`, closure_id: id, reopened_at: new Date().toISOString(), source: 'command', actor_user_id: actorId ?? null }));
         writes.push(q('UPDATE finance_v2.financial_months SET current_closure_id=NULL,updated_at=CURRENT_TIMESTAMP WHERE household_id=$1 AND month=$2', [household, `${m}-01`]));
       }
       // Separate lock then assertion: after a wait, READ COMMITTED observes the winner's revision.

@@ -24,12 +24,12 @@ export default async function dbHealth(request: IncomingMessage, response: Serve
     ], { readOnly: true, fetchOptions: { signal: AbortSignal.timeout(10_000) } });
 
     const result = rows[0];
-    if (result?.database !== 'neondb' || result.schema_exists !== true || result.tables !== 18) {
+    if (result?.database !== 'neondb' || result.schema_exists !== true || result.tables !== 21) {
       throw new Error('Unexpected database structure');
     }
     response.statusCode = 200;
     response.end(request.method === 'HEAD' ? undefined : JSON.stringify({
-      status: 'ok', database: 'neondb', schema: 'finance_v2', tables: 18,
+      status: 'ok', database: 'neondb', schema: 'finance_v2', tables: 21,
     }));
   } catch {
     response.statusCode = 500;

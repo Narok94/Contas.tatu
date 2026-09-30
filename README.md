@@ -3,10 +3,11 @@
 ## Arquitetura
 
 O frontend React/TypeScript usa a API como fonte de persistência financeira no
-ambiente local controlado. Dados locais antigos não são importados ou apagados.
+ambiente autenticado. Dados locais antigos não são importados ou apagados.
 
 Arquitetura: **React/Vite → API server-side → Neon**. As rotas financeiras
-continuam bloqueadas na Vercel/Production até autenticação e autorização definitivas.
+exigem sessão válida de Henrique ou Jéssica, ambos na mesma casa. Escrita anônima
+continua bloqueada. O acesso fechado está descrito em [AUTHENTICATION.md](docs/AUTHENTICATION.md).
 Na Vercel, `dist/` contém o frontend e `api/health.ts` é executado sob demanda
 no runtime Node.js em `/api/health`. Não há processo Express nem `listen()`.
 O health check é público: GET retorna `200 {"status":"ok"}`, HEAD retorna 200
@@ -17,7 +18,8 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
 
 - `api/`: pontos de entrada HTTP para `/api/health` e `/api/db-health`.
   O diagnóstico do banco aceita GET/HEAD e consulta somente metadados em uma
-  transação read-only. Confirma `neondb`, `finance_v2` e 18 tabelas; falhas
+  transação read-only. Confirma `neondb`, `finance_v2` e 21 tabelas (18 financeiras
+  e três de autenticação); falhas
   retornam HTTP 500 com mensagem genérica, sem detalhes de conexão.
 - `server/neon.ts`: fonte única do cliente HTTP Neon server-side. `getNeonClient()`
   valida a configuração e cria/reutiliza o cliente por instância do runtime.
@@ -31,6 +33,8 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
   Localmente, o processo Node deve carregar `.env.local` (por exemplo, com
   `node --env-file=.env.local` ao executar um script server-side). O módulo
   lê `process.env` sob demanda e não abre arquivos de ambiente.
+- Configure `CONTAS_TATU_APP_ORIGIN` com a origem HTTPS exata de Production para
+  validar as operações autenticadas. Login e sessão não usam localStorage.
 - Nunca use prefixo `VITE_` para secrets: esse prefixo disponibiliza valores ao
   navegador. Não adicione secrets ao `define` do Vite, respostas HTTP ou logs.
   O cliente fica restrito ao servidor; não retorne erros brutos do driver em APIs.
@@ -68,6 +72,8 @@ A integração financeira está documentada em [FRONTEND-PERSISTENCE.md](docs/FR
 O modo controlado usa apenas a variável dedicada de `.env.local` no servidor.
 Não executa migration nem importa dados locais/demo. O modo isolado aplica a
 migration existente somente ao PGlite em memória e é o destino dos testes E2E.
+O teste focado `tests/auth-browser.cjs` inicia esse ambiente com uma senha
+aleatória transitória e as duas contas fechadas; nenhuma senha entra no código.
 O rollback de localStorage exige `VITE_FINANCE_MODE=local` em desenvolvimento;
 não existe fallback automático nem provider legado no bundle de produção.
 
