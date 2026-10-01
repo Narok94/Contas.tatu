@@ -13,7 +13,7 @@ test('database health endpoint uses read-only metadata and sanitized responses',
   t.mock.method(globalThis, 'fetch', () => { throw new Error('Real network forbidden'); });
   process.env.CONTAS_TATU_DATABASE_URL = 'postgresql://test:synthetic@health.invalid/test';
   const client = getNeonClient();
-  const good = { database: 'neondb', schema_exists: true, tables: 21 };
+  const good = { database: 'neondb', schema_exists: true, tables: 22 };
   let row = good;
   let failure = false;
   let calls = 0;
@@ -37,7 +37,7 @@ test('database health endpoint uses read-only metadata and sanitized responses',
   await t.test('GET returns only the expected public metadata', async () => {
     const r = await invoke('GET');
     assert.equal(r.status, 200);
-    assert.deepEqual(JSON.parse(r.body!), { status: 'ok', database: 'neondb', schema: 'finance_v2', tables: 21 });
+    assert.deepEqual(JSON.parse(r.body!), { status: 'ok', database: 'neondb', schema: 'finance_v2', tables: 22 });
     assert.equal(r.headers['Cache-Control'], 'no-store');
   });
   await t.test('HEAD verifies the database with no body', async () => {

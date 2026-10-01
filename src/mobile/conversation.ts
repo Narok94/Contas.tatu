@@ -3,8 +3,9 @@ export interface Preview {
   cardId?: string; cardName?: string; categoryId?: string;
 }
 export interface ChatMessage {
-  id: string; authorId: string; authorName: string; role: 'user' | 'assistant'; text: string;
+  id: string; sequence?: string; authorId: string; authorName: string; role: 'user' | 'assistant'; text: string;
   createdAt: string; linkedFinancialOperationId?: string; preview?: Preview; saved?: boolean;
+  originalPreview?: Preview;
   interactionAuthor?: { id: string; name: string };
 }
 const normalize = (s: string) => s.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();

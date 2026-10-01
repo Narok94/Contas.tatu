@@ -18,8 +18,8 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
 
 - `api/`: pontos de entrada HTTP para `/api/health` e `/api/db-health`.
   O diagnóstico do banco aceita GET/HEAD e consulta somente metadados em uma
-  transação read-only. Confirma `neondb`, `finance_v2` e 21 tabelas (18 financeiras
-  e três de autenticação); falhas
+  transação read-only. Confirma `neondb`, `finance_v2` e 22 tabelas (18 financeiras,
+  três de autenticação e uma de chat); falhas
   retornam HTTP 500 com mensagem genérica, sem detalhes de conexão.
 - `server/neon.ts`: fonte única do cliente HTTP Neon server-side. `getNeonClient()`
   valida a configuração e cria/reutiliza o cliente por instância do runtime.

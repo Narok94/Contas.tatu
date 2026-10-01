@@ -53,3 +53,9 @@
 .chat-composer button svg { width:25px; height:25px; stroke-width:2.4; }
 .chat-composer button:disabled { opacity:.8; box-shadow:0 3px 9px #315d3420; }
 }
+
+.chat-history-search { display:flex; gap:6px; padding:8px 16px; flex:none; border-bottom:1px solid #e5e5d9; }
+.chat-history-search input { flex:1; min-width:0; width:100%; }
+.chat-history-search input,.chat-history-search select,.chat-history-search button { font-size:16px; padding:6px; border:1px solid #e5e5d9; border-radius:8px; background:white; }
+.chat-history-search select { max-width:100px; }
+.chat-history-search button { font-size:12px; }

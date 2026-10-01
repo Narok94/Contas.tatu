@@ -7,7 +7,7 @@ import type { Preview } from './conversation';
 
 export type EntryKind = 'account' | 'card' | 'installment';
 export interface EntrySuccess { name: string; amount: number; title: string; preview?: Preview }
-export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry; initial?: Preview; onSuccess: (value: EntrySuccess) => void }> = ({ kind, editing, initial, onSuccess }) => {
+export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry; initial?: Preview; onConfirm?: (preview: Preview) => Promise<boolean>; onSuccess: (value: EntrySuccess) => void }> = ({ kind, editing, initial, onConfirm, onSuccess }) => {
   const f = useFinance();
   const [name, setName] = useState(editing?.name ?? initial?.name ?? '');
   const [value, setValue] = useState(editing || initial ? String((editing ?? initial)!.amount).replace('.', ',') : '');
@@ -50,7 +50,11 @@ export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry;
         action = 'installment.create'; data = { description: name.trim(), totalAmount: amount, installmentsCount,
           categoryId: categoryId || undefined, creditCardId: (kind === 'card' ? card : linkedCard) || undefined };
       }
-      const ok = await f.submitFinancialCommand(action, data, month);
+      const cardId = kind === 'card' ? card : kind === 'installment' ? linkedCard : undefined;
+      const preview: Preview = { name: name.trim(), amount, month, count: needsCount ? installmentsCount : 1,
+        paid: kind === 'account' && paid, cardId: cardId || undefined,
+        cardName: f.creditCards.find(c => c.id === cardId)?.name, categoryId: categoryId || undefined };
+      const ok = onConfirm ? await onConfirm(preview) : await f.submitFinancialCommand(action, data, month);
       if (ok) {
         const cardId = kind === 'card' ? card : kind === 'installment' ? linkedCard : undefined;
         onSuccess({ name: name.trim(), amount, title: editing ? 'Alterações salvas!' : kind === 'account' ? 'Conta adicionada com sucesso!' : kind === 'card' ? 'Compra adicionada com sucesso!' : 'Parcelamento adicionado!',

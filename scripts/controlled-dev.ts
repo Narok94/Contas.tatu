@@ -11,6 +11,8 @@ import { authHandler } from '../server/auth/api.js';
 import { createAuthService } from '../server/auth/service.js';
 import { provisionUsers } from '../server/auth/provision.js';
 import { neonTransport } from '../server/finance/repository.js';
+import { chatHandler } from '../server/chat/api.js';
+import { createChatService } from '../server/chat/service.js';
 
 async function main() {
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') throw new Error('Local development only');
@@ -26,6 +28,7 @@ async function main() {
     const pg = new PGlite();
     await pg.exec(await readFile(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
     await pg.exec(await readFile(new URL('../database/migrations/002_closed_auth.sql', import.meta.url), 'utf8'));
+    await pg.exec(await readFile(new URL('../database/migrations/003_household_chat.sql', import.meta.url), 'utf8'));
     transport = { batch: (queries, readOnly) => pg.transaction(async tx => {
       if (readOnly) await tx.exec('SET TRANSACTION READ ONLY');
       const results = [];
@@ -46,6 +49,8 @@ async function main() {
   const finance = createFinanceService(createRepository(transport));
   const read = financeHandler(false, finance, auth), write = financeHandler(true, finance, auth);
   const categories = categoryHandler(false, foundation, auth), category = categoryHandler(true, foundation, auth);
+  const chatService=createChatService(transport ?? neonTransport);
+  const chat=chatHandler(false,chatService,auth), chatConfirm=chatHandler(true,chatService,auth);
   const vite = await viteServer({ envDir: false, server: { middlewareMode: true }, appType: 'spa' });
   const server = httpServer(async (req, res) => {
     try {
@@ -58,6 +63,8 @@ async function main() {
       if (url.pathname === '/api/auth/logout') return await logout(request,res);
       if (url.pathname === '/api/auth/session') return await session(request,res);
       if (url.pathname === '/api/finance') return await read(request, res);
+      if (url.pathname === '/api/chat') return await chat(request,res);
+      if (url.pathname === '/api/chat/confirm') return await chatConfirm(request,res);
       if (url.pathname === '/api/finance/commands') return await write(request, res);
       if (url.pathname === '/api/categories' || url.pathname === '/api/categories/') return await categories(request, res);
       const item = /^\/api\/categories\/([0-9a-f-]+)$/i.exec(url.pathname);
