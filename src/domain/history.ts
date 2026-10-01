@@ -1,4 +1,4 @@
-import { computeFinancialSummary, FinanceDataStore, getInstallmentStatusForMonth } from './financeRules';
+import { computeFinancialSummary, FinanceDataStore, getInstallmentStatusForMonth } from './financeRules.js';
 
 /** Sum each month's paid expenses once. Card items and previous balances are not added again.
  * Closed months use their official snapshot; open months use current registered occurrences.

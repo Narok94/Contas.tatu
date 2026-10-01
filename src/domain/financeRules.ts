@@ -14,8 +14,8 @@ import {
   RecurringAccountMonthlyRecord,
   SimpleAccount,
   UnifiedMonthlyAccount,
-} from '../types/finance';
-import { addMonths, compareMonths, getMonthDifference } from '../utils/formatters';
+} from '../types/finance.js';
+import { addMonths, compareMonths, getMonthDifference } from '../utils/formatters.js';
 
 export interface FinanceDataStore {
   closedMonths?: Record<string, ClosedMonthSnapshot>;
@@ -30,8 +30,8 @@ export interface FinanceDataStore {
   cardMonthlyInvoices: CreditCardMonthlyInvoice[];
 }
 
-export { calculateInstallmentValue, getInstallmentStatusForMonth } from './installmentTimeline';
-import { getInstallmentStatusForMonth, installmentMonthsBefore, appendInstallmentVersion, InstallmentChange } from './installmentTimeline';
+export { calculateInstallmentValue, getInstallmentStatusForMonth } from './installmentTimeline.js';
+import { getInstallmentStatusForMonth, installmentMonthsBefore, appendInstallmentVersion, InstallmentChange } from './installmentTimeline.js';
 
 const money = (value: number) => Math.round(value * 100) / 100;
 

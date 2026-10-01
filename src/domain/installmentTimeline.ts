@@ -1,5 +1,5 @@
-import { InstallmentPurchase, InstallmentVersion } from '../types/finance';
-import { addMonths, getMonthDifference } from '../utils/formatters';
+import { InstallmentPurchase, InstallmentVersion } from '../types/finance.js';
+import { addMonths, getMonthDifference } from '../utils/formatters.js';
 
 export function assertInstallmentMonth(month: string) {
   if (!/^(?!0000)\d{4}-(0[1-9]|1[0-2])$/.test(month)) throw new Error('Mês de parcelamento inválido.');

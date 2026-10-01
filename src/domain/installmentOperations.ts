@@ -1,8 +1,8 @@
-import { FinanceDataStore, computeMonthlyAccounts } from './financeRules';
-import { assertFinancialMutation, assertMonthOpen, recordPayment } from './monthOperations';
-import { InstallmentPurchase, InstallmentVersion } from '../types/finance';
+import { FinanceDataStore, computeMonthlyAccounts } from './financeRules.js';
+import { assertFinancialMutation, assertMonthOpen, recordPayment } from './monthOperations.js';
+import { InstallmentPurchase, InstallmentVersion } from '../types/finance.js';
 import { appendInstallmentVersion, getInstallmentStatusForMonth, InstallmentChange,
-  installmentVersions, assertInstallmentMoney } from './installmentTimeline';
+  installmentVersions, assertInstallmentMoney } from './installmentTimeline.js';
 
 function purchaseIn(store: FinanceDataStore, id: string) {
   const p = store.installmentPurchases.find(p => p.id === id);

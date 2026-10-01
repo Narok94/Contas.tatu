@@ -1,6 +1,6 @@
-import { FinanceDataStore, computeMonthlyAccounts, computeFinancialSummary } from './financeRules';
-import { AccountType, PaymentStatus } from '../types/finance';
-import { getInstallmentStatusForMonth } from './installmentTimeline';
+import { FinanceDataStore, computeMonthlyAccounts, computeFinancialSummary } from './financeRules.js';
+import { AccountType, PaymentStatus } from '../types/finance.js';
+import { getInstallmentStatusForMonth } from './installmentTimeline.js';
 
 // Commands can target a month different from the one currently displayed.
 export function assertFinancialMutation(previous: FinanceDataStore, next: FinanceDataStore) {
