@@ -1,14 +1,21 @@
 # Base administrativa de backup e restauração
 
-Não executa SQL, migrations, limpeza, recriação de tabelas ou reset. Não há UI,
-rota HTTP pública, tarefa automática nem integração no fluxo financeiro.
+Não executa SQL, migrations, limpeza, recriação de tabelas ou reset. Não há
+tarefa automática nem integração no fluxo financeiro.
 Nada é executado ao importar o módulo, iniciar o app ou publicar o commit.
 
-Configure apenas no ambiente do operador `CONTAS_TATU_NEON_API_KEY`,
+Configure apenas no ambiente do operador ou servidor Vercel `CONTAS_TATU_NEON_API_KEY`,
 `CONTAS_TATU_NEON_PROJECT_ID=small-dream-79132114` e
 `CONTAS_TATU_NEON_BRANCH_ID=br-purple-tree-b7rcasev`. A chave administrativa deve
 ter acesso somente ao projeto necessário; não pertence ao frontend nem ao Git.
 A URL PostgreSQL não autoriza a API administrativa. O script não lê `.env` sozinho.
+
+Configurações oferece somente criar e listar pontos seguros. `/api/backup`
+exige sessão válida e mesma origem para escrita; disponibilidade e andamento
+também exigem autenticação. Sem configuração administrativa, as duas ações
+ficam bloqueadas com mensagem clara. Erros são sanitizados. Não existe rota
+HTTP de restauração; a confirmação extra no terminal permanece obrigatória.
+Criação não tem retry automático e só informa conclusão após operações finalizadas.
 
 Com o runtime/dependências instalados:
 

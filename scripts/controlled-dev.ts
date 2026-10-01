@@ -13,6 +13,8 @@ import { provisionUsers } from '../server/auth/provision.js';
 import { neonTransport } from '../server/finance/repository.js';
 import { chatHandler } from '../server/chat/api.js';
 import { createChatService } from '../server/chat/service.js';
+import { backupHandler } from '../server/backup/api.js';
+import { createNeonBackupService } from '../server/backup/neonBackup.js';
 
 async function main() {
   if (process.env.VERCEL || process.env.NODE_ENV === 'production') throw new Error('Local development only');
@@ -51,6 +53,8 @@ async function main() {
   const categories = categoryHandler(false, foundation, auth), category = categoryHandler(true, foundation, auth);
   const chatService=createChatService(transport ?? neonTransport);
   const chat=chatHandler(false,chatService,auth), chatConfirm=chatHandler(true,chatService,auth);
+  // Isolated mode must never inherit administrative credentials or contact real Neon.
+  const backup=backupHandler(createNeonBackupService(isolated?{env:{}}:{}),auth);
   const vite = await viteServer({ envDir: false, server: { middlewareMode: true }, appType: 'spa' });
   const server = httpServer(async (req, res) => {
     try {
@@ -65,6 +69,7 @@ async function main() {
       if (url.pathname === '/api/finance') return await read(request, res);
       if (url.pathname === '/api/chat') return await chat(request,res);
       if (url.pathname === '/api/chat/confirm') return await chatConfirm(request,res);
+      if (url.pathname === '/api/backup') return await backup(request,res);
       if (url.pathname === '/api/finance/commands') return await write(request, res);
       if (url.pathname === '/api/categories' || url.pathname === '/api/categories/') return await categories(request, res);
       const item = /^\/api\/categories\/([0-9a-f-]+)$/i.exec(url.pathname);

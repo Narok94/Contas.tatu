@@ -71,6 +71,12 @@ export function createNeonBackupService(options:{env?:NodeJS.ProcessEnv;fetcher?
     return found;
   }
   return {
+    configured() {
+      try { config(); return true; } catch (error) {
+        if(error instanceof BackupError && error.code==='CONFIGURATION')return false;
+        throw error;
+      }
+    },
     list,
     async create(name:string) {
       if(typeof name!=='string' || !/^[a-zA-Z0-9][a-zA-Z0-9 _.-]{0,79}$/.test(name))throw new BackupError('INVALID_NAME','Nome do ponto seguro inválido (até 80 caracteres).');

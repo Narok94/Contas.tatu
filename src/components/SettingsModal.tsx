@@ -4,6 +4,7 @@ import { X, Plus, Edit2, Trash2, Tag, RefreshCw, Check } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { Category } from '../types/finance';
 import { ConfirmDialog } from './ConfirmDialog';
+import { DataSafetySection } from './DataSafetySection';
 
 interface SettingsModalProps {
   isOpen: boolean;
@@ -264,6 +265,8 @@ export const SettingsModal: React.FC<SettingsModalProps> = ({
                 ))}
               </div>
             </div>
+
+            {mode === 'neon' && <DataSafetySection />}
 
             {/* Separador e Opção de Resetar Demonstração */}
             {mode !== 'neon' && <div className="pt-4 border-t border-stone-200">
