@@ -5,7 +5,7 @@ import { addMonths, formatBRL, formatMonthYear } from '../utils/formatters';
 import MobileManual from './MobileManual';
 import { MobileSheet } from './MobileSheet';
 import { MobileEntryForm, type EntryKind } from './MobileEntryForm';
-import { type ChatMessage } from './conversation';
+import { choosePreviewCard, type ChatMessage } from './conversation';
 import { useHouseholdChat } from './useHouseholdChat';
 import { ACCESS_MESSAGE } from './model';
 import { useAuth } from '../auth/AuthContext';
@@ -27,6 +27,7 @@ export default function MobileApp() {
   const [correction, setCorrection] = useState<ChatMessage>();
   const [error, setError] = useState('');
   const [pending, setPending] = useState('');
+  const [selectedCards, setSelectedCards] = useState<Record<string, string>>({});
   const lock = useRef(false);
   const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -83,9 +84,10 @@ export default function MobileApp() {
   }
   async function confirm(m: ChatMessage) {
     if (!m.preview || lock.current || m.saved || f.busy || chat.busy) return;
+    if (m.preview.requiresCard && !f.creditCards.some(card => card.id === selectedCards[m.id])) { setError('Qual cartão deseja usar? Escolha antes de adicionar.'); return; }
     if (!f.ready || !f.submitFinancialCommand) { setError(f.apiErrorStatus === 403 ? ACCESS_MESSAGE : 'Não foi possível conectar. Atualize os dados e tente novamente.'); return; }
     lock.current = true; setPending(m.id); setError('');
-    try { if(await chat.confirm(m))f.refresh(); }
+    try { if(await chat.confirm(m, m.preview.requiresCard ? choosePreviewCard(m.preview, selectedCards[m.id], f.creditCards) : undefined))f.refresh(); }
     finally { lock.current = false; setPending(''); }
   }
   if (screen !== 'conversation') return <MobileManual initialScreen={screen} onBack={() => setScreen('conversation')} />;
@@ -99,7 +101,7 @@ export default function MobileApp() {
       <div className="chat-bubble"><div className="chat-byline"><b>{m.authorName}</b><time dateTime={m.createdAt}>{new Date(m.createdAt).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' })}</time></div><p>{m.text}</p>
         {m.interactionAuthor && <div className="chat-interaction-author"><ChatParticipant name={m.interactionAuthor.name} /></div>}
         {m.preview && <div className="chat-preview"><h2>{m.preview.name}</h2><p className="chat-confirmation-copy">✨ Entendi que é {m.preview.count > 1 ? `uma compra de ${m.preview.name} em ${m.preview.count} parcelas de ${formatBRL(m.preview.amount / m.preview.count)}` : `uma despesa de ${m.preview.name} no valor de ${formatBRL(m.preview.amount)}`}. Posso adicionar essa despesa para vocês?</p><p className="chat-preview-meta">{formatMonthYear(m.preview.month)}{m.preview.paid ? ' · Paga' : ''}{m.preview.cardName ? ` · ${m.preview.cardName}` : ''}</p><span className="chat-category" style={{ color: f.categories.find(c => c.id === m.preview?.categoryId)?.color }}>{f.categories.find(c => c.id === m.preview?.categoryId)?.name ?? 'Sem categoria'} · sugerida</span>
-          {m.saved ? <p className="chat-saved"><Check size={16} /> Adicionada</p> : <div className="chat-actions"><button className="mobile-primary" disabled={!!pending || f.busy || chat.busy || !chat.ready} onClick={() => void confirm(m)}>{pending === m.id ? 'Salvando…' : '✓ Sim, adicionar'}</button><button disabled={!!pending || f.busy || chat.busy || !chat.ready} onClick={() => setCorrection(m)}>✎ Editar detalhes</button></div>}</div>}
+          {m.preview.requiresCard && !m.saved && <label className="mobile-field">Qual cartão deseja usar?<select aria-label="Cartão para esta compra" value={selectedCards[m.id] ?? ''} disabled={!!pending || f.busy || chat.busy} onChange={e => setSelectedCards(previous => ({ ...previous, [m.id]: e.target.value }))}><option value="">Selecione um cartão</option>{f.creditCards.map(card => <option key={card.id} value={card.id}>{card.name}</option>)}</select>{!f.creditCards.length && <small>Não há cartões disponíveis. Cadastre um cartão pelo computador antes de adicionar.</small>}</label>}{m.saved ? <p className="chat-saved"><Check size={16} /> Adicionada</p> : <div className="chat-actions"><button className="mobile-primary" disabled={!!pending || f.busy || chat.busy || !chat.ready || (!!m.preview.requiresCard && !selectedCards[m.id])} onClick={() => void confirm(m)}>{pending === m.id ? 'Salvando…' : '✓ Sim, adicionar'}</button><button disabled={!!pending || f.busy || chat.busy || !chat.ready || (!!m.preview.requiresCard && !selectedCards[m.id])} onClick={() => setCorrection(m.preview?.requiresCard ? { ...m, preview: choosePreviewCard(m.preview, selectedCards[m.id], f.creditCards) } : m)}>✎ Editar detalhes</button></div>}</div>}
         {!m.preview && m.text.startsWith('Não consegui') && <button className="mobile-secondary" onClick={() => setScreen('choose')}>Ir para Geral</button>}
       </div></article>)}<div ref={end} /></main>
     <footer className="chat-footer">{(chat.error || error || f.operationError) && <div className="chat-error" role="alert">{chat.error || error || (f.apiErrorStatus === 403 ? ACCESS_MESSAGE : f.operationError)}<button onClick={()=>{f.refresh();void chat.refresh();}}>Atualizar dados</button></div>}<nav className="chat-shortcuts" aria-label="Atalhos da conversa"><button className="chat-chip-general" onClick={() => setScreen('choose')}>Geral</button><button className="chat-chip-accounts" onClick={() => setScreen('list')}>Contas</button><button className="chat-chip-market" onClick={() => { setText(value => value || 'Mercado '); document.querySelector<HTMLInputElement>('.chat-composer input')?.focus(); }}>Mercado</button><button className="chat-chip-home" onClick={() => { setText(value => value || 'Casa '); document.querySelector<HTMLInputElement>('.chat-composer input')?.focus(); }}>Casa</button></nav><form className="chat-composer" onSubmit={send}><button type="button" className="chat-add" aria-label="Mais opções" onClick={() => setSheet('menu')}><Plus size={22} /></button><div className="chat-compose-field"><input aria-label="Digite sua conta" placeholder="Escreva uma mensagem..." maxLength={300} value={text} onChange={e => setText(e.target.value)} enterKeyHint="send" /><button type="button" className="chat-audio" aria-label="Áudio indisponível" title="Áudio ainda não disponível" disabled><Mic size={22} /></button></div><button type="submit" aria-label="Enviar" disabled={!text.trim() || chat.busy || !chat.ready}><Send size={21} /></button></form></footer>
