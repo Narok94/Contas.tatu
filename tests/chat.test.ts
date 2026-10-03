@@ -10,7 +10,7 @@ import { createChatService } from '../server/chat/service.js';
 import { chatHandler } from '../server/chat/api.js';
 import { createFinanceService } from '../server/finance/service.js';
 import { createRepository, q, type Transport } from '../server/finance/repository.js';
-import { choosePreviewCard } from '../src/mobile/conversation.js';
+
 
 test('persistent household chat with both authenticated users and atomic financial confirmation',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
@@ -100,25 +100,24 @@ test('persistent household chat with both authenticated users and atomic financi
     while(page.nextBefore){page=await chat.list(j.user,{before:page.nextBefore});for(const m of page.messages){assert.ok(!seen.has(m.id));seen.add(m.id);}}
     assert.ok(seen.has(hId));assert.ok(seen.has(jId));
   });
-  await t.test('natural card purchase keeps authenticated author, waits for card and explicit confirmation',async()=>{
+  await t.test('card category purchase keeps authenticated author and waits only for explicit confirmation',async()=>{
     let view=await finance.read('2026-10');
-    await finance.execute({action:'card.create',month:'2026-10',expectedRevision:view.revision,data:{name:'Nubank'}},h.user.id);
+    await db.batch([q('UPDATE finance_v2.categories SET name=$1 WHERE household_id=$2 AND id=$3',['Cartão',h.user.householdId,view.state.categories[0].id])],false);
     view=await finance.read('2026-10');
     const result=await chat.send(j.user,{id:randomUUID(),text:'Fiz uma compra de 80 reais no mercado alvorada no cartão',month:'2026-10'});
     assert.equal(result.messages[0].authorId,j.user.id);
     const draft=result.messages[1];assert.equal(draft.preview?.name,'Mercado Alvorada');
-    assert.equal(draft.preview?.amount,80);assert.equal(draft.preview?.month,'2026-10');assert.equal(draft.preview?.requiresCard,true);
+    assert.equal(draft.preview?.amount,80);assert.equal(draft.preview?.month,'2026-10');assert.equal(draft.preview?.requiresCard,undefined);assert.equal(draft.preview?.categoryId,view.state.categories[0].id);
     assert.equal(draft.interactionAuthor?.id,j.user.id);
     assert.deepEqual((await finance.read('2026-10')).state,view.state);
-    await assert.rejects(chat.confirm(j.user,{id:draft.id,expectedRevision:view.revision}));
+
     assert.deepEqual((await finance.read('2026-10')).state,view.state);
-    const card=view.state.creditCards.find(c=>c.name==='Nubank')!;
-    const preview=choosePreviewCard(draft.preview!,card.id,view.state.creditCards);
+    const preview=draft.preview!;
     assert.deepEqual((await finance.read('2026-10')).state,view.state);
     await chat.confirm(j.user,{id:draft.id,expectedRevision:view.revision,preview});
     const after=await finance.read('2026-10');
-    const expense=after.state.cardExpenses.find(e=>e.description==='Mercado Alvorada')!;
-    assert.equal(expense.amount,80);assert.equal(expense.cardId,card.id);assert.equal(expense.month,'2026-10');
-    assert.equal(after.state.simpleAccounts.length,view.state.simpleAccounts.length);
+    const expense=after.state.simpleAccounts.find(e=>e.name==='Mercado Alvorada')!;
+    assert.equal(expense.value,80);assert.equal(expense.categoryId,view.state.categories[0].id);assert.equal(expense.month,'2026-10');
+    assert.equal(after.state.cardExpenses.length,view.state.cardExpenses.length);
   });
 });

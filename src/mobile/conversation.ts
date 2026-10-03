@@ -16,17 +16,17 @@ export function interpret(text: string, month: string, cards: { id: string; name
   if (!s || /\b(ou|talvez|acho|nao|ontem|amanha|janeiro|fevereiro|marco|abril|maio|junho|julho|agosto|setembro|outubro|novembro|dezembro)\b/.test(s)) return null;
   const matched = cards.filter(c => s.includes(normalize(c.name)));
   if (matched.length > 1) return null;
-  const card = matched[0];
-  const requiresCard = !card && /\b(?:no\s+)?cartao\b/.test(s);
+  const cardCategory = /\bno\s+cartao\b/.test(s);
+  const card = cardCategory ? undefined : matched[0];
   if (card) s = s.replace(normalize(card.name), '');
-  else if (!requiresCard && /\bno\s+(?!mercado\b|supermercado\b|restaurante\b|posto\b|shopping\b)/.test(s)) return null;
+  else if (!cardCategory && /\bno\s+(?!mercado\b|supermercado\b|restaurante\b|posto\b|shopping\b)/.test(s)) return null;
   const installments = [...s.matchAll(/\bem\s+(\d+)\s*(?:vezes|x)?\b|\b(\d+)\s*(?:x|vezes)\b/g)];
   if (installments.length > 1) return null;
   const count = installments.length ? Number(installments[0][1] ?? installments[0][2]) : 1;
   if (count < 1 || count > 120) return null;
   if (installments.length) s = s.replace(installments[0][0], '');
   const paid = /\b(pago|paga)\b/.test(s);
-  if (paid && (card || requiresCard || count > 1)) return null; // Payment owner differs; use the existing manual flow.
+  if (paid && (card || cardCategory || count > 1)) return null; // Payment owner differs; use the existing manual flow.
   s = s.replace(/\b(?:ja\s+)?(?:esta\s+)?pag[oa]\b/g, '').replace(/\b(\d+)\s*(polegadas|litros|kg)\b/g, '$1_$2');
   const amounts = [...s.matchAll(/(?<![\w\d])(?:r\$\s*)?(\d{1,3}(?:\.\d{3})+(?:,\d{1,2})?|\d+(?:[,.]\d{1,2})?)\s*(mil)?(?:\s*reais)?(?![\w\d])/g)];
   if (amounts.length !== 1) return null;
@@ -35,20 +35,21 @@ export function interpret(text: string, month: string, cards: { id: string; name
   if (!Number.isFinite(amount) || amount <= 0 || amount > 9999999999999.99) return null;
   s = s.replace(m[0], '').replace(/\bfiz\s+(?:uma\s+)?compra\s*(?:de\b)?/g, ' ').replace(/\b(a|o|uma?|comprei|gastei|conta de|esse mes|este mes|veio|por|no|cartao|r\$)\b/g, ' ').replace(/_/g, ' ').replace(/\s+/g, ' ').trim();
   if (/-\s*\d/.test(s)) return null;
+  if (!s && cardCategory) s = 'compra no cartão';
   if (!s || /\b(em|vezes)\b/.test(s)) return null;
   const name = s === 'luz' ? 'Conta de luz' : /^mercado\b/.test(s) ? s.replace(/\b\p{L}/gu, c => c.toUpperCase()) : s.replace(/^tv\b/, 'TV').replace(/^./, c => c.toUpperCase());
-  const suggested = /luz|agua|internet|aluguel/.test(s) ? 'casa' : /mercado/.test(s) ? 'mercado' : /gasolina/.test(s) ? 'transporte' : '';
-  return { name, amount, month, count, paid, cardId: card?.id, cardName: card?.name, categoryId: categories.find(c => normalize(c.name) === suggested)?.id,
-    ...(requiresCard ? { requiresCard: true } : {}) };
+  const suggested = cardCategory ? 'cartao' : /luz|agua|internet|aluguel/.test(s) ? 'casa' : /mercado/.test(s) ? 'mercado' : /gasolina/.test(s) ? 'transporte' : '';
+  const categoryId = categories.find(c => normalize(c.name) === suggested)?.id;
+  if (cardCategory && !categoryId) return null; // Never invent a category ID or save under the wrong category.
+  return { name, amount, month, count, paid, cardId: card?.id, cardName: card?.name, categoryId };
 }
-export function choosePreviewCard(p: Preview, id: string, cards: {id:string;name:string}[]): Preview {
-  const card = cards.find(card => card.id === id);
-  if (!card) throw new Error('Escolha um dos cartões existentes antes de adicionar.');
-  const { requiresCard: _requiresCard, ...preview } = p;
-  return { ...preview, cardId: card.id, cardName: card.name };
-}
-export function previewCommand(p: Preview) {
-  if (p.requiresCard) throw new Error('Qual cartão deseja usar? Escolha antes de adicionar.');
+export function cardCategoryPreview(p: Preview, categories: {id:string;name:string}[]): Preview {
+  const category = categories.find(c => normalize(c.name) === 'cartao');
+  if (!category) throw new Error('A categoria Cartão precisa existir antes de confirmar. Nenhuma conta foi adicionada.');
+  const { requiresCard: _legacy, cardId: _cardId, cardName: _cardName, ...preview } = p;
+  return { ...preview, categoryId: category.id };
+}export function previewCommand(p: Preview) {
+
   if (p.count > 1) return { action: 'installment.create', data: { description: p.name, totalAmount: p.amount, installmentsCount: p.count, creditCardId: p.cardId, categoryId: p.categoryId } };
   if (p.cardId) return { action: 'expense.create', data: { description: p.name, amount: p.amount, cardId: p.cardId, categoryId: p.categoryId } };
   return { action: 'simple.create', data: { name: p.name, value: p.amount, paid: p.paid, categoryId: p.categoryId } };

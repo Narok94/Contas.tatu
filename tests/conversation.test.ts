@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
-import { interpret, previewCommand, choosePreviewCard } from '../src/mobile/conversation';
+import { interpret, previewCommand, cardCategoryPreview } from '../src/mobile/conversation';
 const cards = [{id:'nubank',name:'Nubank'}];
 const categories = [{id:'home',name:'Casa'}];
 const parse = (s: string) => interpret(s, '2026-09', cards, categories);
@@ -22,24 +22,19 @@ test('ambiguity never creates a preview', () => {
   for (const s of ['luz', '200', 'luz 200 ou 300', 'tv 500 em 0', 'tv 500 no desconhecido', 'luz -200', 'luz 200 amanhã', 'tv 500 10x pago']) assert.equal(parse(s),null,s);
 });
 
-test('natural card purchase asks for an existing card without creating a simple account', () => {
-  for (const phrase of ['Fiz uma compra de 80 reais no mercado alvorada no cartão', 'mercado alvorada 80 no cartão', 'comprei 80 reais no mercado no cartão']) {
-    const p = parse(phrase)!;
-    assert.ok(p, phrase); assert.equal(p.amount,80); assert.equal(p.month,'2026-09');
-    assert.equal(p.name, phrase.includes('alvorada') ? 'Mercado Alvorada' : 'Mercado');
-    assert.equal(p.requiresCard,true); assert.equal(p.cardId,undefined);
-    assert.throws(()=>previewCommand(p));
-    assert.throws(()=>choosePreviewCard(p,'missing',cards));
-    assert.throws(()=>choosePreviewCard(p,'',[]));
-    const selected=choosePreviewCard(p,'nubank',cards);
-    assert.equal(selected.cardId,'nubank'); assert.equal(selected.requiresCard,undefined);
-    assert.equal('requiresCard' in selected,false); // Existing confirmation API needs no new fields.
-    assert.equal(previewCommand(selected).action,'expense.create');
-    assert.equal(previewCommand(selected).data.description,'Mercado Alvorada' === p.name ? 'Mercado Alvorada':'Mercado');
-    assert.equal(p.cardId,undefined);
+test('no cartão means the existing Cartão category, never a card selector',()=>{
+  const categories=[{id:'category-card',name:'Cartão'},{id:'market',name:'Mercado'}];
+  for(const phrase of ['Fiz uma compra de 80 reais no mercado alvorada no cartão','mercado alvorada 80 no cartão','comprei 80 reais no mercado no cartão','gastei 80 no cartão']) {
+    const p=interpret(phrase,'2026-10',cards,categories)!;
+    assert.ok(p);assert.equal(p.amount,80);assert.equal(p.month,'2026-10');assert.equal(p.categoryId,'category-card');
+    assert.equal(p.cardId,undefined);assert.equal(p.requiresCard,undefined);
+    assert.equal(p.name,phrase.includes('alvorada')?'Mercado Alvorada':phrase.includes('mercado')?'Mercado':'Compra no cartão');
+    assert.equal(previewCommand(p).action,'simple.create');
   }
+  assert.equal(interpret('mercado 80 no cartão','2026-10',cards,[]),null);
+  const legacy=cardCategoryPreview({name:'Mercado',amount:80,month:'2026-10',count:1,paid:false,requiresCard:true},categories);
+  assert.equal('requiresCard' in legacy,false);assert.equal(legacy.categoryId,'category-card');
 });
-
 test('named card purchase cleans verbs and merchant prepositions', () => {
   const p=parse('gastei 80 no mercado alvorada no Nubank')!;
   assert.equal(p.name,'Mercado Alvorada'); assert.equal(p.amount,80);
