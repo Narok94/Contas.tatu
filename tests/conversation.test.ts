@@ -42,3 +42,24 @@ test('named card purchase cleans verbs and merchant prepositions', () => {
   assert.equal(previewCommand(p).action,'expense.create');
   assert.equal(parse('Fiz uma compra de 80 reais no mercado alvorada no cartão pago'),null);
 });
+
+test('natural pharmacy purchases extract total, installments and card category in any order',()=>{
+  const categories=[{id:'card-category',name:'Cartão'}];
+  for(const [phrase,name,count,category] of [
+    ['Fiz uma compra de 635 reais na Farmácia Drogasil em 6 vezes no cartão','Farmácia Drogasil',6,'card-category'],
+    ['drogasil 635 em 6x no cartão','Drogasil',6,'card-category'],
+    ['comprei 635 na drogasil em 6 vezes','Drogasil',6,undefined],
+    ['farmácia 635 cartão 6x','Farmácia',6,'card-category'],
+    ['em 6 vezes no cartão na Farmacia Drogasil comprei 635 reais','Farmácia Drogasil',6,'card-category'],
+    ['comprie 635 reias na farmcia Drogasil em 6 veses no cartoa','Farmácia Drogasil',6,'card-category'],
+    ['comprei 635 na drogasil','Drogasil',1,undefined],
+  ] as const) {
+    const p=interpret(phrase,'2026-10',cards,categories)!;
+    assert.ok(p,phrase);assert.equal(p.name,name,phrase);assert.equal(p.amount,635);
+    assert.equal(p.count,count);assert.equal(p.categoryId,category);assert.equal(p.month,'2026-10');
+    assert.equal(p.cardId,undefined);assert.equal(p.requiresCard,undefined);
+    if(count>1){const command=previewCommand(p);assert.equal(command.action,'installment.create');assert.equal(command.data.totalAmount,635);assert.equal(command.data.installmentsCount,6);}
+  }
+  assert.equal(interpret('farmácia 635 cartão 6x 8x','2026-10',cards,categories),null);
+  assert.equal(interpret('farmácia 635 ou 700 cartão 6x','2026-10',cards,categories),null);
+});

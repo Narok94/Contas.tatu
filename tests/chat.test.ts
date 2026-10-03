@@ -119,5 +119,16 @@ test('persistent household chat with both authenticated users and atomic financi
     const expense=after.state.simpleAccounts.find(e=>e.name==='Mercado Alvorada')!;
     assert.equal(expense.value,80);assert.equal(expense.categoryId,view.state.categories[0].id);assert.equal(expense.month,'2026-10');
     assert.equal(after.state.cardExpenses.length,view.state.cardExpenses.length);
+    const pharmacy=(await chat.send(j.user,{id:randomUUID(),text:'Fiz uma compra de 635 reais na Farmácia Drogasil em 6 vezes no cartão',month:'2026-10'})).messages;
+    assert.equal(pharmacy[0].authorId,j.user.id);
+    assert.equal(pharmacy[1].preview?.name,'Farmácia Drogasil');
+    assert.equal(pharmacy[1].preview?.amount,635);assert.equal(pharmacy[1].preview?.count,6);
+    assert.equal(pharmacy[1].preview?.categoryId,view.state.categories[0].id);
+    assert.deepEqual((await finance.read('2026-10')).state,after.state);
+    await chat.confirm(j.user,{id:pharmacy[1].id,expectedRevision:after.revision});
+    const confirmed=await finance.read('2026-10');
+    const purchase=confirmed.state.installmentPurchases.find(p=>p.description==='Farmácia Drogasil')!;
+    assert.equal(purchase.totalAmount,635);assert.equal(purchase.installmentsCount,6);
+    assert.equal(purchase.categoryId,view.state.categories[0].id);
   });
 });
