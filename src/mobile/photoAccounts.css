@@ -1,0 +1,10 @@
+@media (max-width:767px) {
+  .photo-entry { padding-top:14px; }
+  .photo-source { display:flex; gap:8px; }.photo-source button { flex:1; min-width:0; font-size:13px; padding:12px 8px; }
+  .photo-thumbnail { width:100%; max-height:180px; object-fit:contain; border-radius:14px; margin:16px 0; background:#edf3e7; }
+  .photo-entry h3 { font-size:20px; font-weight:750; margin:20px 0 10px; }
+  .photo-review { margin-top:18px; padding:16px; border:1px solid #dce6d6; background:#fff; border-radius:20px; }
+  .photo-review fieldset { display:grid; gap:16px; min-width:0; }
+  .photo-review fieldset:disabled { opacity:.7; }.photo-parcels { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  .photo-entry .mobile-field input { min-width:0; width:100%; }
+}

@@ -43,8 +43,8 @@
 .chat-footer { position:relative; isolation:isolate; overflow:hidden; padding-top:9px; background:#fafcf1; border-top:1px solid #d8e5c9; box-shadow:0 -4px 20px #36553306; }
 .chat-footer::before,.chat-footer::after { content:''; position:absolute; z-index:-1; pointer-events:none; width:75px; height:120px; bottom:-75px; left:-30px; background:#96b77c22; border-radius:90% 0 90% 0; transform:rotate(-24deg); box-shadow:30px 15px 0 #adc99120; }
 .chat-footer::after { left:auto; right:-35px; transform:rotate(24deg) scaleX(-1); }
-.chat-shortcuts { display:flex; gap:7px; margin-bottom:10px; }
-.chat-shortcuts button { white-space:nowrap; flex:1; min-width:0; min-height:36px; padding:0 8px; border:1px solid #d2e2bd; border-radius:18px; background:#edf5de; color:#365f35; font-size:12px; font-weight:700; }
+.chat-shortcuts { display:flex; gap:7px; margin-bottom:10px; overflow-x:auto; scrollbar-width:none; }
+.chat-shortcuts button { white-space:nowrap; flex:1 0 auto; min-width:0; min-height:36px; padding:0 8px; border:1px solid #d2e2bd; border-radius:18px; background:#edf5de; color:#365f35; font-size:12px; font-weight:700; }
 .chat-tools { display:flex; justify-content:flex-start; color:#526a51; min-height:44px; margin-top:14px; }.chat-current-participant { gap:8px; }.chat-current-participant>button { min-height:44px; padding:0 10px; font-size:12px; color:#3e613c; }
 .chat-current-participant .chat-participant-avatar { width:24px; height:26px; }
 .chat-composer { gap:8px; }.chat-composer input { height:58px; border-radius:22px; border-color:#c9dcb9; padding:17px 16px; box-shadow:0 3px 10px #36553308; color:#294a34; }
