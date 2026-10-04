@@ -12,7 +12,7 @@ export function createChatApi(fetcher: typeof fetch = globalThis.fetch.bind(glob
   }
   return {
     list: (query:{before?:string;q?:string;author?:string}={})=>request<ChatPage>('/api/chat?'+new URLSearchParams(query)),
-    send: (id:string,text:string,month:string)=>request<{messages:ChatMessage[]}>('/api/chat',{id,text,month}),
+    send: (id:string,text:string,month:string,replyTo?:string)=>request<{messages:ChatMessage[]}>('/api/chat',{id,text,month,replyTo}),
     confirm: (id:string,expectedRevision:string,preview?:Preview)=>request<{alreadySaved:boolean;message:ChatMessage}>('/api/chat/confirm',{id,expectedRevision,preview}),
   };
 }

@@ -9,7 +9,7 @@ export function useHouseholdChat(search:string,author:string) {
   const [participants,setParticipants]=useState<ChatPage['participants']>([]);
   const [nextBefore,setNextBefore]=useState<string|null>(null);
   const [ready,setReady]=useState(false), [busy,setBusy]=useState(false), [error,setError]=useState('');
-  const epoch=useRef(0), lock=useRef(false), sending=useRef<{id:string;text:string;month:string}>();
+  const epoch=useRef(0), lock=useRef(false), sending=useRef<{id:string;text:string;month:string;replyTo?:string}>();
   const newest=useRef<string>();
   const active=useRef(false), filter=useRef({q:search,author});
   filter.current={q:search,author};
@@ -41,11 +41,11 @@ export function useHouseholdChat(search:string,author:string) {
     const focused=()=>void refresh();window.addEventListener('focus',focused);
     return()=>{++epoch.current;active.current=false;window.clearInterval(timer);window.removeEventListener('focus',focused);};
   },[search,author]);
-  async function send(text:string,month:string) {
+  async function send(text:string,month:string,replyTo?:string) {
     if(lock.current || !ready)return false;
     lock.current=true;setBusy(true);setError('');
-    if(!sending.current || sending.current.text!==text || sending.current.month!==month)sending.current={id:crypto.randomUUID(),text,month};
-    try { const input=sending.current;await api.send(input.id,input.text,input.month);sending.current=undefined;await refresh();return true; }
+    if(!sending.current || sending.current.text!==text || sending.current.month!==month || sending.current.replyTo!==replyTo)sending.current={id:crypto.randomUUID(),text,month,replyTo};
+    try { const input=sending.current;await api.send(input.id,input.text,input.month,input.replyTo);sending.current=undefined;await refresh();return true; }
     catch {setError('Não foi possível confirmar o envio. Tente novamente para verificar e salvar a mesma mensagem.');return false;}
     finally {lock.current=false;setBusy(false);}
   }

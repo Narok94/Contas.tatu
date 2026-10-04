@@ -30,15 +30,15 @@ test('persistent household chat with both authenticated users and atomic financi
   const hId=randomUUID(),jId=randomUUID();let previewId='';
   await t.test('Henrique and Jessica share content, immutable authors and server timestamps',async()=>{
     assert.equal((await invoke('', 'GET')).status,401);
-    assert.equal((await invoke(h.token,'POST',{id:hId,text:'Mercado 123,45',month:'2026-10',authorId:j.user.id})).status,400);
-    assert.equal((await invoke(h.token,'POST',{id:hId,text:'Mercado 123,45',month:'2026-10'})).status,200);
-    assert.equal((await invoke(j.token,'POST',{id:jId,text:'Luz 87,90 paga',month:'2026-10'})).status,200);
+    assert.equal((await invoke(h.token,'POST',{id:hId,text:'Mercado, Loja, 123,45, 1x',month:'2026-10',authorId:j.user.id})).status,400);
+    assert.equal((await invoke(h.token,'POST',{id:hId,text:'Mercado, Loja, 123,45, 1x',month:'2026-10'})).status,200);
+    assert.equal((await invoke(j.token,'POST',{id:jId,text:'Luz, Empresa, 87,90, 1x',month:'2026-10'})).status,200);
     const first=await invoke(h.token,'GET'),second=await invoke(j.token,'GET');
     assert.deepEqual(first.result,second.result);assert.equal(first.result.messages.length,4);
     const hm=first.result.messages.find((m:any)=>m.id===hId),jm=first.result.messages.find((m:any)=>m.id===jId);
     assert.equal(hm.authorId,h.user.id);assert.equal(jm.authorId,j.user.id);assert.equal(jm.authorName,'Jéssica');assert.ok(!Number.isNaN(Date.parse(hm.createdAt)));
     previewId=first.result.messages[1].id;
-    await invoke(h.token,'POST',{id:hId,text:'Mercado 123,45',month:'2026-10'});
+    await invoke(h.token,'POST',{id:hId,text:'Mercado, Loja, 123,45, 1x',month:'2026-10'});
     assert.equal((await invoke(j.token,'GET')).result.messages.length,4);
     assert.equal((await invoke(j.token,'POST',{id:hId,text:'Texto alterado',month:'2026-10'})).status,409);
   });
@@ -62,17 +62,17 @@ test('persistent household chat with both authenticated users and atomic financi
     assert.equal(preview.interactionAuthor?.id,h.user.id);
   });
   await t.test('corrections are stored, rejected commands leave no saved receipt',async()=>{
-    const result=await chat.send(j.user,{id:randomUUID(),text:'Luz 50',month:'2026-10'});const draft=result.messages[1];
+    const result=await chat.send(j.user,{id:randomUUID(),text:'Conta de luz, Empresa, 50, 1x',month:'2026-10'});const draft=result.messages[1];
     let state=await finance.read('2026-10');
-    await assert.rejects(chat.confirm(j.user,{id:draft.id,expectedRevision:state.revision,preview:{...draft.preview,categoryId:randomUUID()}}));
+    await assert.rejects(chat.confirm(j.user,{id:draft.id,expectedRevision:state.revision,preview:{...draft.preview,amount:-1}}));
     assert.equal((await chat.list(h.user)).messages.find(m=>m.id===draft.id)?.saved,false);
-    await chat.confirm(j.user,{id:draft.id,expectedRevision:state.revision,preview:{...draft.preview,name:'Luz corrigida',amount:62.30,paid:true}});
+    await chat.confirm(j.user,{id:draft.id,expectedRevision:state.revision,preview:{...draft.preview,name:'Luz corrigida',amount:62.30}});
     state=await finance.read('2026-10');assert.equal(state.state.simpleAccounts.find(a=>a.name==='Luz corrigida')?.value,62.30);
     assert.equal((await chat.list(h.user)).messages.find(m=>m.id===draft.id)?.preview?.name,'Luz corrigida');
     assert.equal((await chat.list(h.user)).messages.find(m=>m.id===draft.id)?.originalPreview?.name,'Conta de luz');
   });
   await t.test('simultaneous confirmations by both users create one financial entry',async()=>{
-    const draft=(await chat.send(h.user,{id:randomUUID(),text:'Internet 40',month:'2026-10'})).messages[1];
+    const draft=(await chat.send(h.user,{id:randomUUID(),text:'Internet, Empresa, 40, 1x',month:'2026-10'})).messages[1];
     const before=await finance.read('2026-10');
     const results=await Promise.allSettled([chat.confirm(h.user,{id:draft.id,expectedRevision:before.revision}),chat.confirm(j.user,{id:draft.id,expectedRevision:before.revision})]);
     assert.ok(results.some(r=>r.status==='fulfilled'));
@@ -80,7 +80,7 @@ test('persistent household chat with both authenticated users and atomic financi
     assert.equal((await chat.list(h.user)).messages.filter(m=>m.saved && m.preview?.name==='Internet').length,2);
   });
   await t.test('a SQL failure after financial writes rolls back the account and chat receipt together',async()=>{
-    const draft=(await chat.send(h.user,{id:randomUUID(),text:'Teste rollback 15',month:'2026-10'})).messages[1];
+    const draft=(await chat.send(h.user,{id:randomUUID(),text:'Teste rollback, Empresa, 15, 1x',month:'2026-10'})).messages[1];
     const before=await finance.read('2026-10');
     const failing:Transport={batch:(qs,ro)=>db.batch(!ro && qs.some(s=>s.text.startsWith('UPDATE finance_v2.chat_messages')) ? [...qs,q('SELECT 1/0')] : qs,ro)};
     await assert.rejects(createChatService(failing).confirm(h.user,{id:draft.id,expectedRevision:before.revision}),{status:409});
@@ -100,14 +100,37 @@ test('persistent household chat with both authenticated users and atomic financi
     while(page.nextBefore){page=await chat.list(j.user,{before:page.nextBefore});for(const m of page.messages){assert.ok(!seen.has(m.id));seen.add(m.id);}}
     assert.ok(seen.has(hId));assert.ok(seen.has(jId));
   });
+  await t.test('payment questions persist and no account or category is written before confirmation',async()=>{
+    const before=await finance.read('2026-10');
+    const start=(await chat.send(h.user,{id:randomUUID(),text:'Chocolate, Padaria, 10',month:'2026-10'})).messages[1];
+    assert.equal(start.text,'Essa compra já foi paga?');
+    await assert.rejects(chat.confirm(h.user,{id:start.id,expectedRevision:before.revision}),{status:400});
+    const method=(await createChatService(db).send(h.user,{id:randomUUID(),text:'Sim',month:'2026-10',replyTo:start.id})).messages[1];
+    assert.equal(method.text,'Como foi pago?');
+    await assert.rejects(chat.send(j.user,{id:randomUUID(),text:'Dinheiro',month:'2026-10',replyTo:method.id}),{status:409});
+    const ready=(await chat.send(h.user,{id:randomUUID(),text:'Dinheiro',month:'2026-10',replyTo:method.id})).messages[1];
+    assert.equal(ready.preview?.categoryName,'Dinheiro');
+    assert.deepEqual((await finance.read('2026-10')).state,before.state);
+    await chat.confirm(h.user,{id:ready.id,expectedRevision:before.revision});
+    const after=await finance.read('2026-10');
+    const account=after.state.simpleAccounts.find(a=>a.name==='Chocolate')!;
+    assert.equal(account.status,'pago');assert.equal(account.notes,'Local: Padaria');
+    assert.equal(after.state.categories.find(c=>c.id===account.categoryId)?.name,'Dinheiro');
+    const pending=(await chat.send(j.user,{id:randomUUID(),text:'Chocolate, Padaria, 10',month:'2026-10'})).messages[1];
+    const no=(await chat.send(j.user,{id:randomUUID(),text:'Não',month:'2026-10',replyTo:pending.id})).messages[1];
+    assert.equal(no.preview?.paid,false);assert.equal(no.preview?.stage,'ready');
+    assert.deepEqual((await finance.read('2026-10')).state,after.state);
+    await chat.confirm(j.user,{id:no.id,expectedRevision:after.revision});
+    assert.equal((await finance.read('2026-10')).state.simpleAccounts.filter(a=>a.name==='Chocolate'&&a.status==='pendente').length,1);
+  });
   await t.test('card category purchase keeps authenticated author and waits only for explicit confirmation',async()=>{
     let view=await finance.read('2026-10');
-    await db.batch([q('UPDATE finance_v2.categories SET name=$1 WHERE household_id=$2 AND id=$3',['Cartão',h.user.householdId,view.state.categories[0].id])],false);
+
     view=await finance.read('2026-10');
-    const result=await chat.send(j.user,{id:randomUUID(),text:'Fiz uma compra de 80 reais no mercado alvorada no cartão',month:'2026-10'});
+    const result=await chat.send(j.user,{id:randomUUID(),text:'Mercado Alvorada, Loja, 80, 1x',month:'2026-10'});
     assert.equal(result.messages[0].authorId,j.user.id);
     const draft=result.messages[1];assert.equal(draft.preview?.name,'Mercado Alvorada');
-    assert.equal(draft.preview?.amount,80);assert.equal(draft.preview?.month,'2026-10');assert.equal(draft.preview?.requiresCard,undefined);assert.equal(draft.preview?.categoryId,view.state.categories[0].id);
+    assert.equal(draft.preview?.amount,80);assert.equal(draft.preview?.month,'2026-10');assert.equal(draft.preview?.requiresCard,undefined);assert.equal(draft.preview?.categoryId,view.state.categories.find(c=>c.name==='Cartão')!.id);
     assert.equal(draft.interactionAuthor?.id,j.user.id);
     assert.deepEqual((await finance.read('2026-10')).state,view.state);
 
@@ -117,24 +140,24 @@ test('persistent household chat with both authenticated users and atomic financi
     await chat.confirm(j.user,{id:draft.id,expectedRevision:view.revision,preview});
     const after=await finance.read('2026-10');
     const expense=after.state.simpleAccounts.find(e=>e.name==='Mercado Alvorada')!;
-    assert.equal(expense.value,80);assert.equal(expense.categoryId,view.state.categories[0].id);assert.equal(expense.month,'2026-10');
+    assert.equal(expense.value,80);assert.equal(expense.categoryId,view.state.categories.find(c=>c.name==='Cartão')!.id);assert.equal(expense.month,'2026-10');
     assert.equal(after.state.cardExpenses.length,view.state.cardExpenses.length);
-    const pharmacy=(await chat.send(j.user,{id:randomUUID(),text:'Fiz uma compra de 635 reais na Farmácia Drogasil em 6 vezes no cartão',month:'2026-10'})).messages;
+    const pharmacy=(await chat.send(j.user,{id:randomUUID(),text:'Farmácia Drogasil, Loja, 635, 6x',month:'2026-10'})).messages;
     assert.equal(pharmacy[0].authorId,j.user.id);
     assert.equal(pharmacy[1].preview?.name,'Farmácia Drogasil');
     assert.equal(pharmacy[1].preview?.amount,635);assert.equal(pharmacy[1].preview?.count,6);
-    assert.equal(pharmacy[1].preview?.categoryId,view.state.categories[0].id);
+    assert.equal(pharmacy[1].preview?.categoryId,view.state.categories.find(c=>c.name==='Cartão')!.id);
     assert.deepEqual((await finance.read('2026-10')).state,after.state);
     await chat.confirm(j.user,{id:pharmacy[1].id,expectedRevision:after.revision});
     const confirmed=await finance.read('2026-10');
     const purchase=confirmed.state.installmentPurchases.find(p=>p.description==='Farmácia Drogasil')!;
     assert.equal(purchase.totalAmount,635);assert.equal(purchase.installmentsCount,6);
-    assert.equal(purchase.categoryId,view.state.categories[0].id);
-    const petshop=(await chat.send(j.user,{id:randomUUID(),text:'Comprei ração no petshop 300 reais em 8 vezes no cartão',month:'2026-10'})).messages;
+    assert.equal(purchase.categoryId,view.state.categories.find(c=>c.name==='Cartão')!.id);
+    const petshop=(await chat.send(j.user,{id:randomUUID(),text:'Ração no petshop, Petshop, 300, 8x',month:'2026-10'})).messages;
     assert.equal(petshop[0].authorId,j.user.id);
     assert.equal(petshop[1].preview?.name,'Ração no petshop');
     assert.equal(petshop[1].preview?.amount,300);assert.equal(petshop[1].preview?.count,8);
-    assert.equal(petshop[1].preview?.categoryId,view.state.categories[0].id);
+    assert.equal(petshop[1].preview?.categoryId,view.state.categories.find(c=>c.name==='Cartão')!.id);
     assert.equal(petshop[1].preview?.month,'2026-10');
     assert.deepEqual((await finance.read('2026-10')).state,confirmed.state);
   });

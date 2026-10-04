@@ -10,6 +10,7 @@ export interface EntrySuccess { name: string; amount: number; title: string; pre
 export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry; initial?: Preview; onConfirm?: (preview: Preview) => Promise<boolean>; onSuccess: (value: EntrySuccess) => void }> = ({ kind, editing, initial, onConfirm, onSuccess }) => {
   const f = useFinance();
   const [name, setName] = useState(editing?.name ?? initial?.name ?? '');
+  const [location, setLocation] = useState(initial?.location ?? '');
   const [value, setValue] = useState(editing || initial ? String((editing ?? initial)!.amount).replace('.', ',') : '');
   const [categoryId, setCategoryId] = useState(editing?.categoryId ?? initial?.categoryId ?? '');
   const [month, setMonth] = useState(editing?.month ?? initial?.month ?? f.currentMonth);
@@ -51,7 +52,7 @@ export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry;
           categoryId: categoryId || undefined, creditCardId: (kind === 'card' ? card : linkedCard) || undefined };
       }
       const cardId = kind === 'card' ? card : kind === 'installment' ? linkedCard : undefined;
-      const preview: Preview = { name: name.trim(), amount, month, count: needsCount ? installmentsCount : 1,
+      const preview: Preview = { location: initial?.location === undefined ? undefined : location.trim(), stage: initial?.stage, categoryName: initial?.categoryName, name: name.trim(), amount, month, count: needsCount ? installmentsCount : 1,
         paid: kind === 'account' && paid, cardId: cardId || undefined,
         cardName: f.creditCards.find(c => c.id === cardId)?.name, categoryId: categoryId || undefined };
       const ok = onConfirm ? await onConfirm(preview) : await f.submitFinancialCommand(action, data, month);
@@ -68,17 +69,18 @@ export const MobileEntryForm: React.FC<{ kind: EntryKind; editing?: MobileEntry;
   return <form className="mobile-form" onSubmit={submit} aria-label={editing ? 'Edição rápida' : label}>
     <div className="mobile-form-intro"><span className="mobile-kind-icon">{kind === 'account' ? <ReceiptText /> : kind === 'card' ? <CreditCard /> : <Layers />}</span><p>{editing ? 'Só o essencial, do seu jeito.' : 'Poucos detalhes. Tudo no lugar.'}</p></div>
     <label className="mobile-field">Descrição<input name="description" autoComplete="off" maxLength={160} required placeholder={kind === 'account' ? 'Ex.: Mercado' : 'Ex.: Fone de ouvido'} value={name} onChange={e => setName(e.target.value)} enterKeyHint="next" /></label>
+    {initial?.location !== undefined && <label className="mobile-field">Local<input required value={location} onChange={e => setLocation(e.target.value)} maxLength={160} /></label>}
     <label className="mobile-field">{needsCount || kind === 'installment' ? 'Valor total' : 'Valor'}<span className="mobile-money"><span aria-hidden="true">R$</span><input name="amount" inputMode="decimal" autoComplete="off" required placeholder="0,00" value={value} onChange={e => setValue(e.target.value)} enterKeyHint="next" /></span></label>
     {kind === 'card' && !editing && <>
       <label className="mobile-field">Cartão<select required value={card} onChange={e => setCard(e.target.value)}><option value="">Selecione um cartão</option>{f.creditCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>
       {!f.creditCards.length && <p className="mobile-hint">Seus cartões aparecerão aqui quando o acesso estiver disponível. O cadastro de cartões é feito pelo computador.</p>}
       <fieldset className="mobile-segment"><legend>Tipo de compra</legend><button type="button" aria-pressed={!parcelled} onClick={() => setParcelled(false)}>À vista</button><button type="button" aria-pressed={parcelled} onClick={() => setParcelled(true)}>Parcelado</button></fieldset>
     </>}
-    {needsCount && <label className="mobile-field">Número de parcelas<input name="installments" inputMode="numeric" pattern="[0-9]*" required value={count} onChange={e => setCount(e.target.value)} />{parseMobileMoney(value) !== null && Number(count) > 0 && <small>{count}x de {formatBRL(Math.round(parseMobileMoney(value)! / Number(count) * 100) / 100)}</small>}</label>}
-    {CategoryField}
+    {needsCount && <label className="mobile-field">Número de parcelas<input name="installments" readOnly={!!initial?.location} inputMode="numeric" pattern="[0-9]*" required value={count} onChange={e => setCount(e.target.value)} />{parseMobileMoney(value) !== null && Number(count) > 0 && <small>{count}x de {formatBRL(Math.round(parseMobileMoney(value)! / Number(count) * 100) / 100)}</small>}</label>}
+    {initial?.categoryName ? <p>Categoria: {initial.categoryName}</p> : CategoryField}
     {kind !== 'card' || editing ? <label className="mobile-field">{kind === 'installment' ? 'Início' : 'Mês'}<input type="month" required value={month} readOnly={!!editing} onChange={e => setMonth(e.target.value)} />{editing && <small>Para mudar o mês, use o Contas Tatu no computador.</small>}</label> : <p className="mobile-hint">Compra em {formatMonthYear(month)}.</p>}
-    {kind === 'installment' && <label className="mobile-field">Cartão <small>(opcional)</small><select value={linkedCard} onChange={e => setLinkedCard(e.target.value)}><option value="">Sem cartão · parcelamento independente</option>{f.creditCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
-    {kind === 'account' && <label className="mobile-toggle"><span><b>Já está paga</b><small>Registrar como pagamento realizado</small></span><input type="checkbox" role="switch" checked={paid} onChange={e => setPaid(e.target.checked)} /><span className="mobile-switch" aria-hidden="true"><Check size={16} /></span></label>}
+    {kind === 'installment' && !initial?.location && <label className="mobile-field">Cartão <small>(opcional)</small><select value={linkedCard} onChange={e => setLinkedCard(e.target.value)}><option value="">Sem cartão · parcelamento independente</option>{f.creditCards.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}</select></label>}
+    {kind === 'account' && !initial?.location && <label className="mobile-toggle"><span><b>Já está paga</b><small>Registrar como pagamento realizado</small></span><input type="checkbox" role="switch" checked={paid} onChange={e => setPaid(e.target.checked)} /><span className="mobile-switch" aria-hidden="true"><Check size={16} /></span></label>}
     {(error || f.operationError) && <p className="mobile-error" role="alert">{error || (f.apiErrorStatus === 403 ? ACCESS_MESSAGE : f.operationError)}</p>}
     <button className="mobile-primary" type="submit" disabled={sending || f.busy}>{sending || f.busy ? 'Salvando…' : label}</button>
     <p className="mobile-footnote">Cada conta em seu lugar.</p>
