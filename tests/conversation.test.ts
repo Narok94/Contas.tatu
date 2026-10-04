@@ -19,7 +19,7 @@ test('paid status and month default', () => {
   for (const status of ['pago','já paga','já está paga']) { const p = parse(`mercado 350 ${status}`)!; assert.equal(p.paid,true); assert.equal(p.month,'2026-09'); assert.equal(p.name,'Mercado'); }
 });
 test('ambiguity never creates a preview', () => {
-  for (const s of ['luz', '200', 'luz 200 ou 300', 'tv 500 em 0', 'tv 500 no desconhecido', 'luz -200', 'luz 200 amanhã', 'tv 500 10x pago']) assert.equal(parse(s),null,s);
+  for (const s of ['luz', '200', 'luz 200 ou 300', 'tv 500 em 0', 'luz -200', 'luz 200 amanhã', 'tv 500 10x pago']) assert.equal(parse(s),null,s);
 });
 
 test('no cartão means the existing Cartão category, never a card selector',()=>{
@@ -62,4 +62,27 @@ test('natural pharmacy purchases extract total, installments and card category i
   }
   assert.equal(interpret('farmácia 635 cartão 6x 8x','2026-10',cards,categories),null);
   assert.equal(interpret('farmácia 635 ou 700 cartão 6x','2026-10',cards,categories),null);
+});
+
+test('layered extraction preserves merchant phrases and works without optional fields',()=>{
+  const categories=[{id:'card-category',name:'Cartão'},{id:'home',name:'Casa'}];
+  for(const [phrase,name,amount,count,paid,category] of [
+    ['Comprei ração no petshop 300 reais em 8 vezes no cartão','Ração no petshop',300,8,false,'card-category'],
+    ['mercado 80 no cartão','Mercado',80,1,false,'card-category'],
+    ['comprei 635 na drogasil em 6 vezes','Drogasil',635,6,false,undefined],
+    ['ração 300 8x cartão','Ração',300,8,false,'card-category'],
+    ['luz 200 paga','Conta de luz',200,1,true,'home'],
+    ['no cartão em 8 vezes comprei ração no petshop 300 reais','Ração no petshop',300,8,false,'card-category'],
+    ['paguei luz 200','Conta de luz',200,1,true,'home'],
+    ['coloquei ração no petshop 300','Ração no petshop',300,1,false,undefined],
+    ['comprie ração no petshop 300 reias em 8 veses no cartoa','Ração no petshop',300,8,false,'card-category'],
+    ['ração no petshop 300','Ração no petshop',300,1,false,undefined],
+    ['tv 500 no desconhecido','TV no desconhecido',500,1,false,undefined],
+  ] as const) {
+    const p=interpret(phrase,'2026-10',cards,categories)!;
+    assert.ok(p,phrase);assert.equal(p.name,name);assert.equal(p.amount,amount);
+    assert.equal(p.count,count);assert.equal(p.paid,paid);assert.equal(p.categoryId,category);
+    assert.equal(p.month,'2026-10');assert.equal(p.cardId,undefined);
+  }
+  for(const phrase of ['ração 300 400','ração 300 8x 9x','ração 300 0x','ração -300']) assert.equal(interpret(phrase,'2026-10',cards,categories),null);
 });

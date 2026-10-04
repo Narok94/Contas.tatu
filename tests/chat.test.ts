@@ -130,5 +130,12 @@ test('persistent household chat with both authenticated users and atomic financi
     const purchase=confirmed.state.installmentPurchases.find(p=>p.description==='Farmácia Drogasil')!;
     assert.equal(purchase.totalAmount,635);assert.equal(purchase.installmentsCount,6);
     assert.equal(purchase.categoryId,view.state.categories[0].id);
+    const petshop=(await chat.send(j.user,{id:randomUUID(),text:'Comprei ração no petshop 300 reais em 8 vezes no cartão',month:'2026-10'})).messages;
+    assert.equal(petshop[0].authorId,j.user.id);
+    assert.equal(petshop[1].preview?.name,'Ração no petshop');
+    assert.equal(petshop[1].preview?.amount,300);assert.equal(petshop[1].preview?.count,8);
+    assert.equal(petshop[1].preview?.categoryId,view.state.categories[0].id);
+    assert.equal(petshop[1].preview?.month,'2026-10');
+    assert.deepEqual((await finance.read('2026-10')).state,confirmed.state);
   });
 });
