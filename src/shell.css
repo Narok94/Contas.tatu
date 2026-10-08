@@ -33,3 +33,14 @@
   .app-main > .accounts-page { width: 100%; max-width: none; margin: 0; padding: 0; align-content: start; }
   .app-shell .app-footer { padding: 8px 0; font-size: 10px; min-height: var(--shell-footer-height); }
 }
+
+.sidebar-toggle { display: none; }
+@media (min-width: 1024px) {
+  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; color: var(--color-stone-600); background: transparent; border: 0; border-radius: 8px; padding: 6px; cursor: pointer; }
+  .sidebar-toggle:hover { background: var(--color-surface-soft); }
+  .sidebar-toggle:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+  .sidebar-collapse { align-self: flex-end; margin-bottom: 6px; }
+  .app-shell.sidebar-collapsed { --shell-sidebar-width: 0px; }
+  .app-shell.sidebar-collapsed .app-sidebar { display: none; }
+  .sidebar-reopen { float: left; margin-right: 10px; }
+}

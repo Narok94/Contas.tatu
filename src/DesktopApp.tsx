@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { useFinance } from './context/FinanceContext';
 import { Header } from './components/Header';
 import { DashboardPage } from './pages/DashboardPage';
@@ -11,6 +11,7 @@ import { PaymentDialog } from './components/PaymentDialog';
 import './history.css';
 
 const AppContent: React.FC = () => {
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const {
     activeTab,
     isSettingsOpen,
@@ -22,9 +23,9 @@ const AppContent: React.FC = () => {
   } = useFinance();
 
   return (
-    <div className="app-shell min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20">
+    <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20`}>
       {/* Persistent sidebar and shared toolbar */}
-      <Header />
+      <Header collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
       {(loading || busy) && <div role="status" className="fixed bottom-6 right-6 z-40 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm shadow-sm">{busy ? 'Salvando…' : 'Carregando dados…'}</div>}
 
       {/* Main Content Area */}

@@ -1,16 +1,17 @@
 import React from 'react';
-import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History } from 'lucide-react';
+import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { MonthSelector } from './MonthSelector';
 import { TatuIllustration } from './TatuIllustration';
 import { useAuth } from '../auth/AuthContext';
 
-export const Header: React.FC = () => {
+export const Header: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => {
   const { user, logout } = useAuth();
   const { activeTab, setActiveTab, currentMonth, setCurrentMonth, isSettingsOpen, setIsSettingsOpen, openCreateAccountModal, financialSummary } = useFinance();
   return (
     <>
-      <aside className="app-sidebar">
+      <aside id="desktop-sidebar" className="app-sidebar">
+        <button className="sidebar-toggle sidebar-collapse" aria-label="Recolher menu lateral" aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={onToggle}><PanelLeftClose size={18} /></button>
         <div className="app-brand"><TatuIllustration className="brand-mascot" /><div><h1>Contas Tatu<span>.</span></h1><p>Seu mês, mais leve</p></div></div>
         <p className="nav-caption">SEU ESPAÇO</p>
         <nav className="app-nav" aria-label="Navegação principal">
@@ -23,7 +24,7 @@ export const Header: React.FC = () => {
         <span className="sidebar-footer">{user.name} · <button onClick={() => void logout()}>Sair</button></span>
       </aside>
       <header className="app-toolbar">
-        <div className="toolbar-title"><span>CONTAS TATU</span><p>{activeTab === 'dashboard' ? 'Um olhar sobre o seu mês' : 'Tudo no seu lugar'}</p></div>
+        <div className="toolbar-title">{collapsed && <button className="sidebar-toggle sidebar-reopen" aria-label="Abrir menu lateral" aria-controls="desktop-sidebar" aria-expanded={false} onClick={onToggle}><PanelLeftOpen size={18} /></button>}<span>CONTAS TATU</span><p>{activeTab === 'dashboard' ? 'Um olhar sobre o seu mês' : 'Tudo no seu lugar'}</p></div>
         <div className="app-month"><MonthSelector currentMonth={currentMonth} onMonthChange={setCurrentMonth} /></div>
         <button id="btn-header-new-account" type="button" onClick={openCreateAccountModal} className="new-account-button"><Plus size={16} /><span>Nova conta</span><ArrowUpRight size={15} /></button>
       </header>

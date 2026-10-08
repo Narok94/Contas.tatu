@@ -7,6 +7,7 @@ import { MobileSheet } from './MobileSheet';
 import { MobileEntryForm, type EntryKind } from './MobileEntryForm';
 import { cardCategoryPreview, type ChatMessage } from './conversation';
 import { useHouseholdChat } from './useHouseholdChat';
+import { useChatScroll } from './useChatScroll';
 import { ACCESS_MESSAGE } from './model';
 import { useAuth } from '../auth/AuthContext';
 import { ChatParticipant, participantTone } from './ChatParticipant';
@@ -28,11 +29,7 @@ export default function MobileApp() {
   const [error, setError] = useState('');
   const [pending, setPending] = useState('');
   const lock = useRef(false);
-  const end = useRef<HTMLDivElement>(null);
-  useEffect(() => {
-    const stream = end.current?.parentElement;
-    if(stream && stream.scrollHeight-stream.scrollTop-stream.clientHeight<250) stream.scrollTo({ top: stream.scrollHeight, behavior: 'smooth' });
-  }, [messages, screen]);
+  const end = useChatScroll(messages.at(-1)?.id, messages[0]?.id, chat.ready, screen === 'conversation', chat.busy);
   useEffect(() => {
     if (screen !== 'conversation') return;
     const root = document.documentElement, body = document.body;

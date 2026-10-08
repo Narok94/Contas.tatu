@@ -7,7 +7,7 @@
 .chat-hero::before { content:''; position:absolute; z-index:-1; inset:-10px 35% 0 -15px; background:radial-gradient(ellipse at 35% 45%,#fff3dff5 0%,#fff3dfdf 40%,#fff3df00 75%); pointer-events:none; }
 .chat-hero h1 { color:#235640; font-size:30px; line-height:1.2; font-weight:800; letter-spacing:-1px; }
 .chat-hero p { max-width:190px; margin-top:7px; font-size:13px; line-height:1.5; color:#547455; }
-.chat-stream { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:none; padding:6px 16px 20px; background:transparent; scroll-behavior:smooth; }
+.chat-stream { flex:1; min-height:0; overflow-y:auto; overscroll-behavior:none; padding:6px 16px 20px; background:transparent; scroll-behavior:auto; overflow-anchor:none; }
 .chat-message { display:flex; align-items:flex-start; gap:8px; margin-bottom:12px; }
 .chat-message.user { flex-direction:row-reverse; margin-left:18px; }
 .chat-tatu { width:30px; height:32px; object-fit:contain; flex:none; }
