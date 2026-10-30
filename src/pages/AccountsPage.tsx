@@ -317,8 +317,9 @@ export const AccountsPage: React.FC = () => {
             if (account.type === 'credit_card') {
               return (
                 <CreditCardAccountCard
-                  key={account.id}
+                  key={`${account.id}-${currentMonth}`}
                   account={account}
+                  month={currentMonth}
                   onToggleStatus={toggleAccountStatus}
                   onEdit={openEditAccountModal}
                   onDelete={(acc) => setAccountToDelete(acc)}

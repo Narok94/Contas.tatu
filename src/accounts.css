@@ -62,8 +62,6 @@
 /* Stretch only the container; existing content spacing stays compact. */
 .accounts-grid .account-tile { min-width: 0; display: flex; flex-direction: column; align-self: stretch; height: auto; }
 .accounts-grid .account-footer { margin-top: auto; min-height: 39px; }
-/* Explicit invoice expansion must not stretch the other cards to its height. */
-.accounts-grid:has([id^="btn-expand-card-"][aria-expanded="true"]) .account-tile { align-self: start; }
 .account-header > div:first-child { flex-wrap: nowrap; min-width: 0; gap: 4px; }
 .account-header > div:first-child > span { flex-shrink: 0; }
 .account-header > div:first-child > span.category-chip { flex-shrink: 1; min-width: 0; }
@@ -76,3 +74,22 @@
 .card-purchases-heading { flex-wrap: wrap; gap: 6px; }
 .accounts-filter-group label { font-size: 11px; font-weight: 650; color: var(--color-stone-600); }
 .accounts-filter-group select { max-width: 220px; padding: 5px 8px; border: 1px solid var(--color-line); border-radius: 8px; font-size: 12px; background: var(--color-surface-soft); }
+
+/* This component is mounted only by the desktop accounts page (768px and up). */
+.card-details-dialog { position: fixed; inset: 0; margin: auto; padding: 0; width: min(1120px, calc(100vw - 64px)); height: min(820px, calc(100dvh - 64px)); max-width: none; max-height: none; border: 1px solid var(--color-line); border-radius: 24px; background: white; color: var(--color-stone-900); box-shadow: 0 24px 80px #0003; overflow: hidden; }
+.card-details-dialog[open] { display: flex; flex-direction: column; }
+.card-details-dialog::backdrop { background: color-mix(in srgb, var(--color-brand) 40%, transparent); backdrop-filter: blur(4px); }
+.card-details-header { display: flex; flex-shrink: 0; align-items: flex-start; justify-content: space-between; gap: 24px; padding: 24px 28px; border-bottom: 1px solid var(--color-line); background: var(--color-teal-soft); }
+.card-details-header p { font-size: 12px; color: var(--color-stone-600); }
+.card-details-header h2 { margin-top: 4px; font-size: 22px; font-weight: 700; overflow-wrap: anywhere; }
+.card-details-header strong { display: block; margin-top: 8px; font-size: 28px; font-variant-numeric: tabular-nums; }
+.card-details-header button { display: grid; place-items: center; width: 40px; height: 40px; flex-shrink: 0; border-radius: 12px; cursor: pointer; }
+.card-details-header button:hover { background: var(--color-surface-muted); }
+.card-details-dialog button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.card-details-content { min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px 28px; display: flex; flex-direction: column; gap: 24px; }
+.card-details-content .card-invoice-breakdown { margin: 0; gap: 6px; padding: 16px; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-surface-soft); font-size: 13px; }
+.card-details-content .card-purchases-heading { margin-bottom: 14px; }
+.card-details-purchases .card-purchase-row { padding: 14px 16px; gap: 12px 24px; font-size: 14px; }
+.card-details-purchases .card-purchase-name { overflow-wrap: anywhere; }
+.card-details-purchases .card-purchase-actions { gap: 12px; }
+.card-details-purchases .card-purchase-actions button { min-width: 36px; min-height: 36px; display: grid; place-items: center; }

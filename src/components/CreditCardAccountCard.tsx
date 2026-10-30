@@ -7,12 +7,12 @@ import {
   Plus,
   Trash2,
   Edit2,
-  ChevronDown,
-  ChevronUp,
+  Maximize2,
   Layers,
   Edit3,
 } from 'lucide-react';
 import { PaymentOptions } from './PaymentOptions';
+import { CardDetailsDialog } from './CardDetailsDialog';
 import { CardInternalItem, UnifiedMonthlyAccount } from '../types/finance';
 import { formatBRL, formatMonthEnd, formatMonthYear } from '../utils/formatters';
 
@@ -20,6 +20,7 @@ export type { CardInternalItem };
 
 interface CreditCardAccountCardProps {
   account: UnifiedMonthlyAccount;
+  month: string;
   onToggleStatus: (account: UnifiedMonthlyAccount) => void;
   onEdit: (account: UnifiedMonthlyAccount) => void;
   onDelete: (account: UnifiedMonthlyAccount) => void;
@@ -34,6 +35,7 @@ interface CreditCardAccountCardProps {
 
 export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
   account,
+  month,
   onToggleStatus,
   onEdit,
   onDelete,
@@ -113,31 +115,24 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
           </div>}
         </div>
 
-        {/* Botão de Expandir / Recolher Itens */}
+        {/* Detalhes ficam fora do fluxo do card desktop. */}
         <button
           id={`btn-expand-card-${account.id}`}
           type="button"
-          aria-expanded={isExpanded}
+          aria-haspopup="dialog"
           aria-controls={`card-items-${account.id}`}
-          onClick={() => setIsExpanded(!isExpanded)}
+          onClick={() => setIsExpanded(true)}
           className="mt-2 w-full flex items-center justify-between px-2.5 py-1.5 bg-surface-soft hover:bg-surface-muted border border-line rounded-xl text-xs font-medium text-stone-700 transition-colors cursor-pointer"
         >
-          <span>
-            {isExpanded
-              ? 'Ocultar detalhes'
-              : 'Ver detalhes'}
-          </span>
-          {isExpanded ? (
-            <ChevronUp className="w-3.5 h-3.5 text-stone-500" />
-          ) : (
-            <ChevronDown className="w-3.5 h-3.5 text-stone-500" />
-          )}
+          <span>Ver detalhes</span>
+          <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
         </button>
       </div>
 
       {/* Compras que compõem a fatura do mês */}
       {isExpanded && (
-        <div id={`card-items-${account.id}`} className="border-t border-line bg-surface-soft/50 p-3 space-y-3 animate-in slide-in-from-top-1 duration-150">
+        <CardDetailsDialog id={`card-items-${account.id}`} name={account.name}
+          month={formatMonthYear(month)} total={formatBRL(account.amount)} onClose={() => setIsExpanded(false)}>
           <div className="card-invoice-breakdown" aria-label="Detalhes financeiros da fatura">
             <div><span>Total da fatura</span><b>{formatBRL(account.amount)}</b></div>
             <div><span>Compras do mês</span><span>{formatBRL(currentMonthAmount)}</span></div>
@@ -154,7 +149,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
               <button
                 id={`btn-add-expense-to-card-${account.id}`}
                 type="button"
-                onClick={() => onAddPurchase(cardInfo?.cardId || account.id)}
+                onClick={() => { setIsExpanded(false); onAddPurchase(cardInfo?.cardId || account.id); }}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-strong transition-colors cursor-pointer"
               >
                 <Plus className="w-3.5 h-3.5" />
@@ -167,7 +162,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
                 Nenhuma compra lançada nesta fatura
               </div>
             ) : (
-              <div className="space-y-1.5 max-h-56 overflow-y-auto pr-0.5">
+              <div className="card-details-purchases space-y-1.5">
                 {items.map((item) => (
                   <div
                     key={item.id}
@@ -223,7 +218,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
                       <button
                         type="button"
                         title="Editar compra da fatura"
-                        onClick={() => onEditItem(item)}
+                        onClick={() => { setIsExpanded(false); onEditItem(item); }}
                         className="text-stone-400 hover:text-stone-800 p-1 rounded hover:bg-stone-100 transition-colors cursor-pointer"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
@@ -232,9 +227,10 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
                       <button
                         type="button"
                         title="Excluir compra da fatura"
-                        onClick={() =>
-                          onDeleteItem(item.sourceType, item.sourceId, item.description)
-                        }
+                        onClick={() => {
+                          setIsExpanded(false);
+                          onDeleteItem(item.sourceType, item.sourceId, item.description);
+                        }}
                         className="text-stone-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -245,7 +241,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
               </div>
             )}
           </div>
-        </div>
+        </CardDetailsDialog>
       )}
 
       {/* Card Action Bar */}
