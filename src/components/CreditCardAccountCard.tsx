@@ -1,23 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
 import {
   CreditCard as CardIcon,
   Undo2, CheckCircle2,
   Circle,
   Plus,
   Trash2,
-  Maximize2,
+  ArrowUpRight,
   Edit3,
 } from 'lucide-react';
 import { PaymentOptions } from './PaymentOptions';
-import { CardDetailsDialog } from './CardDetailsDialog';
 import { CardInternalItem, UnifiedMonthlyAccount } from '../types/finance';
-import { formatBRL, formatMonthYear } from '../utils/formatters';
+import { formatBRL } from '../utils/formatters';
 
 export type { CardInternalItem };
 
 interface CreditCardAccountCardProps {
   account: UnifiedMonthlyAccount;
-  month: string;
+  onViewDetails: (cardId: string) => void;
   onToggleStatus: (account: UnifiedMonthlyAccount) => void;
   onEdit: (account: UnifiedMonthlyAccount) => void;
   onDelete: (account: UnifiedMonthlyAccount) => void;
@@ -32,15 +31,13 @@ interface CreditCardAccountCardProps {
 
 export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
   account,
-  month,
+  onViewDetails,
   onToggleStatus,
   onEdit,
   onDelete,
 }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
   const isPaid = account.status === 'pago';
   const cardInfo = account.cardInfo;
-  const items = (cardInfo?.items || []) as CardInternalItem[];
 
   const previousPendingAmount = cardInfo?.previousPendingAmount ?? 0;
   const totalOpenAmount = cardInfo?.totalOpenAmount ?? (isPaid ? 0 : account.amount);
@@ -111,22 +108,13 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
         <button
           id={`btn-expand-card-${account.id}`}
           type="button"
-          aria-haspopup="dialog"
-          aria-controls={`card-items-${account.id}`}
-          onClick={() => setIsExpanded(true)}
+          onClick={() => onViewDetails(account.id)}
           className="mt-2 w-full flex items-center justify-between px-2.5 py-1.5 bg-surface-soft hover:bg-surface-muted border border-line rounded-xl text-xs font-medium text-stone-700 transition-colors cursor-pointer"
         >
           <span>Ver detalhes</span>
-          <Maximize2 className="w-3.5 h-3.5 text-stone-500" />
+          <ArrowUpRight className="w-3.5 h-3.5 text-stone-500" />
         </button>
       </div>
-
-      {/* Compras que compõem a fatura do mês */}
-      {isExpanded && (
-        <CardDetailsDialog id={`card-items-${account.id}`} name={account.name}
-          month={formatMonthYear(month)} total={account.amount} items={items}
-          onClose={() => setIsExpanded(false)} />
-      )}
 
       {/* Card Action Bar */}
       <div

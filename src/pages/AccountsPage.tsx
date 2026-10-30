@@ -21,7 +21,7 @@ type StatusFilterType = 'all' | 'pendente' | 'pago' | 'parcial';
 type SortOrder = 'default' | 'highest' | 'lowest' | 'category' | 'name';
 type AccountTypeFilter = 'all' | 'simple' | 'recurring' | 'installment' | 'credit_card';
 
-export const AccountsPage: React.FC = () => {
+export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidden?: boolean }> = ({ onViewCard, hidden }) => {
   const {
     mode,
     currentMonth,
@@ -113,7 +113,7 @@ export const AccountsPage: React.FC = () => {
   };
 
   return (
-    <div className="accounts-page">
+    <div className="accounts-page" hidden={hidden} style={hidden ? { display: 'none' } : undefined}>
       <header className="accounts-heading">
         <h2>Contas <span>· {formatMonthYear(currentMonth)}</span></h2>
       </header>
@@ -319,7 +319,7 @@ export const AccountsPage: React.FC = () => {
                 <CreditCardAccountCard
                   key={`${account.id}-${currentMonth}`}
                   account={account}
-                  month={currentMonth}
+                  onViewDetails={onViewCard}
                   onToggleStatus={toggleAccountStatus}
                   onEdit={openEditAccountModal}
                   onDelete={(acc) => setAccountToDelete(acc)}

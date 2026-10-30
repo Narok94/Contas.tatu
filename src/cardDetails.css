@@ -1,0 +1,31 @@
+/* Read-only statement in the existing desktop main area, with document scrolling. */
+.card-details-page { width: 100%; min-width: 0; padding: 8px 24px 24px; align-self: flex-start; }
+.card-statement-back { display: inline-flex; align-items: center; gap: 6px; color: var(--color-stone-600); font-size: 12px; padding: 4px 0; margin-bottom: 10px; cursor: pointer; }
+.card-statement-back:hover { color: var(--color-brand-strong); }
+.card-statement-heading { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px 24px; margin-bottom: 16px; }
+.card-statement-heading h2 { font-size: 21px; font-weight: 750; letter-spacing: -.5px; overflow-wrap: anywhere; }
+.card-statement-heading p { margin-top: 2px; font-size: 12px; color: var(--color-stone-600); }
+.card-statement-summary { display: flex; align-items: baseline; flex-wrap: wrap; gap: 6px 20px; font-size: 12px; color: var(--color-stone-600); }
+.card-statement-summary strong { font-size: 20px; color: var(--color-stone-900); font-variant-numeric: tabular-nums; font-weight: 750; white-space: nowrap; }
+.card-statement-toolbar { display: flex; align-items: center; gap: 16px; margin-bottom: 14px; font-size: 12px; color: var(--color-stone-600); }
+.card-statement-search { display: flex; align-items: center; gap: 8px; width: min(400px, 75%); padding: 8px 12px; border: 1px solid var(--color-line); border-radius: 10px; background: white; color: var(--color-stone-500); }
+.card-statement-search input { width: 100%; min-width: 0; background: transparent; color: var(--color-stone-900); font-size: 13px; }
+.card-details-page :is(button, input):focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
+.card-statement-table { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; border: 1px solid var(--color-line); border-radius: 12px; background: white; text-align: left; font-size: 13px; }
+.card-statement-table thead { position: sticky; top: 0; z-index: 1; }
+.card-statement-table th { padding: 11px 14px; background: var(--color-surface-soft); border-bottom: 1px solid var(--color-line); color: var(--color-stone-600); font-size: 11px; font-weight: 650; }
+.card-statement-table th:first-child { width: 19%; border-top-left-radius: 12px; }
+.card-statement-table th:nth-child(2) { width: 48%; }
+.card-statement-table th:nth-child(3) { width: 12%; }
+.card-statement-table th:last-child { width: 21%; text-align: right; border-top-right-radius: 12px; }
+.card-statement-entry td { padding: 10px 14px; border-bottom: 1px solid var(--color-line); vertical-align: middle; }
+.card-statement-entry:last-child td { border-bottom: 0; }
+.card-statement-entry:hover { background: var(--color-surface-soft); }
+.card-statement-date { color: var(--color-stone-500); font-size: 11px; }
+.card-statement-entry td:last-child { text-align: right; white-space: nowrap; font-variant-numeric: tabular-nums; font-weight: 650; }
+.card-statement-description { overflow-wrap: anywhere; }
+.card-statement-category { display: inline-block; margin-left: 8px; padding: 2px 6px; border-radius: 5px; font-size: 10px; }
+.card-statement-installment { font-variant-numeric: tabular-nums; color: var(--color-brand-strong); font-weight: 600; }
+.card-statement-dash { color: var(--color-stone-500); }
+.card-statement-empty { padding: 32px 16px; text-align: center; color: var(--color-stone-600); }
+@media (min-width: 1024px) { .card-details-page { padding: 0; } }

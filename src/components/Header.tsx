@@ -6,7 +6,7 @@ import { MonthSelector } from './MonthSelector';
 import { TatuIllustration } from './TatuIllustration';
 import { useAuth } from '../auth/AuthContext';
 
-export const Header: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({ collapsed, onToggle }) => {
+export const Header: React.FC<{ collapsed: boolean; onToggle: () => void; onAccounts?: () => void }> = ({ collapsed, onToggle, onAccounts }) => {
   const { user, logout } = useAuth();
   const { activeTab, setActiveTab, currentMonth, setCurrentMonth, isSettingsOpen, setIsSettingsOpen, openCreateAccountModal, financialSummary } = useFinance();
   return (
@@ -17,7 +17,7 @@ export const Header: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({
         <p className="nav-caption">SEU ESPAÇO</p>
         <nav className="app-nav" aria-label="Navegação principal">
           <button id="tab-dashboard" type="button" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /><span>Início</span></button>
-          <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => setActiveTab('accounts')}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
+          <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => { onAccounts?.(); setActiveTab('accounts'); }}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
           <button id="tab-history" type="button" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History size={18} /><span>Histórico</span></button>
           <button id="btn-settings-header" type="button" aria-haspopup="dialog" aria-expanded={isSettingsOpen} onClick={() => setIsSettingsOpen(true)}><Settings size={18} /><span>Configurações</span></button>
           <ClearConversation />

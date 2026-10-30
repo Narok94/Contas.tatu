@@ -1,8 +1,9 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useFinance } from './context/FinanceContext';
 import { Header } from './components/Header';
 import { DashboardPage } from './pages/DashboardPage';
 import { AccountsPage } from './pages/AccountsPage';
+import { CardDetailsPage } from './pages/CardDetailsPage';
 import { SettingsModal } from './components/SettingsModal';
 import { AccountModal } from './components/AccountModal';
 import './shell.css';
@@ -12,6 +13,8 @@ import './history.css';
 
 const AppContent: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [selectedCardId, setSelectedCardId] = useState<string | null>(null);
+  const accountsScroll = useRef(0);
   const {
     activeTab,
     isSettingsOpen,
@@ -22,15 +25,35 @@ const AppContent: React.FC = () => {
     operationError, clearOperationError, loading, busy, mode, refresh, hasCurrentView,
   } = useFinance();
 
+  useEffect(() => {
+    if (activeTab !== 'accounts') setSelectedCardId(null);
+  }, [activeTab]);
+
+  const openCardDetails = (cardId: string) => {
+    accountsScroll.current = window.scrollY;
+    setSelectedCardId(cardId);
+  };
+  const backToAccounts = () => {
+    const cardId = selectedCardId;
+    setSelectedCardId(null);
+    requestAnimationFrame(() => {
+      window.scrollTo(0, accountsScroll.current);
+      document.getElementById(`btn-expand-card-${cardId}`)?.focus({ preventScroll: true });
+    });
+  };
+
   return (
     <div className={`app-shell ${sidebarCollapsed ? 'sidebar-collapsed' : ''} min-h-screen bg-canvas text-stone-900 flex flex-col font-sans selection:bg-brand/20`}>
       {/* Persistent sidebar and shared toolbar */}
-      <Header collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} />
+      <Header collapsed={sidebarCollapsed} onToggle={() => setSidebarCollapsed(value => !value)} onAccounts={() => setSelectedCardId(null)} />
       {(loading || busy) && <div role="status" className="fixed bottom-6 right-6 z-40 rounded-lg border border-stone-200 bg-white px-4 py-2 text-sm shadow-sm">{busy ? 'Salvando…' : 'Carregando dados…'}</div>}
 
       {/* Main Content Area */}
       <main className="app-main flex-1 pb-10">
-        {mode === 'neon' && !hasCurrentView ? <div className="p-6 text-sm">{loading ? 'Aguarde o carregamento do mês.' : <><p>Não foi possível carregar os dados.</p><button onClick={refresh}>Tentar novamente</button></>}</div> : activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <AccountsPage /> : <HistoryPage />}
+        {mode === 'neon' && !hasCurrentView ? <div className="p-6 text-sm">{loading ? 'Aguarde o carregamento do mês.' : <><p>Não foi possível carregar os dados.</p><button onClick={refresh}>Tentar novamente</button></>}</div> : activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <>
+          <AccountsPage hidden={Boolean(selectedCardId)} onViewCard={openCardDetails} />
+          {selectedCardId && <CardDetailsPage cardId={selectedCardId} onBack={backToAccounts} />}
+        </> : <HistoryPage />}
       </main>
       <PaymentDialog />
       {operationError && <div className="operation-error" role="alert"><span>{operationError}</span>{refresh && <button onClick={refresh}>Atualizar</button>}<button onClick={clearOperationError} aria-label="Fechar aviso">×</button></div>}
