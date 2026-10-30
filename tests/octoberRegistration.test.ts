@@ -7,6 +7,8 @@ import { createRepository, type Transport } from '../server/finance/repository.j
 import { createFinanceService } from '../server/finance/service.js';
 import { getInstallmentStatusForMonth } from '../src/domain/installmentTimeline.js';
 import { planOctober, purchases } from '../scripts/register-october-2026.js';
+import { computeOperationalMonthlyAccounts } from '../src/domain/financeRules.js';
+import { cardStatementRows, formatPurchaseDate } from '../src/utils/cardStatement.js';
 
 test('October import preserves old SQL rows, dates, current installments and is idempotent; variable recurring stays editable',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
@@ -23,6 +25,25 @@ test('October import preserves old SQL rows, dates, current installments and is 
   assert.equal(purchases.reduce((n,p)=>n+p.cents,0),272282);
   await repo.save(before,plan.next);
   const after=await repo.load();
+  const originalState=JSON.stringify(after.store);
+  const card=computeOperationalMonthlyAccounts('2026-10',after.store).find(a=>a.type==='credit_card')!;
+  const statement=cardStatementRows(card,after.store);
+  assert.equal(card.amount,2722.82);
+  assert.equal(statement.length,38);
+  assert.equal(statement.filter(row=>row.purchaseDate).length,21);
+  assert.equal(statement.filter(row=>!row.purchaseDate).length,17);
+  assert.deepEqual(statement.filter(row=>row.purchaseDate).map(row=>row.purchaseDate),[
+    ...Array(6).fill('2026-10-22'),...Array(5).fill('2026-10-21'),...Array(4).fill('2026-10-20'),
+    '2026-10-14','2026-10-13','2026-10-09','2026-10-09','2026-10-04','2026-10-01',
+  ]);
+  for(const expected of purchases) {
+    const row=statement.find(({item})=>item.description===expected.name && Math.round(item.amount*100)===expected.cents
+      && (expected.total ? item.installmentInfo?.current===expected.current && item.installmentInfo?.total===expected.total : !item.isInstallment));
+    assert.ok(row,expected.name);
+    assert.equal(row.purchaseDate,expected.day ? `2026-10-${String(expected.day).padStart(2,'0')}` : undefined,expected.name);
+    assert.equal(formatPurchaseDate(row.purchaseDate),expected.day ? `${String(expected.day).padStart(2,'0')}/10/2026` : 'Data não informada');
+  }
+  assert.equal(JSON.stringify(after.store),originalState,'Statement projection cannot mutate any financial record');
   for(const [table,rows] of Object.entries(before.tables))for(const row of rows)
     assert.ok(after.tables[table].some(r=>JSON.stringify(r)===JSON.stringify(row)),table);
   const again=await planOctober(after);assert.deepEqual(again.next,after.store);
