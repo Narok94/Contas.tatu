@@ -1,4 +1,5 @@
 import React from 'react';
+import { ClearConversation } from './ClearConversation';
 import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { MonthSelector } from './MonthSelector';
@@ -19,6 +20,7 @@ export const Header: React.FC<{ collapsed: boolean; onToggle: () => void }> = ({
           <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => setActiveTab('accounts')}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
           <button id="tab-history" type="button" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History size={18} /><span>Histórico</span></button>
           <button id="btn-settings-header" type="button" aria-haspopup="dialog" aria-expanded={isSettingsOpen} onClick={() => setIsSettingsOpen(true)}><Settings size={18} /><span>Configurações</span></button>
+          <ClearConversation />
         </nav>
         <div className="sidebar-note"><span className="note-kicker">UM PASSO DE CADA VEZ</span><p>Disciplina hoje,<br />mais liberdade amanhã.</p><TatuIllustration variant="laptop" className="note-mascot" /><span className="note-signature">Cada conta em seu lugar.</span></div>
         <span className="sidebar-footer">{user.name} · <button onClick={() => void logout()}>Sair</button></span>

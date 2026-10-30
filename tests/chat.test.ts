@@ -161,4 +161,22 @@ test('persistent household chat with both authenticated users and atomic financi
     assert.equal(petshop[1].preview?.month,'2026-10');
     assert.deepEqual((await finance.read('2026-10')).state,confirmed.state);
   });
+  await t.test('clear requires explicit authenticated same-origin confirmation and preserves all finance and sessions',async()=>{
+    const before=await createRepository(db).load();
+    const count=(await db.batch([q('SELECT count(*)::int AS n FROM finance_v2.chat_messages')],true))[0][0].n;
+    assert.ok(count>0);
+    assert.equal((await invoke('', 'DELETE',{confirmed:true})).status,401);
+    for(const body of [{},{confirmed:false},{confirmed:'true'},{confirmed:true,householdId:randomUUID()}])
+      assert.equal((await invoke(h.token,'DELETE',body)).status,400);
+    assert.equal((await chat.clear({...h.user,householdId:randomUUID()},{confirmed:true})).deleted,0);
+    const cleared=await invoke(h.token,'DELETE',{confirmed:true});
+    assert.equal(cleared.status,200);assert.equal(cleared.result.deleted,count);
+    assert.deepEqual((await createRepository(db).load()),before);
+    assert.equal((await invoke(j.token,'GET')).result.messages.length,0);
+    assert.equal((await invoke(h.token,'GET')).result.historyStart,null);
+    assert.equal((await invoke(h.token,'DELETE',{confirmed:true})).result.deleted,0);
+    await chat.send(j.user,{id:randomUUID(),text:'Nova conversa',month:'2026-10'});
+    assert.equal((await invoke(h.token,'GET')).result.messages.length,2);
+  });
+
 });

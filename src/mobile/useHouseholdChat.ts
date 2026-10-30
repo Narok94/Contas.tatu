@@ -13,9 +13,9 @@ export function useHouseholdChat(search:string,author:string) {
   const newest=useRef<string>();
   const active=useRef(false), filter=useRef({q:search,author});
   filter.current={q:search,author};
-  function merge(incoming:ChatMessage[]) {
+  function merge(incoming:ChatMessage[], historyStart?:string|null) {
     setMessages(previous=>{
-      const merged=new Map<string,ChatMessage>(previous.map(m=>[m.id,m] as const));
+      const merged=new Map<string,ChatMessage>(previous.filter(m=>historyStart===undefined || (historyStart!==null && BigInt(m.sequence!)>=BigInt(historyStart))).map(m=>[m.id,m] as const));
       for(const m of incoming){const old=merged.get(m.id);merged.set(m.id,old?.saved && !m.saved?old:m);}
       return [...merged.values()].sort((a,b)=>BigInt(a.sequence!)<BigInt(b.sequence!)?-1:1);
     });
@@ -26,7 +26,8 @@ export function useHouseholdChat(search:string,author:string) {
     try {
       const page=await api.list({...filter.current,...(before?{before}:{})});
       if(current!==epoch.current)return;
-      merge(page.messages);setParticipants(page.participants);setReady(true);setError('');
+      if(page.historyStart===null){newest.current=undefined;setNextBefore(null);}
+      merge(page.messages,page.historyStart);setParticipants(page.participants);setReady(true);setError('');
       // A long pause may skip a whole page of new messages. Reopen the cursor at
       // the gap so every intervening message remains reachable through history.
       const gap=!before && newest.current && page.messages.length && BigInt(page.messages[0].sequence!)>BigInt(newest.current);
@@ -38,8 +39,10 @@ export function useHouseholdChat(search:string,author:string) {
   useEffect(()=>{
     ++epoch.current;active.current=true;newest.current=undefined;setMessages([]);setNextBefore(null);setReady(false);void refresh(undefined,true);
     const timer=window.setInterval(()=>void refresh(),5000);
+    const cleared=()=>{++epoch.current;newest.current=undefined;sending.current=undefined;setMessages([]);setNextBefore(null);void refresh(undefined,true);};
+    window.addEventListener('chat-cleared',cleared);
     const focused=()=>void refresh();window.addEventListener('focus',focused);
-    return()=>{++epoch.current;active.current=false;window.clearInterval(timer);window.removeEventListener('focus',focused);};
+    return()=>{++epoch.current;active.current=false;window.clearInterval(timer);window.removeEventListener('chat-cleared',cleared);window.removeEventListener('focus',focused);};
   },[search,author]);
   async function send(text:string,month:string,replyTo?:string) {
     if(lock.current || !ready)return false;

@@ -11,13 +11,13 @@ export function chatHandler(confirm=false, service=createChatService(), auth=cre
     response.setHeader('Cache-Control','no-store');
     response.setHeader('X-Content-Type-Options','nosniff');
     const send=(status:number,body:unknown)=>{ response.statusCode=status; response.end(request.method==='HEAD' ? undefined : JSON.stringify(body)); };
-    const allowed=confirm ? ['POST'] : ['GET','HEAD','POST'];
+    const allowed=confirm ? ['POST'] : ['GET','HEAD','POST','DELETE'];
     if (!allowed.includes(request.method ?? '')) { response.setHeader('Allow',allowed.join(', ')); send(405,{error:'Método não permitido.'}); return; }
     try {
       const user=await authenticated(request,auth);
       if (!user) { send(401,{error:'Entre para continuar.'}); return; }
-      if (request.method==='POST' && Object.keys(request.query ?? {}).length) throw new FoundationError(400,'Invalid query');
-      send(200,request.method==='POST' ? await (confirm ? service.confirm(user,await readBody(request)) : service.send(user,await readBody(request))) : await service.list(user,request.query));
+      if (['POST','DELETE'].includes(request.method ?? '') && Object.keys(request.query ?? {}).length) throw new FoundationError(400,'Invalid query');
+      send(200,request.method==='DELETE' ? await service.clear(user,await readBody(request)) : request.method==='POST' ? await (confirm ? service.confirm(user,await readBody(request)) : service.send(user,await readBody(request))) : await service.list(user,request.query));
     } catch (error) {
       if (error instanceof FoundationError) send(error.status,{error:error.message});
       else send(503,{error:'Não foi possível carregar ou salvar a conversa. Tente novamente.'});

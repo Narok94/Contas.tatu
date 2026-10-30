@@ -43,15 +43,23 @@ export function createChatService(db: Transport = neonTransport) {
       if (before !== null && !/^[1-9]\d{0,18}$/.test(before)) throw new FoundationError(400,'Invalid cursor');
       const search = query.q === undefined || query.q === '' ? '' : text(query.q)!;
       const author = query.author === undefined || query.author === '' ? null : uuid(query.author);
-      const [rows,participants] = await db.batch([
+      const [rows,participants,boundary] = await db.batch([
         q(`SELECT * FROM finance_v2.chat_messages WHERE household_id=$1 AND ($2::bigint IS NULL OR sequence<$2)
           AND ($3='' OR strpos(lower(content||COALESCE(preview::text,'')||COALESCE(confirmed_preview::text,'')),lower($3))>0)
           AND ($4::uuid IS NULL OR actor_user_id=$4) ORDER BY sequence DESC LIMIT 101`,[identity.householdId,before,search,author]),
         q(`SELECT u.id,u.display_name AS name FROM finance_v2.app_users u JOIN finance_v2.household_memberships m ON m.user_id=u.id
           JOIN finance_v2.auth_credentials c ON c.user_id=u.id WHERE m.household_id=$1 AND c.enabled AND c.login IN ('henrique','jessica') ORDER BY c.login`,[identity.householdId]),
+        q('SELECT min(sequence)::text AS first_sequence FROM finance_v2.chat_messages WHERE household_id=$1',[identity.householdId]),
       ],true);
       const page = rows.slice(0,100).reverse();
-      return { messages: page.map(decode), participants, nextBefore: rows.length>100 ? String(page[0].sequence) : null };
+      return { messages: page.map(decode), participants, historyStart: boundary[0].first_sequence, nextBefore: rows.length>100 ? String(page[0].sequence) : null };
+    },
+    async clear(identity: Identity, value: unknown) {
+      const input=object(value); keys(input,['confirmed']);
+      if(input.confirmed !== true) throw new FoundationError(400,'Confirme explicitamente a limpeza da conversa.');
+      // This table contains conversation only; financial_operation_id is not a foreign key.
+      const [rows]=await db.batch([q('DELETE FROM finance_v2.chat_messages WHERE household_id=$1 RETURNING id',[identity.householdId])],false);
+      return { deleted: rows.length };
     },
     async send(identity: Identity, value: unknown) {
       const input=object(value); keys(input,['id','text','month','replyTo']);
