@@ -1,4 +1,3 @@
-import { categoryDisplayColor } from '../utils/categoryPalette';
 import React, { useState } from 'react';
 import {
   CreditCard as CardIcon,
@@ -6,15 +5,13 @@ import {
   Circle,
   Plus,
   Trash2,
-  Edit2,
   Maximize2,
-  Layers,
   Edit3,
 } from 'lucide-react';
 import { PaymentOptions } from './PaymentOptions';
 import { CardDetailsDialog } from './CardDetailsDialog';
 import { CardInternalItem, UnifiedMonthlyAccount } from '../types/finance';
-import { formatBRL, formatMonthEnd, formatMonthYear } from '../utils/formatters';
+import { formatBRL, formatMonthYear } from '../utils/formatters';
 
 export type { CardInternalItem };
 
@@ -39,18 +36,13 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
   onToggleStatus,
   onEdit,
   onDelete,
-  onAddPurchase,
-  onEditItem,
-  onDeleteItem,
 }) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const isPaid = account.status === 'pago';
   const cardInfo = account.cardInfo;
   const items = (cardInfo?.items || []) as CardInternalItem[];
 
-  const currentMonthAmount = cardInfo?.currentMonthAmount ?? account.amount;
   const previousPendingAmount = cardInfo?.previousPendingAmount ?? 0;
-  const previousPendingInvoices = cardInfo?.previousPendingInvoices ?? [];
   const totalOpenAmount = cardInfo?.totalOpenAmount ?? (isPaid ? 0 : account.amount);
   const hasPreviousPending = previousPendingAmount > 0;
 
@@ -132,116 +124,8 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
       {/* Compras que compõem a fatura do mês */}
       {isExpanded && (
         <CardDetailsDialog id={`card-items-${account.id}`} name={account.name}
-          month={formatMonthYear(month)} total={formatBRL(account.amount)} onClose={() => setIsExpanded(false)}>
-          <div className="card-invoice-breakdown" aria-label="Detalhes financeiros da fatura">
-            <div><span>Total da fatura</span><b>{formatBRL(account.amount)}</b></div>
-            <div><span>Compras do mês</span><span>{formatBRL(currentMonthAmount)}</span></div>
-            {hasPreviousPending && <div className="card-previous-balance"><span>Saldo anterior{previousPendingInvoices[0] && ` · ${formatMonthYear(previousPendingInvoices[0].month).split(' ')[0]}`}</span><span>{formatBRL(previousPendingAmount)}</span></div>}
-            <div><span>Pago</span><span>{formatBRL(cardInfo?.paidAmount ?? (isPaid ? account.amount : 0))}</span></div>
-            <div><span>Restante</span><span>{formatBRL(totalOpenAmount)}</span></div>
-          </div>
-          {/* Seção 1: Compras do Mês */}
-          <div>
-            <div className="card-purchases-heading flex items-center justify-between mb-2">
-              <span className="text-[11px] font-semibold text-stone-600 uppercase tracking-wider">
-                Compras do Mês ({formatBRL(currentMonthAmount)})
-              </span>
-              <button
-                id={`btn-add-expense-to-card-${account.id}`}
-                type="button"
-                onClick={() => { setIsExpanded(false); onAddPurchase(cardInfo?.cardId || account.id); }}
-                className="inline-flex items-center gap-1 text-xs font-semibold text-brand hover:text-brand-strong transition-colors cursor-pointer"
-              >
-                <Plus className="w-3.5 h-3.5" />
-                Adicionar compra
-              </button>
-            </div>
-
-            {items.length === 0 ? (
-              <div className="py-2.5 text-center text-xs text-stone-400 bg-white rounded-lg border border-line">
-                Nenhuma compra lançada nesta fatura
-              </div>
-            ) : (
-              <div className="card-details-purchases space-y-1.5">
-                {items.map((item) => (
-                  <div
-                    key={item.id}
-                    className="card-purchase-row flex items-center justify-between p-2 rounded-lg bg-white border border-line text-xs gap-2 group/item hover:border-line-strong transition-colors"
-                  >
-                    <div className="card-purchase-copy">
-                      <div className="card-purchase-name font-medium text-stone-800">
-                        {item.description}
-                      </div>
-                      <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
-                        {item.isInstallment && item.installmentInfo && (
-                          <span className="text-[10px] font-semibold text-brand bg-brand/10 px-1.5 py-0.5 rounded border border-brand/20 inline-flex items-center gap-1">
-                            <Layers className="w-2.5 h-2.5" />
-                            <span>
-                              {item.installmentInfo.current}/{item.installmentInfo.total}
-                            </span>
-                            {item.installmentInfo.endMonth && (
-                              <span className="text-stone-600 font-medium ml-0.5">
-                                • Fim: {formatMonthEnd(item.installmentInfo.endMonth)}
-                              </span>
-                            )}
-                          </span>
-                        )}
-                        {item.category && (
-                          <span
-                            className="category-chip text-[10px] font-medium px-1.5 py-0.2 rounded"
-                            style={{
-                              '--category-color': categoryDisplayColor(item.category.color),
-                            } as React.CSSProperties}
-                          >
-                            {item.category.name}
-                          </span>
-                        )}
-                      </div>
-                    </div>
-
-                    <div className="card-purchase-actions flex items-center gap-2 shrink-0">
-                      <div className="text-right">
-                        <span className="font-semibold text-stone-900 block">
-                          {formatBRL(item.amount)}
-                        </span>
-                        {item.isInstallment && item.installmentInfo && (
-                          <span className="text-[10px] text-stone-400 block">
-                            Total:{' '}
-                            {formatBRL(
-                              item.installmentInfo.totalAmount ||
-                                item.amount * item.installmentInfo.total
-                            )}
-                          </span>
-                        )}
-                      </div>
-                      {/* Botão de Editar Compra Interna */}
-                      <button
-                        type="button"
-                        title="Editar compra da fatura"
-                        onClick={() => { setIsExpanded(false); onEditItem(item); }}
-                        className="text-stone-400 hover:text-stone-800 p-1 rounded hover:bg-stone-100 transition-colors cursor-pointer"
-                      >
-                        <Edit2 className="w-3.5 h-3.5" />
-                      </button>
-                      {/* Botão de Excluir Compra Interna */}
-                      <button
-                        type="button"
-                        title="Excluir compra da fatura"
-                        onClick={() => {
-                          setIsExpanded(false);
-                          onDeleteItem(item.sourceType, item.sourceId, item.description);
-                        }}
-                        className="text-stone-400 hover:text-rose-600 p-1 rounded hover:bg-rose-50 transition-colors cursor-pointer"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        </CardDetailsDialog>
+          month={formatMonthYear(month)} total={account.amount} items={items}
+          onClose={() => setIsExpanded(false)} />
       )}
 
       {/* Card Action Bar */}
