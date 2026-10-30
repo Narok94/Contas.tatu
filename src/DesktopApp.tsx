@@ -10,6 +10,7 @@ import './shell.css';
 import { HistoryPage } from './pages/HistoryPage';
 import { PaymentDialog } from './components/PaymentDialog';
 import './history.css';
+import './desktopAppearance.css';
 
 const AppContent: React.FC = () => {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);

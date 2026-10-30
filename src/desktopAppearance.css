@@ -1,0 +1,62 @@
+/* Shared by the authenticated desktop shell only; mobile/login keep their own palette. */
+@media (min-width: 768px) {
+  .app-shell {
+    --desktop-landscape: url('./assets/desktop-dawn.webp');
+    --color-line: #e0e7e6;
+    --color-line-strong: #cbd8d6;
+    --color-surface-soft: #f5f8f6;
+    --color-surface-muted: #e9f0ed;
+    --color-teal-soft: #e6f1ed;
+    --color-info-soft: #edf4f8;
+    --color-success-soft: #edf5ee;
+    --color-expense-soft: #fbefea;
+    --color-warning-soft: #f8f2e5;
+    --color-success: #46755b;
+    --color-expense: #9b5b4d;
+    --shadow-xs: 0 2px 9px rgb(45 68 67 / .025);
+    --shadow-sm: 0 4px 16px rgb(45 68 67 / .035);
+    background-color: #fcfcfa;
+    background-image: linear-gradient(180deg, rgb(240 247 250 / .15), rgb(249 242 233 / .4) 50%, #f8f2ea 100%), var(--desktop-landscape), linear-gradient(180deg, #e8f2f8 0, #f8f2ea 250px, #fbf0e9 550px, #fcfcfa 1000px);
+    background-size: 100% 250px, 100% 250px, 100% 100%;
+    background-repeat: no-repeat;
+    background-position: center top;
+  }
+  .app-shell .app-toolbar { background: transparent; }
+  .app-shell .app-sidebar { background: rgb(252 253 251 / .86); border-color: rgb(216 228 229 / .7); backdrop-filter: blur(8px); box-shadow: none; }
+  .app-shell .app-brand { gap: 6px; }
+  .app-shell .brand-mascot { width: 40px; }
+  .app-shell .app-brand h1 { font-size: 18px; }
+  .app-shell .app-brand p { font-size: 9px; }
+  .app-shell .app-nav { gap: 5px; margin-top: 28px; }
+  .app-shell .app-nav button { padding: 10px 12px; min-height: 40px; font-size: 12px; font-weight: 550; border-radius: 10px; color: var(--color-stone-600); }
+  .app-shell .app-nav button[aria-current=page], .app-shell .app-nav button[aria-expanded=true] { background: #e5f0ef; color: var(--color-brand-strong); font-weight: 650; box-shadow: none; }
+  .app-shell .app-nav button:hover { background: #eef4f1; }
+  .app-shell .nav-count { background: #f4f6f2; color: var(--color-stone-600); font-weight: 550; }
+  .app-shell .sidebar-footer { margin-top: auto; padding-top: 24px; }
+  .app-shell .new-account-button { background: #467b7c; box-shadow: none; font-weight: 600; }
+  .app-shell .new-account-button:hover { background: var(--color-brand); }
+  .app-shell .app-footer { background: transparent; border-color: rgb(224 231 230 / .6); }
+  .app-shell .account-tile { background: rgb(255 255 255 / .94); border-color: var(--color-line); border-left-width: 2px; box-shadow: var(--shadow-xs); }
+  .app-shell .account-tile:hover { box-shadow: var(--shadow-sm); }
+  .app-shell .account-tile.bg-success-soft { background: #f6faf5; border-left-color: #9dbda4; }
+  .app-shell .account-tile:not(.bg-success-soft) { border-left-color: #d7b8a1; }
+  .app-shell .account-footer { background: #f8faf8; }
+  .app-shell .account-footer button.bg-brand { background: #e7f0ed; color: #356564; box-shadow: none; }
+  .app-shell .account-footer button.bg-brand:hover { background: #dcebe5; }
+  .app-shell .accounts-summary > div { background: rgb(255 255 255 / .9); border: 1px solid var(--color-line); }
+  .app-shell .accounts-filters { background: rgb(255 255 255 / .9); }
+  .app-shell .history-panel { background: rgb(255 255 255 / .94); border-radius: 16px; box-shadow: var(--shadow-xs); }
+  .app-shell .history-heading h1 { font-size: 23px; }
+  .app-shell .history-totals > div { background: #f7faf9; border: 1px solid var(--color-line); border-radius: 12px; padding: 12px 14px; }
+  .app-shell .history-totals strong { font-size: 23px; }
+  .app-shell #settings-modal-overlay { background: rgb(51 77 79 / .15); backdrop-filter: blur(3px); }
+  .app-shell #settings-modal-box { border-radius: 20px; box-shadow: 0 12px 40px rgb(45 68 67 / .1); background: #fdfefa; }
+  .app-shell #settings-modal-box > div:first-child { background: #f0f5f3; }
+  .app-shell .card-statement-table { background: #fffffff2; border-color: var(--color-line); }
+  .app-shell .card-statement-table th { background: #f2f7f5; }
+}
+@media (min-width: 1024px) {
+  .app-shell { --shell-sidebar-width: 212px; }
+  .app-shell .app-sidebar { padding-inline: 14px; padding-top: 18px; }
+  .app-shell .app-main > .desktop-dashboard { max-width: 1440px; margin-inline: auto; padding-top: 4px; }
+}

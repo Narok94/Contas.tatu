@@ -1,5 +1,4 @@
 import React from 'react';
-import { ClearConversation } from './ClearConversation';
 import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { MonthSelector } from './MonthSelector';
@@ -14,15 +13,12 @@ export const Header: React.FC<{ collapsed: boolean; onToggle: () => void; onAcco
       <aside id="desktop-sidebar" className="app-sidebar">
         <button className="sidebar-toggle sidebar-collapse" aria-label="Recolher menu lateral" aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={onToggle}><PanelLeftClose size={18} /></button>
         <div className="app-brand"><TatuIllustration className="brand-mascot" /><div><h1>Contas Tatu<span>.</span></h1><p>Seu mês, mais leve</p></div></div>
-        <p className="nav-caption">SEU ESPAÇO</p>
         <nav className="app-nav" aria-label="Navegação principal">
           <button id="tab-dashboard" type="button" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /><span>Início</span></button>
           <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => { onAccounts?.(); setActiveTab('accounts'); }}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
           <button id="tab-history" type="button" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History size={18} /><span>Histórico</span></button>
           <button id="btn-settings-header" type="button" aria-haspopup="dialog" aria-expanded={isSettingsOpen} onClick={() => setIsSettingsOpen(true)}><Settings size={18} /><span>Configurações</span></button>
-          <ClearConversation />
         </nav>
-        <div className="sidebar-note"><span className="note-kicker">UM PASSO DE CADA VEZ</span><p>Disciplina hoje,<br />mais liberdade amanhã.</p><TatuIllustration variant="laptop" className="note-mascot" /><span className="note-signature">Cada conta em seu lugar.</span></div>
         <span className="sidebar-footer">{user.name} · <button onClick={() => void logout()}>Sair</button></span>
       </aside>
       <header className="app-toolbar">
