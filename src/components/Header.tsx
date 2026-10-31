@@ -1,31 +1,35 @@
 import React from 'react';
-import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Settings, LayoutDashboard, ReceiptText, Plus, ArrowUpRight, History } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { MonthSelector } from './MonthSelector';
 import { TatuIllustration } from './TatuIllustration';
 import { useAuth } from '../auth/AuthContext';
 
-export const Header: React.FC<{ collapsed: boolean; onToggle: () => void; onAccounts?: () => void }> = ({ collapsed, onToggle, onAccounts }) => {
+export const Header: React.FC<{ onAccounts?: () => void }> = ({ onAccounts }) => {
   const { user, logout } = useAuth();
-  const { activeTab, setActiveTab, currentMonth, setCurrentMonth, isSettingsOpen, setIsSettingsOpen, openCreateAccountModal, financialSummary } = useFinance();
+  const { activeTab, setActiveTab, currentMonth, setCurrentMonth, isSettingsOpen, setIsSettingsOpen, openCreateAccountModal } = useFinance();
   return (
     <>
-      <aside id="desktop-sidebar" className="app-sidebar">
-        <button className="sidebar-toggle sidebar-collapse" aria-label="Recolher menu lateral" aria-controls="desktop-sidebar" aria-expanded={!collapsed} onClick={onToggle}><PanelLeftClose size={18} /></button>
-        <div className="app-brand"><TatuIllustration className="brand-mascot" /><div><h1>Contas Tatu<span>.</span></h1><p>Seu mês, mais leve</p></div></div>
-        <nav className="app-nav" aria-label="Navegação principal">
-          <button id="tab-dashboard" type="button" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}><LayoutDashboard size={18} /><span>Início</span></button>
-          <button id="tab-accounts" type="button" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => { onAccounts?.(); setActiveTab('accounts'); }}><ReceiptText size={18} /><span>Contas</span>{financialSummary.pendingCount > 0 && <b className="nav-count">{financialSummary.pendingCount}</b>}</button>
-          <button id="tab-history" type="button" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History size={18} /><span>Histórico</span></button>
-          <button id="btn-settings-header" type="button" aria-haspopup="dialog" aria-expanded={isSettingsOpen} onClick={() => setIsSettingsOpen(true)}><Settings size={18} /><span>Configurações</span></button>
-        </nav>
-        <span className="sidebar-footer">{user.name} · <button onClick={() => void logout()}>Sair</button></span>
-      </aside>
       <header className="app-toolbar">
-        <div className="toolbar-title">{collapsed && <button className="sidebar-toggle sidebar-reopen" aria-label="Abrir menu lateral" aria-controls="desktop-sidebar" aria-expanded={false} onClick={onToggle}><PanelLeftOpen size={18} /></button>}<span>CONTAS TATU</span><p>{activeTab === 'dashboard' ? 'Um olhar sobre o seu mês' : 'Tudo no seu lugar'}</p></div>
+        <div className="app-brand"><TatuIllustration className="brand-mascot" /><h1>Contas Tatu<span>.</span></h1></div>
         <div className="app-month"><MonthSelector currentMonth={currentMonth} onMonthChange={setCurrentMonth} /></div>
         <button id="btn-header-new-account" type="button" onClick={openCreateAccountModal} className="new-account-button"><Plus size={16} /><span>Nova conta</span><ArrowUpRight size={15} /></button>
+        <div className="toolbar-account"><span title={user.name}>{user.name}</span><button type="button" onClick={() => void logout()}>Sair</button></div>
       </header>
+      <nav id="desktop-navigation" className="desktop-dock" aria-label="Navegação principal">
+        <button id="tab-dashboard" type="button" aria-label="Início" aria-describedby="dock-tip-dashboard" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}>
+          <LayoutDashboard size={20} aria-hidden="true" /><span id="dock-tip-dashboard" className="dock-tooltip" role="tooltip">Início</span>
+        </button>
+        <button id="tab-accounts" type="button" aria-label="Contas" aria-describedby="dock-tip-accounts" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => { onAccounts?.(); setActiveTab('accounts'); }}>
+          <ReceiptText size={20} aria-hidden="true" /><span id="dock-tip-accounts" className="dock-tooltip" role="tooltip">Contas</span>
+        </button>
+        <button id="tab-history" type="button" aria-label="Histórico" aria-describedby="dock-tip-history" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}>
+          <History size={20} aria-hidden="true" /><span id="dock-tip-history" className="dock-tooltip" role="tooltip">Histórico</span>
+        </button>
+        <button id="btn-settings-header" type="button" aria-label="Configurações" aria-describedby="dock-tip-settings" aria-haspopup="dialog" aria-expanded={isSettingsOpen} aria-current={isSettingsOpen ? 'page' : undefined} onClick={() => setIsSettingsOpen(true)}>
+          <Settings size={20} aria-hidden="true" /><span id="dock-tip-settings" className="dock-tooltip" role="tooltip">Configurações</span>
+        </button>
+      </nav>
     </>
   );
 };

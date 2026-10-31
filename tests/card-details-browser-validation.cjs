@@ -53,7 +53,7 @@ const { join } = require('node:path');
     const noModal = async () => {
       assert.equal(await page.locator('dialog[open], [aria-modal="true"], .card-details-dialog').count(), 0);
       assert.equal(await page.evaluate(() => document.body.style.overflow), '');
-      assert.equal(await page.locator('#desktop-sidebar').isVisible(), true);
+      assert.equal(await page.locator('#desktop-navigation').isVisible(), true);
       assert.equal(await page.locator('.app-toolbar').isVisible(), true);
     };
     const geometry = await tile.boundingBox();
@@ -90,7 +90,7 @@ const { join } = require('node:path');
     await page.locator('#toggle-account-filters').click();
     assert.deepEqual(await tile.boundingBox(), geometry);
     for (let i = 0; i < 3; i++) { await open(); await back(); }
-    // Both sidebar paths must leave the statement, including the current Contas tab.
+    // Both dock paths must leave the statement, including the current Contas tab.
     await open(); await page.locator('#tab-accounts').click(); await trigger.waitFor();
     assert.equal(await statement.count(), 0);
     await open(); await page.locator('#tab-dashboard').click();
@@ -129,10 +129,8 @@ const { join } = require('node:path');
     assert.match(await statement.locator('header').innerText(), /Novembro 2026/);
     await page.locator('#btn-prev-month').click();
     await page.waitForFunction(() => document.querySelectorAll('.card-statement-entry').length === 52);
-    await page.getByRole('button', { name: 'Recolher menu lateral' }).click();
-    assert.equal(await page.locator('#desktop-sidebar').isVisible(), false);
-    await page.getByRole('button', { name: 'Abrir menu lateral' }).click();
-    assert.equal(await page.locator('#desktop-sidebar').isVisible(), true);
+    assert.equal(await page.locator('#desktop-sidebar,.sidebar-toggle').count(), 0);
+    assert.equal(await page.locator('#tab-accounts').getAttribute('aria-current'), 'page');
     await page.setViewportSize({ width: 393, height: 852 });
     await page.locator('[data-testid="mobile-app"]').waitFor();
     assert.equal(await statement.count(), 0);
@@ -154,6 +152,6 @@ const { join } = require('node:path');
     assert.match(await summary.innerText(), /0 lançamentos/);
     await statement.getByRole('button', { name: 'Voltar para Contas' }).click();
     assert.deepEqual(errors, []);
-    console.log('PASS: internal desktop page, no modal/overlay/scroll lock, back/sidebar navigation, real totals/counts, simple/installment columns, missing purchase date, search, empty state, 1366/1440/1920 width/visible rows, document scroll/sticky headings, month selection, unchanged cards/mobile, zero financial writes and unchanged persisted state.');
+    console.log('PASS: internal desktop page, no modal/overlay/scroll lock, back/dock navigation, real totals/counts, simple/installment columns, missing purchase date, search, empty state, 1366/1440/1920 width/visible rows, document scroll/sticky headings, month selection, unchanged cards/mobile, zero financial writes and unchanged persisted state.');
   } finally { await browser.close(); }
 })().catch(error => { console.error(error); process.exitCode = 1; });

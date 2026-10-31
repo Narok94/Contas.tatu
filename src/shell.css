@@ -1,46 +1,54 @@
-/* Desktop geometry belongs to the persistent shell, never to the active page. */
-@media (min-width: 1024px) {
-  html { scrollbar-gutter: stable; }
-
+/* Geometry belongs to the desktop shell; mobile uses a separate app below 768px. */
+@media (min-width: 768px) {
   .app-shell {
-    --shell-sidebar-width: 236px;
     --shell-gutter: clamp(18px, 1.7vw, 32px);
-    --shell-header-height: clamp(54px, 7dvh, 76px);
+    --shell-header-height: clamp(60px, 7dvh, 76px);
     --shell-footer-height: 34px;
+    --dock-clearance: 96px;
     min-height: 100dvh;
-    padding-left: var(--shell-sidebar-width);
+    padding: 0 0 var(--dock-clearance);
   }
-
-  .app-shell .app-sidebar { width: var(--shell-sidebar-width); padding-block: clamp(16px, 2.5dvh, 28px); overflow: visible; }
-  .app-shell .nav-caption { margin-top: clamp(16px, 3dvh, 32px); }
-  .app-shell .sidebar-note { margin-top: auto; }
-  .app-shell .note-mascot { width: clamp(64px, 9dvh, 88px); height: auto; }
-  .app-shell .sidebar-footer { display: block; }
-
   .app-shell .app-toolbar {
     display: grid;
-    grid-template-columns: minmax(0, 1fr) auto auto;
+    grid-template-columns: minmax(0, 1fr) auto auto auto;
+    align-items: center;
+    gap: 20px;
     height: var(--shell-header-height);
     min-height: var(--shell-header-height);
     flex-shrink: 0;
     padding: 8px var(--shell-gutter);
   }
-  .app-shell .toolbar-title { display: block; min-width: 0; margin-right: 0; }
-  .app-shell .toolbar-title p { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-
+  .app-shell .app-brand { display: flex; align-items: center; gap: 8px; min-width: 0; }
+  .app-shell .brand-mascot { width: 34px; height: auto; flex-shrink: 0; object-fit: contain; border-radius: 50%; }
+  .app-shell .app-brand h1 { font-weight: 750; font-size: 18px; letter-spacing: -.6px; white-space: nowrap; }
+  .app-shell .app-brand h1 span { color: var(--color-brand); }
+  .toolbar-account { display: inline-flex; align-items: center; gap: 10px; color: var(--color-stone-600); font-size: 11px; }
+  .toolbar-account > span { max-width: 110px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .toolbar-account button { padding: 6px 2px; color: var(--color-brand-strong); cursor: pointer; }
+  .toolbar-account button:hover { text-decoration: underline; }
   .app-shell .app-main { display: flex; min-width: 0; padding: 8px var(--shell-gutter) 14px; }
-  .app-main > .desktop-dashboard,
-  .app-main > .accounts-page { width: 100%; max-width: none; margin: 0; padding: 0; align-content: start; }
+  .app-main > .desktop-dashboard, .app-main > .accounts-page { width: 100%; max-width: none; margin: 0; padding: 0; align-content: start; }
   .app-shell .app-footer { padding: 8px 0; font-size: 10px; min-height: var(--shell-footer-height); }
+  .desktop-dock {
+    position: fixed;
+    left: 50%;
+    bottom: 20px;
+    transform: translateX(-50%);
+    z-index: 40;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px;
+    border: 1px solid rgb(215 226 224 / .85);
+    border-radius: 999px;
+    background: rgb(255 255 255 / .96);
+    box-shadow: 0 5px 22px rgb(41 68 64 / .09);
+  }
+  .desktop-dock > button { position: relative; display: grid; place-items: center; width: 44px; height: 40px; border-radius: 999px; background: transparent; color: var(--color-stone-500); cursor: pointer; }
+  .desktop-dock > button:hover { background: #f0f5f2; }
+  .desktop-dock > button[aria-current=page] { background: #e5f0ef; color: var(--color-brand-strong); }
+  .desktop-dock > button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
+  .dock-tooltip { position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--color-line); border-radius: 8px; background: #fffffff5; color: var(--color-stone-700); box-shadow: var(--shadow-sm); font-size: 11px; white-space: nowrap; pointer-events: none; visibility: hidden; opacity: 0; }
+  .desktop-dock > button:hover .dock-tooltip, .desktop-dock > button:focus-visible .dock-tooltip { visibility: visible; opacity: 1; }
 }
-
-.sidebar-toggle { display: none; }
-@media (min-width: 1024px) {
-  .sidebar-toggle { display: inline-flex; align-items: center; justify-content: center; color: var(--color-stone-600); background: transparent; border: 0; border-radius: 8px; padding: 6px; cursor: pointer; }
-  .sidebar-toggle:hover { background: var(--color-surface-soft); }
-  .sidebar-toggle:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 2px; }
-  .sidebar-collapse { align-self: flex-end; margin-bottom: 6px; }
-  .app-shell.sidebar-collapsed { --shell-sidebar-width: 0px; }
-  .app-shell.sidebar-collapsed .app-sidebar { display: none; }
-  .sidebar-reopen { float: left; margin-right: 10px; }
-}
+@media (min-width: 1024px) { html { scrollbar-gutter: stable; } }

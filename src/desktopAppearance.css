@@ -22,17 +22,6 @@
     background-position: center top;
   }
   .app-shell .app-toolbar { background: transparent; }
-  .app-shell .app-sidebar { background: rgb(252 253 251 / .86); border-color: rgb(216 228 229 / .7); backdrop-filter: blur(8px); box-shadow: none; }
-  .app-shell .app-brand { gap: 6px; }
-  .app-shell .brand-mascot { width: 40px; }
-  .app-shell .app-brand h1 { font-size: 18px; }
-  .app-shell .app-brand p { font-size: 9px; }
-  .app-shell .app-nav { gap: 5px; margin-top: 28px; }
-  .app-shell .app-nav button { padding: 10px 12px; min-height: 40px; font-size: 12px; font-weight: 550; border-radius: 10px; color: var(--color-stone-600); }
-  .app-shell .app-nav button[aria-current=page], .app-shell .app-nav button[aria-expanded=true] { background: #e5f0ef; color: var(--color-brand-strong); font-weight: 650; box-shadow: none; }
-  .app-shell .app-nav button:hover { background: #eef4f1; }
-  .app-shell .nav-count { background: #f4f6f2; color: var(--color-stone-600); font-weight: 550; }
-  .app-shell .sidebar-footer { margin-top: auto; padding-top: 24px; }
   .app-shell .new-account-button { background: #467b7c; box-shadow: none; font-weight: 600; }
   .app-shell .new-account-button:hover { background: var(--color-brand); }
   .app-shell .app-footer { background: transparent; border-color: rgb(224 231 230 / .6); }
@@ -56,7 +45,5 @@
   .app-shell .card-statement-table th { background: #f2f7f5; }
 }
 @media (min-width: 1024px) {
-  .app-shell { --shell-sidebar-width: 212px; }
-  .app-shell .app-sidebar { padding-inline: 14px; padding-top: 18px; }
   .app-shell .app-main > .desktop-dashboard { max-width: 1440px; margin-inline: auto; padding-top: 4px; }
 }
