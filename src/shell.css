@@ -39,28 +39,31 @@
     align-items: center;
     gap: 6px;
     padding: 7px;
-    border: 1px solid rgb(255 255 255 / .8);
+    border: 1px solid rgb(255 255 255 / .5);
     border-radius: 999px;
-    background: rgb(255 255 255 / .96);
-    box-shadow: 0 8px 28px rgb(41 68 64 / .12), inset 0 1px 0 white, inset 0 -1px 0 rgb(211 227 222 / .5);
+    background: rgb(255 255 255 / .88);
+    box-shadow: inset 0 1px 0 rgb(255 255 255 / .75), 0 10px 30px rgb(40 70 65 / .1);
   }
-  .desktop-dock > button { position: relative; display: grid; place-items: center; width: 44px; height: 40px; border-radius: 999px; background: transparent; color: var(--color-stone-500); cursor: pointer; }
-  .desktop-dock > button:hover { background: #f0f5f2; }
-  .desktop-dock > button[aria-current=page] { background: #e5f0ef; color: var(--color-brand-strong); }
+  .desktop-dock::before { content: ''; position: absolute; inset: 1px; border-radius: inherit; background: linear-gradient(180deg, rgb(255 255 255 / .3), rgb(255 255 255 / .02)); pointer-events: none; }
+  .desktop-dock > button { position: relative; display: grid; place-items: center; width: 44px; height: 40px; border-radius: 999px; background: transparent; color: var(--color-stone-500); cursor: pointer; transition: background-color 160ms ease, box-shadow 160ms ease; }
+  .desktop-dock > button:hover { background: rgb(255 255 255 / .22); }
+  .desktop-dock > button[aria-current=page] { background: rgb(180 225 220 / .72); color: var(--color-brand-strong); box-shadow: inset 0 1px 0 rgb(255 255 255 / .65), 0 3px 10px rgb(30 80 70 / .08); }
   .desktop-dock > button:focus-visible { outline: 2px solid var(--color-brand); outline-offset: 3px; }
   .dock-tooltip { position: absolute; bottom: calc(100% + 16px); left: 50%; transform: translateX(-50%); padding: 6px 10px; border: 1px solid var(--color-line); border-radius: 8px; background: #fffffff5; color: var(--color-stone-700); box-shadow: var(--shadow-sm); font-size: 11px; white-space: nowrap; pointer-events: none; visibility: hidden; opacity: 0; }
   .desktop-dock > button:hover .dock-tooltip, .desktop-dock > button:focus-visible .dock-tooltip { visibility: visible; opacity: 1; }
-  /* Web glass treatment: the Expo package's native iOS material is unavailable here. */
+  /* Native CSS glass, with a readable fallback when backdrop filtering is unavailable. */
   @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
     .desktop-dock {
-      background: linear-gradient(135deg, rgb(255 255 255 / .72), rgb(255 255 255 / .32) 55%, rgb(232 245 240 / .5));
-      -webkit-backdrop-filter: blur(22px) saturate(1.35);
-      backdrop-filter: blur(22px) saturate(1.35);
+      background: rgb(255 255 255 / .35);
+      -webkit-backdrop-filter: blur(20px) saturate(1.5);
+      backdrop-filter: blur(20px) saturate(1.5);
     }
-    .desktop-dock > button[aria-current=page] { background-color: #e5f0ef; background-image: linear-gradient(rgb(255 255 255 / .55), transparent); }
+    .desktop-dock > button[aria-current=page] { background: rgb(180 225 220 / .4); -webkit-backdrop-filter: blur(8px); backdrop-filter: blur(8px); }
   }
   @media (prefers-reduced-transparency: reduce) {
     .desktop-dock { background: #fbfdfa; -webkit-backdrop-filter: none; backdrop-filter: none; }
+    .desktop-dock::before { opacity: 0; }
+    .desktop-dock > button[aria-current=page] { background: #e5f0ef; -webkit-backdrop-filter: none; backdrop-filter: none; }
   }
 }
 @media (min-width: 1024px) { html { scrollbar-gutter: stable; } }

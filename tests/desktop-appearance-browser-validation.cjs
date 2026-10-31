@@ -60,11 +60,16 @@ const { tmpdir } = require('node:os');
       assert.ok(open.height < 400 && categories.height < 400);
       assert.equal(await page.locator('.desk-category-list li').count(), 1);
       assert.equal(await page.locator('.desk-category-list strong').innerText(), money(2722.82));
+      await page.waitForFunction(() => getComputedStyle(document.getElementById('tab-dashboard')).backgroundColor === 'rgba(180, 225, 220, 0.4)');
       const active = await page.locator('#tab-dashboard').evaluate(el => { const c = getComputedStyle(el); return { background: c.backgroundColor, shadow: c.boxShadow }; });
-      assert.equal(active.background, 'rgb(229, 240, 239)'); assert.equal(active.shadow, 'none');
+      assert.equal(active.background, 'rgba(180, 225, 220, 0.4)'); assert.notEqual(active.shadow, 'none');
       const dock = page.locator('#desktop-navigation');
       const dockBounds = await dock.boundingBox();
       assert.ok(dockBounds.width < 260 && dockBounds.height <= 60);
+      assert.equal(dockBounds.width, 210); assert.equal(dockBounds.height, 56);
+      const glass = await dock.evaluate(el => { const c = getComputedStyle(el); return { background: c.backgroundColor, filter: c.backdropFilter }; });
+      assert.equal(glass.background, 'rgba(255, 255, 255, 0.35)');
+      assert.equal(glass.filter, 'blur(20px) saturate(1.5)');
       const availableWidth = await page.evaluate(() => document.documentElement.getBoundingClientRect().width);
       assert.ok(Math.abs(dockBounds.x * 2 + dockBounds.width - availableWidth) < 2);
       assert.ok(height - dockBounds.y - dockBounds.height >= 16);
@@ -119,6 +124,23 @@ const { tmpdir } = require('node:os');
       await page.getByRole('button', { name: 'Fechar configurações' }).click();
       assert.equal(await page.locator('#tab-history').getAttribute('aria-current'), 'page');
     }
+    // Unsupported browsers ignore the @supports glass block; verify the base surface stays readable.
+    const fallback = await page.evaluate(() => {
+      const stripGlassSupport = rules => {
+        for (let index = rules.cssRules.length - 1; index >= 0; index--) {
+          const rule = rules.cssRules[index];
+          if (rule instanceof CSSSupportsRule && rule.conditionText.includes('backdrop-filter') && rule.cssText.includes('.desktop-dock')) rules.deleteRule(index);
+          else if (rule.cssRules && typeof rule.deleteRule === 'function') stripGlassSupport(rule);
+        }
+      };
+      for (const sheet of document.styleSheets) {
+        if (!sheet.href || new URL(sheet.href).origin === location.origin) stripGlassSupport(sheet);
+      }
+      const surface = getComputedStyle(document.querySelector('.desktop-dock'));
+      return { background: surface.backgroundColor, filter: surface.backdropFilter };
+    });
+    assert.equal(fallback.background, 'rgba(255, 255, 255, 0.88)');
+    assert.equal(fallback.filter, 'none');
     // Test all three monetary indicators with paid and unpaid accounts, using display-only fixtures.
     const mixed = structuredClone(fixture);
     mixed.state.simpleAccounts.push({ id: 'paid-fixture', name: 'Conta paga', value: 250, month: '2026-10', status: 'pago', createdAt: '2026-10-01' });
