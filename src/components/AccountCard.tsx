@@ -72,7 +72,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
               } as React.CSSProperties}
               title={account.category?.name || account.type}
             >
-              {getCategoryOrTypeIcon(account.category?.name, account.type, 'w-3.5 h-3.5')}
+              {getCategoryOrTypeIcon(account.category?.name || account.name, account.type, 'w-3.5 h-3.5')}
             </div>
 
             {renderTypeBadge()}
