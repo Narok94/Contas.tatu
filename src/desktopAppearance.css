@@ -1,7 +1,7 @@
 /* Shared by the authenticated desktop shell only; mobile/login keep their own palette. */
 @media (min-width: 768px) {
   .app-shell {
-    --desktop-landscape: url('./assets/desktop-dawn.webp');
+    --desktop-texture: url('./assets/tatu/textura.png');
     --color-line: #e0e7e6;
     --color-line-strong: #cbd8d6;
     --color-surface-soft: #f5f8f6;
@@ -15,11 +15,12 @@
     --color-expense: #9b5b4d;
     --shadow-xs: 0 2px 9px rgb(45 68 67 / .025);
     --shadow-sm: 0 4px 16px rgb(45 68 67 / .035);
-    background-color: #fcfcfa;
-    background-image: linear-gradient(180deg, rgb(240 247 250 / .15), rgb(249 242 233 / .4) 50%, #f8f2ea 100%), var(--desktop-landscape), linear-gradient(180deg, #e8f2f8 0, #f8f2ea 250px, #fbf0e9 550px, #fcfcfa 1000px);
-    background-size: 100% 250px, 100% 250px, 100% 100%;
+    background-color: #f2f3ef;
+    background-image: linear-gradient(rgb(252 253 250 / .62), rgb(252 253 250 / .62)), var(--desktop-texture);
+    background-size: cover;
     background-repeat: no-repeat;
-    background-position: center top;
+    background-position: center;
+    background-attachment: fixed;
   }
   .app-shell .app-toolbar { background: transparent; }
   .app-shell .new-account-button { background: #467b7c; box-shadow: none; font-weight: 600; }

@@ -1,7 +1,7 @@
 import '../dashboard.css';
 import React from 'react';
 import { PaymentOptions } from '../components/PaymentOptions';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, ReceiptText, Clock3, CircleCheck } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { useAuth } from '../auth/AuthContext';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
@@ -21,9 +21,9 @@ export const DashboardPage: React.FC = () => {
         <p>{formatMonthYear(currentMonth)}</p>
       </header>
       <section className="desk-metrics" aria-label="Indicadores do mês">
-        <article className="desk-metric metric-total"><h3>Total do mês</h3><strong>{formatBRL(summary.totalExpected)}</strong></article>
-        <article className="desk-metric metric-pending"><h3>Total pendente</h3><strong>{formatBRL(summary.totalPending)}</strong></article>
-        <article className="desk-metric metric-paid"><h3>Total pago</h3><strong>{formatBRL(summary.totalPaid)}</strong></article>
+        <article className="desk-metric metric-total"><span className="desk-metric-icon" aria-hidden="true"><ReceiptText size={20} /></span><h3>Total do mês</h3><strong>{formatBRL(summary.totalExpected)}</strong></article>
+        <article className="desk-metric metric-pending"><span className="desk-metric-icon" aria-hidden="true"><Clock3 size={20} /></span><h3>Total pendente</h3><strong>{formatBRL(summary.totalPending)}</strong></article>
+        <article className="desk-metric metric-paid"><span className="desk-metric-icon" aria-hidden="true"><CircleCheck size={20} /></span><h3>Total pago</h3><strong>{formatBRL(summary.totalPaid)}</strong></article>
       </section>
       <div className="desk-workspace">
         <section className="desk-panel desk-open" aria-labelledby="desk-open-title">

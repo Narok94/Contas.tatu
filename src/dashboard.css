@@ -3,9 +3,13 @@
 .desk-greeting h2 { font-size: 23px; font-weight: 700; letter-spacing: -.6px; }
 .desk-greeting p { margin-top: 4px; font-size: 12px; color: var(--color-stone-600); }
 .desk-metrics { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }
-.desk-metric { min-width: 0; padding: 15px 18px; border: 1px solid var(--color-line); border-radius: 16px; background: rgb(255 255 255 / .92); box-shadow: var(--shadow-xs); }
-.desk-metric h3 { font-size: 12px; font-weight: 550; color: var(--color-stone-600); }
-.desk-metric > strong { display: block; margin-top: 8px; font-size: 25px; line-height: 1.2; letter-spacing: -.6px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.desk-metric { display: grid; grid-template-columns: 36px minmax(0, 1fr); column-gap: 12px; min-width: 0; padding: 15px 18px; border: 1px solid var(--color-line); border-radius: 16px; background: rgb(255 255 255 / .92); box-shadow: var(--shadow-xs); }
+.desk-metric-icon { grid-row: 1 / span 2; align-self: center; display: grid; place-items: center; width: 36px; height: 36px; border-radius: 12px; }
+.metric-total .desk-metric-icon { background: var(--color-info-soft); color: var(--color-info); }
+.metric-pending .desk-metric-icon { background: var(--color-expense-soft); color: var(--color-expense); }
+.metric-paid .desk-metric-icon { background: var(--color-success-soft); color: var(--color-success); }
+.desk-metric h3 { grid-column: 2; font-size: 12px; font-weight: 550; color: var(--color-stone-600); }
+.desk-metric > strong { grid-column: 2; display: block; margin-top: 8px; font-size: 25px; line-height: 1.2; letter-spacing: -.6px; font-weight: 700; font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
 .metric-total > strong { color: var(--color-stone-900); }
 .metric-paid > strong { color: var(--color-success); }
 .metric-pending > strong { color: var(--color-expense); }
