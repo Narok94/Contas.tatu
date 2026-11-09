@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { createChatApi, type ChatPage } from '../services/chatApi';
 import { createFinanceApi } from '../services/financeApi';
-import type { ChatMessage, Preview } from './conversation';
+import type { ChatMessage, GuidedExpense, Preview } from './conversation';
 
 const api=createChatApi();
 export function useHouseholdChat(search:string,author:string) {
@@ -52,17 +52,23 @@ export function useHouseholdChat(search:string,author:string) {
     catch {setError('Não foi possível confirmar o envio. Tente novamente para verificar e salvar a mesma mensagem.');return false;}
     finally {lock.current=false;setBusy(false);}
   }
-  async function confirm(message:ChatMessage,preview?:Preview) {
-    if(lock.current || !ready || message.saved || !message.preview)return false;
+  async function confirmRequest(month:string,submit:(revision:string)=>ReturnType<typeof api.confirm>) {
+    if(lock.current || !ready)return false;
     lock.current=true;setBusy(true);setError('');
     const current=epoch.current;
     try {
-      const view=await createFinanceApi().read((preview??message.preview).month);
-      const result=await api.confirm(message.id,view.revision,preview);
+      const view=await createFinanceApi().read(month);
+      const result=await submit(view.revision);
       if(current===epoch.current)merge([result.message]);
       await refresh();return true;
     } catch(e) {await refresh();setError(e instanceof Error?e.message:'Não foi possível confirmar. Atualize a conversa antes de tentar novamente.');return false;}
     finally {lock.current=false;setBusy(false);}
   }
-  return {messages,participants,nextBefore,ready,busy,error,refresh,send,confirm};
+  async function confirm(message:ChatMessage,preview?:Preview) {
+    if(message.saved || !message.preview)return false;
+    return confirmRequest((preview??message.preview).month,revision=>api.confirm(message.id,revision,preview));
+  }
+  const confirmGuided = (id:string,expense:GuidedExpense) =>
+    confirmRequest(expense.month,revision=>api.confirmGuided(id,revision,expense));
+  return {messages,participants,nextBefore,ready,busy,error,refresh,send,confirm,confirmGuided};
 }

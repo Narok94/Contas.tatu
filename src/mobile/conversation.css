@@ -36,6 +36,10 @@
 .chat-actions>button { flex:1 1 98px; min-height:40px; padding:8px 5px; font-size:11px; font-weight:700; border-radius:11px; }
 .chat-actions .mobile-primary { min-height:40px!important; padding:8px 5px; color:#fff; background:#43854f; box-shadow:0 2px 5px #305f3420; }
 .chat-actions>button:last-child { color:#466650; background:#fcfff5; border:1px solid #bfd6bb; }
+.chat-guided-actions>button:not(.mobile-primary), .chat-guided-actions>select { min-height:44px; color:#466650; background:#fcfff5; border:1px solid #bfd6bb; border-radius:11px; }
+.chat-guided-actions .mobile-primary { min-height:44px!important; }
+.chat-guided-actions>select { flex:1 1 98px; min-width:0; padding:8px; font-size:16px; }
+.chat-guided-cancel { display:block; min-height:44px; padding:0 8px; color:#466650; font-size:12px; font-weight:700; }
 .chat-saved { display:flex; align-items:center; gap:5px; color:#307346; margin-top:9px; font-size:12px; }
 .chat-footer { flex:none; padding:10px max(13px,env(safe-area-inset-right,0px)) calc(10px + env(safe-area-inset-bottom,0px)) max(13px,env(safe-area-inset-left,0px)); background:#fff9e9eb; border-top:1px solid #d7e4c3; }
 .chat-shortcuts { display:flex; gap:7px; margin-bottom:10px; }

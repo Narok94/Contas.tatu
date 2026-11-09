@@ -4,7 +4,7 @@ import { FoundationError } from '../foundation.js';
 import { neonTransport, q, createRepository, type Transport } from '../finance/repository.js';
 import { createFinanceService } from '../finance/service.js';
 import { keys, object, uuid, month, money, integer, text } from '../finance/validation.js';
-import { interpret, answerPreview, previewQuestion, previewCommand, type ChatMessage, type Preview } from '../../src/mobile/conversation.js';
+import { interpret, answerPreview, previewQuestion, previewCommand, PAYMENT_METHODS, type ChatMessage, type Preview } from '../../src/mobile/conversation.js';
 
 type Row = Record<string, any>;
 const decode = (r: Row): ChatMessage => ({
@@ -23,10 +23,22 @@ function checkedPreview(value: unknown): Preview {
     cardId: p.cardId === undefined ? undefined : uuid(p.cardId), cardName: p.cardName === undefined ? undefined : text(p.cardName)!,
     categoryId: p.categoryId === undefined ? undefined : uuid(p.categoryId) };
 }
+function guidedPreview(value: unknown): Preview {
+  const p = object(value);
+  keys(p, ['name','location','amount','month','count','paymentMethod']);
+  const paymentMethod = PAYMENT_METHODS.find(method => method === p.paymentMethod);
+  const amount = money(p.amount), count = integer(p.count, 1, 120);
+  if ((p.paymentMethod !== undefined && !paymentMethod) || amount <= 0 || (count > 1 && paymentMethod !== 'Crédito')) {
+    throw new FoundationError(400, 'Lançamento inválido. Confira os dados antes de adicionar.');
+  }
+  return { guided: true, name: text(p.name)!, location: text(p.location)!, amount, month: month(p.month), count, paid: !!paymentMethod, paymentMethod };
+}
 function insert(identity: Identity, id: string, requestId: string, role: 'user'|'assistant', content: string, preview?: Preview, operationId?: string) {
+  // A duplicate guided receipt must roll back the financial write in the same transaction.
+  const conflict = preview?.guided ? '' : ' ON CONFLICT (household_id,request_id,role) DO NOTHING';
   return q(`INSERT INTO finance_v2.chat_messages
     (id,household_id,request_id,role,author_user_id,actor_user_id,author_name,actor_name,content,preview,saved,financial_operation_id)
-    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12) ON CONFLICT (household_id,request_id,role) DO NOTHING`,
+    VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10::jsonb,$11,$12)${conflict}`,
     [id, identity.householdId, requestId, role, role === 'user' ? identity.id : null, identity.id,
       role === 'user' ? identity.name : 'Contas Tatu', identity.name, content, preview ? JSON.stringify(preview) : null, !!operationId, operationId ?? null]);
 }
@@ -91,25 +103,41 @@ export function createChatService(db: Transport = neonTransport) {
       return { messages: rows.map(decode) };
     },
     async confirm(identity: Identity, value: unknown) {
-      const input=object(value); keys(input,['id','expectedRevision','preview']);
+      const input=object(value); keys(input,['id','expectedRevision','preview','guidedExpense']);
       const id=uuid(input.id);
-      const [rows]=await db.batch([q("SELECT * FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 AND role='assistant'",[identity.householdId,id])],true);
-      const message=rows[0];
-      if (!message?.preview) throw new FoundationError(404,'Preview not found');
-      if (message.saved) return { alreadySaved: true, message: decode(message) };
-      if (message.preview.stage && message.preview.stage !== 'ready') throw new FoundationError(400,'Responda às perguntas antes de confirmar.');
-      const preview=checkedPreview(input.preview ?? message.preview);
-      if (message.preview.location) {
+      const guided = input.guidedExpense !== undefined;
+      const findMessage = async () => {
+        const [rows] = await db.batch([q("SELECT * FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 AND role='assistant'",[identity.householdId,id])],true);
+        return rows[0];
+      };
+      const isGuidedReceipt = (row?: Row) => row?.saved && row.preview?.guided && row.actor_user_id === identity.id;
+      const message = await findMessage();
+      if (guided) {
+        if (input.preview !== undefined) throw new FoundationError(400,'Lançamento inválido.');
+        if (isGuidedReceipt(message)) return { alreadySaved: true, message: decode(message) };
+        if (message) throw new FoundationError(409,'Identificador do lançamento já utilizado.');
+      } else {
+        if (!message?.preview) throw new FoundationError(404,'Preview not found');
+        if (message.saved) return { alreadySaved: true, message: decode(message) };
+        if (message.preview.stage && message.preview.stage !== 'ready') throw new FoundationError(400,'Responda às perguntas antes de confirmar.');
+      }
+      const preview = guided ? guidedPreview(input.guidedExpense) : checkedPreview(input.preview ?? message.preview);
+      if (!guided && message.preview.location) {
         if (!preview.location || preview.cardId) throw new FoundationError(400,'Invalid structured preview');
         if (preview.count !== message.preview.count) throw new FoundationError(400,'Mantenha o parcelamento informado. Para mudar, envie um novo lançamento.');
         preview.stage='ready'; preview.paid=message.preview.paid;
         preview.categoryName=message.preview.categoryName;
         preview.categoryId=message.preview.categoryId;
       }
-      const operationId=randomUUID();
+      const operationId = guided ? id : randomUUID();
       // Use one snapshot for category resolution and the existing revision guard.
       // Missing payment categories are created only in the confirmed transaction.
       const loaded=await createRepository(db).load();
+      if (preview.paymentMethod === 'Crédito') {
+        const [card] = loaded.store.creditCards;
+        if (!card) throw new FoundationError(422, 'Cadastre um cartão pelo computador para adicionar esta compra.');
+        preview.cardId = card.id;
+      }
       let categoryRow: Row | undefined;
       if(preview.categoryName) {
         const normalized=(name:string)=>name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
@@ -120,28 +148,40 @@ export function createChatService(db: Transport = neonTransport) {
       }
       const atomic: Transport = { batch: async (queries,readOnly) => {
         if (readOnly) return db.batch(queries,true);
+        const guard = guided ? [] : [
+          q('SELECT id FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 FOR UPDATE',[identity.householdId,id]),
+          q('SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 AND NOT saved) THEN 1 ELSE 0 END AS chat_guard',[identity.householdId,id]),
+        ];
         try {
           const result=await db.batch([
-            q('SELECT id FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 FOR UPDATE',[identity.householdId,id]),
-            q('SELECT 1 / CASE WHEN EXISTS (SELECT 1 FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2 AND NOT saved) THEN 1 ELSE 0 END AS chat_guard',[identity.householdId,id]),
+            ...guard,
             ...queries.slice(0,2),
             ...(categoryRow ? [q('INSERT INTO finance_v2.categories (id,household_id,name,color,description,sort_order) VALUES ($1,$2,$3,$4,$5,$6)',[categoryRow.id,identity.householdId,categoryRow.name,categoryRow.color,categoryRow.description,categoryRow.sort_order])] : []),
             ...queries.slice(2),
-            q('UPDATE finance_v2.chat_messages SET confirmed_preview=$3::jsonb,saved=true,financial_operation_id=$4 WHERE household_id=$1 AND id=$2',[identity.householdId,id,JSON.stringify(preview),operationId]),
+            ...(!guided ? [q('UPDATE finance_v2.chat_messages SET confirmed_preview=$3::jsonb,saved=true,financial_operation_id=$4 WHERE household_id=$1 AND id=$2',[identity.householdId,id,JSON.stringify(preview),operationId])] : []),
             insert(identity,operationId,operationId,'assistant','✓ Conta adicionada com sucesso',preview,operationId),
           ],false);
-          return [...result.slice(2,4),...result.slice(categoryRow ? 5 : 4,2+queries.length+(categoryRow ? 1 : 0))];
+          const offset = guard.length + 2;
+          return [...result.slice(guard.length, offset), ...result.slice(offset + (categoryRow ? 1 : 0), guard.length + queries.length + (categoryRow ? 1 : 0))];
         } catch (error) {
           if ((error as {code?:string}).code==='22012') throw new FoundationError(409,'Dados atualizados em outra sessão. Atualize a conversa.');
+          if (guided && (error as {code?:string}).code === '23505') throw new FoundationError(409,'Identificador do lançamento já utilizado.');
           throw error;
         }
       }};
       const repository=createRepository(atomic);
       const service=createFinanceService({...repository,load:async()=>loaded});
       const cmd=previewCommand(preview);
-      await service.execute({ ...cmd, month:preview.month,expectedRevision:input.expectedRevision },identity.id);
-      const [updated]=await db.batch([q('SELECT * FROM finance_v2.chat_messages WHERE household_id=$1 AND id=$2',[identity.householdId,id])],true);
-      return { alreadySaved:false, message:decode(updated[0]) };
+      try {
+        await service.execute({ ...cmd, month:preview.month,expectedRevision:input.expectedRevision },identity.id);
+      } catch (error) {
+        if (guided && error instanceof FoundationError && error.status === 409) {
+          const saved = await findMessage();
+          if (isGuidedReceipt(saved)) return { alreadySaved: true, message: decode(saved) };
+        }
+        throw error;
+      }
+      return { alreadySaved:false, message:decode(await findMessage()) };
     },
   };
 }

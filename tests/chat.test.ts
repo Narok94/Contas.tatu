@@ -179,4 +179,34 @@ test('persistent household chat with both authenticated users and atomic financi
     assert.equal((await invoke(h.token,'GET')).result.messages.length,2);
   });
 
+  await t.test('guided confirmation atomically saves one receipt and uses the existing financial commands', async () => {
+    const month = '2026-10';
+    const current = await finance.read(month);
+    await finance.execute({ action: 'card.create', month, expectedRevision: current.revision, data: { name: 'Cartão do casal' } }, h.user.id);
+    const before = await finance.read(month);
+    const id = randomUUID();
+    const guidedExpense = { name: 'Fone', location: 'Loja', amount: 120.30, month, count: 3, paymentMethod: 'Crédito' };
+    const body = { id, guidedExpense, expectedRevision: before.revision };
+
+    await assert.rejects(chat.confirm(h.user, { ...body, guidedExpense: { ...guidedExpense, paymentMethod: 'Pix' } }), { status: 400 });
+    const failing: Transport = { batch: (queries, ro) => db.batch(!ro && queries.some(query => query.text.includes('INSERT INTO finance_v2.chat_messages')) ? [...queries, q('SELECT 1/0')] : queries, ro) };
+    await assert.rejects(createChatService(failing).confirm(h.user, body), { status: 409 });
+    assert.deepEqual(await finance.read(month), before);
+    assert.equal((await chat.list(h.user)).messages.some(message => message.id === id), false);
+
+    const results = await Promise.all([chat.confirm(h.user, body), chat.confirm(h.user, body)]);
+    assert.equal(results.filter(result => result.alreadySaved).length, 1);
+    assert.equal(results[0].message.id, id);
+    assert.equal(results[0].message.preview?.paymentMethod, 'Crédito');
+    assert.equal(results[0].message.preview?.location, 'Loja');
+    await assert.rejects(chat.confirm(j.user, body), { status: 409 });
+    const after = await finance.read(month);
+    const purchases = after.state.installmentPurchases.filter(purchase => purchase.description === 'Fone');
+    assert.equal(purchases.length, 1);
+    assert.equal(purchases[0].creditCardId, after.state.creditCards[0].id);
+    assert.equal(purchases[0].installmentsCount, 3);
+    assert.equal(purchases[0].totalAmount, 120.30);
+    assert.equal((await chat.list(j.user)).messages.filter(message => message.id === id && message.saved).length, 1);
+  });
+
 });

@@ -1,4 +1,4 @@
-import type { ChatMessage, Preview } from '../mobile/conversation';
+import type { ChatMessage, GuidedExpense, Preview } from '../mobile/conversation';
 import { navigationHeaders } from '../auth/navigationSession';
 export interface ChatPage { messages: ChatMessage[]; participants: {id:string;name:string}[]; nextBefore: string|null; historyStart: string|null }
 export function createChatApi(fetcher: typeof fetch = globalThis.fetch.bind(globalThis)) {
@@ -15,5 +15,6 @@ export function createChatApi(fetcher: typeof fetch = globalThis.fetch.bind(glob
     list: (query:{before?:string;q?:string;author?:string}={})=>request<ChatPage>('/api/chat?'+new URLSearchParams(query)),
     send: (id:string,text:string,month:string,replyTo?:string)=>request<{messages:ChatMessage[]}>('/api/chat',{id,text,month,replyTo}),
     confirm: (id:string,expectedRevision:string,preview?:Preview)=>request<{alreadySaved:boolean;message:ChatMessage}>('/api/chat/confirm',{id,expectedRevision,preview}),
+    confirmGuided: (id:string,expectedRevision:string,guidedExpense:GuidedExpense)=>request<{alreadySaved:boolean;message:ChatMessage}>('/api/chat/confirm',{id,expectedRevision,guidedExpense}),
   };
 }

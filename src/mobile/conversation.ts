@@ -1,9 +1,15 @@
+export const PAYMENT_METHODS = ['Dinheiro', 'Pix', 'Débito', 'Crédito'] as const;
+export type PaymentMethod = typeof PAYMENT_METHODS[number];
+
 export interface Preview {
   name: string; amount: number; month: string; count: number; paid: boolean;
   cardId?: string; cardName?: string; categoryId?: string; requiresCard?: boolean;
   location?: string; stage?: 'payment-status' | 'payment-method' | 'ready' | 'answered';
   categoryName?: 'Dinheiro' | 'Cartão';
+  guided?: true;
+  paymentMethod?: PaymentMethod;
 }
+export type GuidedExpense = Pick<Preview, 'name' | 'amount' | 'month' | 'count' | 'paymentMethod'> & { location: string };
 export interface ChatMessage {
   id: string; sequence?: string; authorId: string; authorName: string; role: 'user' | 'assistant'; text: string;
   createdAt: string; linkedFinancialOperationId?: string; preview?: Preview; saved?: boolean;
@@ -59,7 +65,8 @@ export function cardCategoryPreview(p: Preview, categories: {id:string;name:stri
 }
 export function previewCommand(p: Preview) {
   if (p.stage && p.stage !== 'ready') throw new Error('Responda às perguntas antes de confirmar.');
-  const notes = p.location ? `Local: ${p.location}` : undefined;
+  const notes = [p.location && `Local: ${p.location}`, p.guided && p.paymentMethod && !p.cardId && `Pagamento: ${p.paymentMethod}`]
+    .filter(Boolean).join('\n') || undefined;
   if (p.count > 1) return { action: 'installment.create', data: { description: p.name, totalAmount: p.amount, installmentsCount: p.count, creditCardId: p.cardId, categoryId: p.categoryId, notes } };
   if (p.cardId) return { action: 'expense.create', data: { description: p.name, amount: p.amount, cardId: p.cardId, categoryId: p.categoryId } };
   return { action: 'simple.create', data: { name: p.name, value: p.amount, paid: p.paid, categoryId: p.categoryId, notes } };
