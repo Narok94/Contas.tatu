@@ -96,6 +96,10 @@ export function recordPayment(store: FinanceDataStore, month: string, id: string
   assertMonthOpen(store, month);
   const account = computeMonthlyAccounts(month, store).find(a => a.id === id && a.type === type);
   if (!account) throw new Error('Esta conta não está mais disponível neste mês.');
+  if (account.paymentInfo) {
+    if (account.status === status && amount === undefined) return store;
+    throw new Error('A conta possui pagamentos ou transferências registrados.');
+  }
   if (type === 'installment') {
     const purchase = store.installmentPurchases.find(p => p.id === id)!;
     if (getInstallmentStatusForMonth(purchase, month).operation === 'payoff') {

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getNeonClient } from '../neon.js';
 import { DEFAULT_HOUSEHOLD_ID as household, FoundationError } from '../foundation.js';
 import type { FinanceDataStore } from '../../src/domain/financeRules.js';
-import { mappings, decodeState, encode, encodeVersion, type SqlRow } from './mapping.js';
+import { mappings, decodeState, encode, encodeVersion, mobilePaymentMap, type SqlRow } from './mapping.js';
 
 export interface Query { text: string; values: unknown[] }
 export interface Transport { batch(queries: Query[], readOnly: boolean): Promise<SqlRow[][]> }
@@ -18,6 +18,7 @@ const tableOrders: Record<string, string> = {
   installment_versions: 'purchase_id,revision', installment_month_states: 'purchase_id,month',
   installment_month_snapshots: 'purchase_id,month', financial_months: 'month',
   month_closures: 'month,revision', month_reopenings: 'month,recorded_at,closure_id',
+  mobile_payments: 'created_at,id',
 };
 export interface Loaded { revision: string; store: FinanceDataStore; tables: Record<string, SqlRow[]> }
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -40,6 +41,11 @@ export function createRepository(transport: Transport = neonTransport) {
     },
     async save(before: Loaded, next: FinanceDataStore, actorId?: string): Promise<string> {
       const writes: Query[] = [];
+      for (const payment of next.mobilePayments ?? []) {
+        if (!before.store.mobilePayments?.some(row => row.id === payment.id)) {
+          writes.push(insert('mobile_payments', encode(payment, mobilePaymentMap)));
+        }
+      }
       for (const [key, [table, map]] of Object.entries(mappings)) {
         const old = (before.store as any)[key] as SqlRow[]; const current = (next as any)[key] as SqlRow[];
         for (const [i, row] of current.entries()) {

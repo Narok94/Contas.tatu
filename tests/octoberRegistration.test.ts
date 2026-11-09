@@ -13,6 +13,7 @@ import { cardStatementRows, formatPurchaseDate } from '../src/utils/cardStatemen
 test('October import preserves old SQL rows, dates, current installments and is idempotent; variable recurring stays editable',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
   await pg.exec(readFileSync('database/migrations/001_finance_v2.sql','utf8'));
+  await pg.exec(readFileSync('database/migrations/004_mobile_payments.sql','utf8'));
   const db:Transport={batch:(qs,ro)=>pg.transaction(async tx=>{
     if(ro)await tx.exec('SET TRANSACTION READ ONLY');
     const rows=[];for(const q of qs)rows.push((await tx.query(q.text,q.values)).rows);return rows as any;

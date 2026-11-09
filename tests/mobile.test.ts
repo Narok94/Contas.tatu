@@ -1,6 +1,7 @@
 import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import { readFileSync } from 'node:fs';
+import { randomUUID } from 'node:crypto';
 import { PGlite } from '@electric-sql/pglite';
 import { createFoundation } from '../server/foundation.js';
 import { createRepository, type Transport } from '../server/finance/repository.js';
@@ -32,6 +33,7 @@ test('mobile decimal keyboard parser accepts comma and dot but never guesses gro
 test('mobile paid account create/edit uses one revision, atomic SQL and existing closed-month safeguards', async t => {
   const pg = new PGlite(); t.after(() => pg.close());
   await pg.exec(readFileSync(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
+  await pg.exec(readFileSync(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
   const transport: Transport = { batch: (queries, ro) => pg.transaction(async tx => {
     if (ro) await tx.exec('SET TRANSACTION READ ONLY'); const rows = [];
     for (const q of queries) rows.push((await tx.query(q.text, q.values)).rows); return rows as any;
@@ -52,4 +54,75 @@ test('mobile paid account create/edit uses one revision, atomic SQL and existing
   await run('month.close'); await assert.rejects(run('simple.edit', { id, name: 'Bloqueada', value: 500, paid: true }));
   assert.equal((await service.read('2026-09')).state.simpleAccounts.length, 1);
   assert.equal((await service.read('2026-09')).summary.totalPaid, 201);
+});
+
+test('mobile payments persist actual amounts, settle balances and transfer exactly once', async t => {
+  const pg = new PGlite(); t.after(() => pg.close());
+  for (const migration of ['001_finance_v2', '004_mobile_payments']) {
+    await pg.exec(readFileSync(`database/migrations/${migration}.sql`, 'utf8'));
+  }
+  const transport: Transport = { batch: (queries, readOnly) => pg.transaction(async tx => {
+    if (readOnly) await tx.exec('SET TRANSACTION READ ONLY');
+    const rows = [];
+    for (const query of queries) rows.push((await tx.query(query.text, query.values)).rows);
+    return rows as Record<string, unknown>[][];
+  }) };
+  await createFoundation({ transaction: (queries, readOnly = false) => transport.batch(queries, readOnly) }).initialize();
+  const actor = (await pg.query<{ id: string }>('SELECT id FROM finance_v2.app_users')).rows[0].id;
+  const service = createFinanceService(createRepository(transport));
+  const current = '2026-11', next = '2026-12', following = '2027-01';
+  const run = async (action: string, month: string, data: object, revision?: string) =>
+    service.execute({ action, month, data, expectedRevision: revision ?? (await service.read(month)).revision }, actor);
+  const input = (id: string, type: string, amount: number, expectedOpen: number, transfer = false) =>
+    ({ requestId: randomUUID(), id, type, amount, expectedOpen, transfer });
+
+  const source = (await run('simple.create', current, { name: 'Internet', value: 200, notes: 'Local: Provedor' })).state.simpleAccounts[0].id;
+  const destination = (await run('simple.create', next, { name: 'Internet', value: 80 })).state.simpleAccounts[0].id;
+  const first = input(source, 'simple', 50, 200);
+  await run('payment.mobile', current, first);
+  assert.equal((await service.read(current)).summary.totalPaid, 50);
+  assert.equal((await service.read(current)).summary.totalPending, 150);
+  assert.equal((await service.read(next)).summary.totalPending, 80);
+
+  const second = input(source, 'simple', 30, 150, true);
+  const revision = (await service.read(current)).revision;
+  await run('payment.mobile', current, second, revision);
+  await run('payment.mobile', current, second, revision);
+  await assert.rejects(run('payment.mobile', current, { ...second, amount: 40 }, revision));
+  await assert.rejects(run('payment.mobile', current, input(source, 'simple', 5, 150)));
+  const settled = await service.read(current);
+  assert.equal(settled.summary.totalPaid, 80);
+  assert.equal(settled.summary.totalPending, 0);
+  assert.equal(settled.state.mobilePayments?.length, 2);
+  assert.equal(settled.state.mobilePayments?.find(row => row.id === second.requestId)?.location, 'Provedor');
+  const transferred = await service.read(next);
+  assert.equal(transferred.accounts.filter(a => a.type === 'simple').length, 1);
+  assert.equal(transferred.accounts.find(a => a.id === destination)?.amount, 200);
+  assert.equal(transferred.state.mobilePayments?.find(row => row.id === second.requestId)?.targetId, destination);
+  await run('payment.mobile', next, input(destination, 'simple', 200, 200));
+  assert.equal((await service.read(next)).summary.totalPaid, 200);
+
+  const lone = (await run('simple.create', current, { name: 'Água', value: 100 })).state.simpleAccounts[0].id;
+  await run('payment.mobile', current, input(lone, 'simple', 40, 100, true));
+  const fallback = (await service.read(next)).accounts.find(a => a.name === 'Água');
+  assert.equal(fallback?.amount, 60);
+  await assert.rejects(run('simple.archive', next, { id: fallback?.id }));
+
+  const recurring = (await run('recurring.create', current, { name: 'Aluguel', initialValue: 200 })).state.recurringDefinitions[0].id;
+  await run('recurring.edit', next, { id: recurring, name: 'Aluguel', value: 220 });
+  await run('payment.mobile', current, input(recurring, 'recurring', 180, 200, true));
+  assert.equal((await service.read(next)).accounts.find(a => a.id === recurring)?.amount, 240);
+
+  const card = (await run('card.create', current, { name: 'Cartão' })).state.creditCards[0].id;
+  await run('expense.create', current, { cardId: card, description: 'Compras', amount: 150 });
+  await run('expense.create', next, { cardId: card, description: 'Compras', amount: 90 });
+  await run('payment.mobile', current, input(card, 'credit_card', 40, 150));
+  const invoice = async (month: string) => (await service.read(month)).accounts.find(a => a.id === card);
+  assert.equal((await invoice(current))?.cardInfo?.totalOpenAmount, 110);
+  assert.equal((await invoice(next))?.cardInfo?.totalOpenAmount, 90);
+  await run('payment.mobile', current, input(card, 'credit_card', 20, 110, true));
+  assert.equal((await invoice(current))?.cardInfo?.totalOpenAmount, 0);
+  assert.equal((await invoice(next))?.cardInfo?.totalOpenAmount, 180);
+  await run('payment.mobile', next, input(card, 'credit_card', 180, 180));
+  assert.equal((await invoice(following))?.cardInfo?.totalOpenAmount, 0);
 });

@@ -9,6 +9,7 @@ import { createFinanceService } from '../server/finance/service.js';
 async function fixture(t: TestContext) {
   const pg = new PGlite(); t.after(() => pg.close());
   await pg.exec(readFileSync(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
+  await pg.exec(readFileSync(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
   const transport: Transport = { async batch(queries, readOnly) {
     return pg.transaction(async tx => {
       if (readOnly) await tx.exec('SET TRANSACTION READ ONLY');

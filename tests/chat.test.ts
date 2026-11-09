@@ -14,7 +14,7 @@ import { createRepository, q, type Transport } from '../server/finance/repositor
 
 test('persistent household chat with both authenticated users and atomic financial confirmation',async t=>{
   const pg=new PGlite();t.after(()=>pg.close());
-  for(const migration of ['001_finance_v2','002_closed_auth','003_household_chat'])await pg.exec(readFileSync(`database/migrations/${migration}.sql`,'utf8'));
+  for(const migration of ['001_finance_v2','002_closed_auth','003_household_chat','004_mobile_payments'])await pg.exec(readFileSync(`database/migrations/${migration}.sql`,'utf8'));
   const db:Transport={batch:(qs,ro)=>pg.transaction(async tx=>{if(ro)await tx.exec('SET TRANSACTION READ ONLY');const rows=[];for(const s of qs)rows.push((await tx.query(s.text,s.values)).rows);return rows as any;})};
   await createFoundation({transaction:(qs,ro=false)=>db.batch(qs,ro)}).initialize();
   const password=randomBytes(20).toString('base64url');await provisionUsers(db,password);

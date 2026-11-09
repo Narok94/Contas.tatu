@@ -8,6 +8,7 @@ import {
   CreditCard,
   CreditCardMonthlyInvoice,
   InstallmentPurchase,
+  MobilePayment,
   MonthFinancialSummary,
   PaymentStatus,
   RecurringAccountDefinition,
@@ -16,8 +17,10 @@ import {
   UnifiedMonthlyAccount,
 } from '../types/finance.js';
 import { addMonths, compareMonths, getMonthDifference } from '../utils/formatters.js';
+import { paymentBalances } from './paymentBalances.js';
 
 export interface FinanceDataStore {
+  mobilePayments?: MobilePayment[];
   closedMonths?: Record<string, ClosedMonthSnapshot>;
   closedMonthHistory?: Record<string, ClosedMonthSnapshot[]>;
   categories: Category[];
@@ -68,6 +71,11 @@ export function getPreviousPendingCardInvoices(
       pastMonthsSet.add(inv.month);
     }
   }
+  for (const payment of store.mobilePayments ?? []) {
+    if (payment.accountType === 'credit_card' && payment.accountId === cardId && payment.month < targetMonth) {
+      pastMonthsSet.add(payment.month);
+    }
+  }
 
   for (const [month, snapshot] of Object.entries(store.closedMonths ?? {})) {
     if (month < targetMonth && snapshot.accounts.some(a => a.cardInfo?.cardId === cardId)) pastMonthsSet.add(month);
@@ -76,6 +84,12 @@ export function getPreviousPendingCardInvoices(
   let balance = 0;
 
   for (const m of sortedPastMonths) {
+    const mobile = paymentBalances(store.mobilePayments, m, cardId, 'credit_card');
+    if (mobile.paid > 0) {
+      // A mobile payment gives the remaining balance an explicit month of ownership.
+      balance = mobile.outgoing;
+      continue;
+    }
     const frozen = store.closedMonths?.[m]?.accounts.find(a => a.cardInfo?.cardId === cardId);
     if (frozen?.cardInfo?.paidAmount !== undefined) {
       balance = frozen.cardInfo.totalOpenAmount;
@@ -253,8 +267,9 @@ export function computeMonthlyAccounts(
     // Calcula pendências de faturas anteriores que ainda não foram pagas
     const previousPendingInvoices = getPreviousPendingCardInvoices(card.id, targetMonth, store);
     const previousPendingAmount = previousPendingInvoices.reduce((acc, inv) => acc + inv.amount, 0);
-    const totalInvoiceAmount = money(currentMonthAmount + previousPendingAmount);
-    const paidAmount = invoiceRecord?.paidAmount ?? (invoiceRecord?.status === 'pago' ? currentMonthAmount : 0);
+    const mobile = paymentBalances(store.mobilePayments, targetMonth, card.id, 'credit_card');
+    const totalInvoiceAmount = money(Math.max(0, currentMonthAmount + previousPendingAmount - mobile.outgoing));
+    const paidAmount = money((invoiceRecord?.paidAmount ?? (invoiceRecord?.status === 'pago' ? currentMonthAmount : 0)) + mobile.paid);
     const totalOpenAmount = money(Math.max(0, totalInvoiceAmount - paidAmount));
     const invoiceStatus: PaymentStatus = totalOpenAmount === 0 && (paidAmount > 0 || invoiceRecord?.status === 'pago')
       ? 'pago' : paidAmount > 0 ? 'parcial' : 'pendente';
@@ -265,6 +280,7 @@ export function computeMonthlyAccounts(
       name: card.name,
       amount: totalInvoiceAmount,
       status: invoiceStatus,
+      ...(mobile.paid > 0 ? { paymentInfo: { paidAmount, openAmount: totalOpenAmount, transferredAmount: mobile.outgoing } } : {}),
       cardInfo: {
         cardId: card.id,
         invoiceStatus,
@@ -308,7 +324,18 @@ export function computeMonthlyAccounts(
     }
   }
 
-  return results;
+  if (!store.mobilePayments?.length) return results;
+  return results.map(account => {
+    if (account.cardInfo) return account;
+    const { paid, incoming, outgoing } = paymentBalances(store.mobilePayments, targetMonth, account.id, account.type);
+    if (!paid && !incoming && !outgoing) return account;
+    const paidAmount = money(paid + (account.status === 'pago' ? account.amount : 0));
+    const amount = money(account.amount + incoming - outgoing);
+    const openAmount = money(Math.max(0, amount - paidAmount));
+    return { ...account, amount, status: openAmount === 0 ? 'pago' : paidAmount > 0 ? 'parcial' : 'pendente',
+      ...(incoming > 0 && account.recurringInfo ? { recurringInfo: { ...account.recurringInfo, isValueSet: true } } : {}),
+      paymentInfo: { paidAmount, openAmount, transferredAmount: outgoing } };
+  });
 }
 
 /**
@@ -334,6 +361,10 @@ export function computeFinancialSummary(
     if (acc.cardInfo) {
       totalPaid += acc.cardInfo.paidAmount ?? (acc.status === 'pago' ? acc.amount : 0);
       totalPending += acc.cardInfo.totalOpenAmount;
+      if (acc.status !== 'pago') pendingCount += 1;
+    } else if (acc.paymentInfo) {
+      totalPaid += acc.paymentInfo.paidAmount;
+      totalPending += acc.paymentInfo.openAmount;
       if (acc.status !== 'pago') pendingCount += 1;
     } else if (acc.status === 'pago') {
       totalPaid += acc.amount;

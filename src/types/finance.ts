@@ -2,6 +2,23 @@ export type AccountType = 'simple' | 'recurring' | 'installment' | 'credit_card'
 
 export type PaymentStatus = 'pendente' | 'parcial' | 'pago';
 
+export interface MobilePayment {
+  id: string;
+  actorId: string;
+  accountId: string;
+  accountType: AccountType;
+  month: string;
+  name: string;
+  categoryName?: string;
+  location?: string;
+  paidAmount: number;
+  remainingAmount: number;
+  targetMonth?: string;
+  targetId?: string;
+  targetType?: AccountType;
+  createdAt: string;
+}
+
 export interface Category {
   id: string;
   name: string;
@@ -183,6 +200,7 @@ export interface CardPendingPreviousInvoice {
  * Item unificado de conta para exibição na grade do mês
  */
 export interface UnifiedMonthlyAccount {
+  paymentInfo?: { paidAmount: number; openAmount: number; transferredAmount: number };
   id: string;
   type: AccountType;
   name: string;

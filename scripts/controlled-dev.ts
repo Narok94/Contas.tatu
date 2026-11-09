@@ -31,6 +31,7 @@ async function main() {
     await pg.exec(await readFile(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
     await pg.exec(await readFile(new URL('../database/migrations/002_closed_auth.sql', import.meta.url), 'utf8'));
     await pg.exec(await readFile(new URL('../database/migrations/003_household_chat.sql', import.meta.url), 'utf8'));
+    await pg.exec(await readFile(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
     transport = { batch: (queries, readOnly) => pg.transaction(async tx => {
       if (readOnly) await tx.exec('SET TRANSACTION READ ONLY');
       const results = [];

@@ -1,121 +1,114 @@
-import { Fragment, type FormEvent } from 'react';
-import { formatBRL } from '../utils/formatters';
-import { ChatBubble } from './ChatBubble';
-import { PAYMENT_METHODS, type GuidedExpense, type Preview } from './conversation';
+import { useRef, useState, type FormEvent } from 'react';
+import { Check } from 'lucide-react';
+import { useFinance } from '../context/FinanceContext';
+import { createChatApi } from '../services/chatApi';
+import { createFinanceApi } from '../services/financeApi';
+import { formatBRL, formatMonthYear } from '../utils/formatters';
+import { PAYMENT_METHODS, type GuidedExpense, type PaymentMethod } from './conversation';
 import { parseMobileMoney } from './model';
 
-export const guidedPrompts = {
-  name: 'O que você comprou?',
-  location: 'Onde comprou?',
-  paid: 'Já foi pago?',
-  method: 'Como pagou?',
-  credit: 'Como foi a compra no crédito?',
-  installments: 'Quantas parcelas?',
-  amount: 'Qual o valor?',
-  preview: 'Confira antes de adicionar',
-  correction: 'O que você quer corrigir?',
-};
-
-type Step = keyof typeof guidedPrompts;
-const corrections = [['name', 'Descrição'], ['location', 'Local'], ['paid', 'Pagamento'], ['amount', 'Valor']] as const;
+const chat = createChatApi();
+const finance = createFinanceApi();
 const installments = Array.from({ length: 119 }, (_, index) => index + 2);
 
-export interface GuidedDraft {
-  id: string;
-  command: string;
-  step: Step;
-  expense: GuidedExpense;
-  turns: { step: Step; answer: string }[];
-}
-
-export function startsGuidedExpense(text: string) {
-  return /^(?:compra|comprei|nova compra|fiz uma compra|(?:adicionar|registrar) (?:uma )?compra)[.!?…]*$/i.test(text.trim().replace(/\s+/g, ' '));
-}
-
-export function startGuidedExpense(command: string, month: string): GuidedDraft {
-  return { id: crypto.randomUUID(), command, step: 'name', expense: { name: '', location: '', month, count: 1, amount: 0 }, turns: [] };
-}
-
-export function guidedTextValue({ step, expense }: GuidedDraft) {
-  if (step === 'name' || step === 'location') return expense[step];
-  if (step === 'amount') return expense.amount ? String(expense.amount).replace('.', ',') : '';
-}
-
-function advance(draft: GuidedDraft, step: Step, answer: string, changes?: Partial<GuidedExpense>): GuidedDraft {
-  return { ...draft, step, expense: { ...draft.expense, ...changes }, turns: [...draft.turns, { step: draft.step, answer }] };
-}
-
-export function answerGuidedText(draft: GuidedDraft, answer: string) {
-  const { step, expense } = draft;
-  if (step === 'name' || step === 'location') {
-    const next = step === 'name' ? 'location' : 'paid';
-    return advance(draft, expense.amount ? 'preview' : next, answer, { [step]: answer });
-  }
-  if (step === 'amount') {
-    const amount = parseMobileMoney(answer);
-    if (amount !== null) return advance(draft, 'preview', formatBRL(amount), { amount });
-  }
-}
-
-export function GuidedExpenseSummary({ expense }: { expense: Pick<Preview, 'name' | 'location' | 'amount' | 'count' | 'paymentMethod'> }) {
-  return <>
-    <h2>{expense.name}</h2>
-    <p>{expense.location}</p>
-    <p className="chat-confirmation-copy">{formatBRL(expense.amount)}</p>
-    <p>{expense.paymentMethod ? 'Pago' : 'Pendente'}</p>
-    {expense.paymentMethod && <p>{expense.paymentMethod}</p>}
-    {expense.paymentMethod === 'Crédito' && <p>{expense.count === 1 ? 'À vista' : `Parcelado em ${expense.count}x`}</p>}
-  </>;
-}
-
-export function GuidedExpenseFlow({ draft, author, onChange, onSave, busy, saving }: {
-  draft: GuidedDraft; author: string; onChange: (draft: GuidedDraft) => void; onSave: () => void; busy: boolean; saving: boolean;
+function Choices<T extends string>({ label, options, value, onChange }: {
+  label: string; options: readonly T[]; value?: T; onChange: (value: T) => void;
 }) {
-  const { step, expense } = draft;
-  const afterPayment = expense.amount ? 'preview' : 'amount';
-  const choose = (next: Step, answer: string, changes?: Partial<GuidedExpense>) => onChange(advance(draft, next, answer, changes));
+  return <fieldset className="mobile-flow-choices">
+    <legend>{label}</legend>
+    <div>{options.map(option => <button key={option} type="button" aria-pressed={option === value}
+      onClick={() => onChange(option)}>{option}</button>)}</div>
+  </fieldset>;
+}
 
-  function chooseInstallments(event: FormEvent<HTMLFormElement>) {
+export function GuidedExpenseSummary({ expense }: { expense: GuidedExpense }) {
+  return <dl className="mobile-flow-summary">
+    <div><dt>Produto</dt><dd>{expense.name}</dd></div>
+    <div><dt>Estabelecimento</dt><dd>{expense.location}</dd></div>
+    <div><dt>Valor da compra</dt><dd>{formatBRL(expense.amount)}</dd></div>
+    <div><dt>Mês do lançamento</dt><dd>{formatMonthYear(expense.month)}</dd></div>
+    <div><dt>Status</dt><dd>{expense.paymentMethod ? 'Pago' : 'Pendente'}</dd></div>
+    {expense.paymentMethod && <div><dt>Pagamento</dt><dd>{expense.paymentMethod}</dd></div>}
+    {expense.paymentMethod === 'Crédito' && <div><dt>Parcelamento</dt><dd>{expense.count === 1 ? 'À vista' : `${expense.count}x`}</dd></div>}
+  </dl>;
+}
+
+export function GuidedExpenseFlow({ onSuccess, onSaving }: { onSuccess: () => void; onSaving: (busy: boolean) => void }) {
+  const f = useFinance();
+  const [id] = useState(() => crypto.randomUUID());
+  const [month] = useState(f.currentMonth);
+  const [name, setName] = useState('');
+  const [location, setLocation] = useState('');
+  const [value, setValue] = useState('');
+  const [paid, setPaid] = useState<'Sim' | 'Não'>();
+  const [method, setMethod] = useState<PaymentMethod>();
+  const [credit, setCredit] = useState<'À vista' | 'Parcelado'>();
+  const [count, setCount] = useState(2);
+  const [preview, setPreview] = useState<GuidedExpense>();
+  const [error, setError] = useState('');
+  const [saving, setSaving] = useState(false);
+  const lock = useRef(false);
+  const card = paid === 'Sim' && method === 'Crédito';
+  const blocked = Boolean(f.store.closedMonths?.[month]);
+
+  function review(event: FormEvent) {
     event.preventDefault();
-    const count = Number(new FormData(event.currentTarget).get('count'));
-    choose(afterPayment, `${count} parcelas`, { count });
+    const amount = parseMobileMoney(value);
+    if (!name.trim() || !location.trim() || amount === null || !paid || (paid === 'Sim' && !method) || (card && !credit)) {
+      setError('Confira os campos, o valor e as opções de pagamento.');
+      return;
+    }
+    setError('');
+    setPreview({ name: name.trim(), location: location.trim(), month, amount,
+      count: card && credit === 'Parcelado' ? count : 1, paymentMethod: paid === 'Sim' ? method : undefined });
+  }
+
+  async function save() {
+    if (!preview || lock.current || !f.ready || f.busy || blocked) return;
+    if (preview.paymentMethod === 'Crédito' && !f.creditCards.length) {
+      setError('Cadastre um cartão pelo computador para adicionar esta compra.');
+      return;
+    }
+    lock.current = true;
+    setSaving(true);
+    onSaving(true);
+    setError('');
+    try {
+      const view = await finance.read(month);
+      await chat.confirmGuided(id, view.revision, preview);
+      f.refresh();
+      onSuccess();
+    } catch (cause) {
+      setError(cause instanceof Error ? cause.message : 'Não foi possível salvar a compra. Tente novamente.');
+    } finally {
+      lock.current = false;
+      setSaving(false);
+      onSaving(false);
+    }
   }
 
   return <>
-    <ChatBubble role="user" name={author}><p>{draft.command}</p></ChatBubble>
-    {draft.turns.map((turn, index) => <Fragment key={index}>
-      <ChatBubble role="assistant" name="Contas Tatu"><p>{guidedPrompts[turn.step]}</p></ChatBubble>
-      <ChatBubble role="user" name={author}><p>{turn.answer}</p></ChatBubble>
-    </Fragment>)}
-    <ChatBubble role="assistant" name="Contas Tatu">
-      <p>{guidedPrompts[step]}</p>
-      {step === 'paid' && <div className="chat-actions chat-guided-actions">
-        <button type="button" onClick={() => choose('method', 'Sim')}>Sim</button>
-        <button type="button" onClick={() => choose(afterPayment, 'Não', { paymentMethod: undefined, count: 1 })}>Não</button>
-      </div>}
-      {step === 'method' && <div className="chat-actions chat-guided-actions">
-        {PAYMENT_METHODS.map(method => <button type="button" key={method} onClick={() => choose(method === 'Crédito' ? 'credit' : afterPayment, method, { paymentMethod: method, count: method === 'Crédito' ? expense.count : 1 })}>{method}</button>)}
-      </div>}
-      {step === 'credit' && <div className="chat-actions chat-guided-actions">
-        <button type="button" onClick={() => choose(afterPayment, 'À vista', { count: 1 })}>À vista</button>
-        <button type="button" onClick={() => choose('installments', 'Parcelado')}>Parcelado</button>
-      </div>}
-      {step === 'installments' && <form className="chat-actions chat-guided-actions" onSubmit={chooseInstallments}>
-        <select name="count" aria-label="Quantidade de parcelas" defaultValue={Math.max(2, expense.count)}>
-          {installments.map(count => <option key={count} value={count}>{count}x</option>)}
-        </select>
-        <button type="submit">Continuar</button>
-      </form>}
-      {step === 'preview' && <div className="chat-preview">
-        <GuidedExpenseSummary expense={expense} />
-        <div className="chat-actions chat-guided-actions">
-          <button type="button" className="mobile-primary" disabled={busy} onClick={onSave}>{saving ? 'Salvando…' : 'Adicionar'}</button>
-          <button type="button" disabled={busy} onClick={() => choose('correction', 'Corrigir')}>Corrigir</button>
-        </div>
-      </div>}
-      {step === 'correction' && <div className="chat-actions chat-guided-actions">
-        {corrections.map(([field, label]) => <button type="button" key={field} onClick={() => choose(field, label)}>{label}</button>)}
-      </div>}
-    </ChatBubble>
+    {blocked && <p className="mobile-error" role="alert">Este mês está fechado.</p>}
+    {f.operationError && <p className="mobile-error" role="alert">{f.operationError}{' '}<button type="button" onClick={f.refresh}>Atualizar dados</button></p>}
+    {error && <p className="mobile-error" role="alert">{error}</p>}
+    {preview ? <div className="mobile-flow-form">
+      <h3>Confira antes de adicionar</h3>
+      <GuidedExpenseSummary expense={preview} />
+      <button type="button" className="mobile-primary" disabled={saving || f.busy || !f.ready || blocked} onClick={() => void save()}>
+        <Check size={18} />{saving ? 'Salvando…' : 'Adicionar compra'}
+      </button>
+      <button type="button" className="mobile-secondary" disabled={saving} onClick={() => { setError(''); setPreview(undefined); }}>Corrigir</button>
+    </div> : <form className="mobile-flow-form" onSubmit={review}>
+      <label className="mobile-field">O que você comprou?<input value={name} maxLength={160} required onChange={e => setName(e.target.value)} /></label>
+      <label className="mobile-field">Onde comprou?<input value={location} maxLength={160} required onChange={e => setLocation(e.target.value)} /></label>
+      <label className="mobile-field">Valor da compra<input value={value} maxLength={16} required inputMode="decimal" placeholder="R$ 0,00" onChange={e => setValue(e.target.value)} /></label>
+      <Choices label="Já foi pago?" options={['Sim', 'Não']} value={paid} onChange={setPaid} />
+      {paid === 'Sim' && <Choices label="Como pagou?" options={PAYMENT_METHODS} value={method} onChange={setMethod} />}
+      {card && <Choices label="Parcelamento" options={['À vista', 'Parcelado']} value={credit} onChange={setCredit} />}
+      {card && credit === 'Parcelado' && <label className="mobile-field">Quantidade de parcelas<select value={count} onChange={e => setCount(Number(e.target.value))}>
+        {installments.map(quantity => <option key={quantity} value={quantity}>{quantity}x</option>)}
+      </select></label>}
+      <button type="submit" className="mobile-primary">Revisar compra</button>
+    </form>}
   </>;
 }

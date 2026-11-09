@@ -1,189 +1,89 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { Menu, Send, Check, Mic, Plus } from 'lucide-react';
-import { useFinance } from '../context/FinanceContext';
-import { addMonths, formatBRL, formatMonthYear } from '../utils/formatters';
-import MobileManual from './MobileManual';
-import { MobileSheet } from './MobileSheet';
-import { MobileEntryForm, type EntryKind } from './MobileEntryForm';
-import { cardCategoryPreview, type ChatMessage } from './conversation';
-import { useHouseholdChat } from './useHouseholdChat';
-import { useChatScroll } from './useChatScroll';
-import { ACCESS_MESSAGE } from './model';
+import { useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, ChevronRight, CreditCard, History, List, LogOut, Menu, Settings, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
-import { ChatParticipant } from './ChatParticipant';
-import { ChatBubble } from './ChatBubble';
-import { GuidedExpenseFlow, GuidedExpenseSummary, answerGuidedText, guidedPrompts, guidedTextValue, startGuidedExpense, startsGuidedExpense, type GuidedDraft } from './GuidedExpenseFlow';
-import { ClearConversation } from '../components/ClearConversation';
+import { SettingsModal } from '../components/SettingsModal';
+import { useFinance } from '../context/FinanceContext';
+import { GuidedExpenseFlow } from './GuidedExpenseFlow';
+import { MobileHistory } from './MobileHistory';
+import MobileManual from './MobileManual';
+import { MobilePaymentFlow } from './MobilePaymentFlow';
+import { MobileSheet } from './MobileSheet';
 import './mobile.css';
 import './conversation.css';
 
+const choices = [
+  { key: 'purchase', title: 'Compra', description: 'Gasto, compra do dia, mercado e mais.', icon: ShoppingCart },
+  { key: 'payment', title: 'Pagamento', description: 'Pagar uma conta, total ou parcialmente.', icon: CreditCard },
+  { key: 'general', title: 'Geral', description: 'Lançamento manual com todos os campos.', icon: List },
+] as const;
+type Screen = 'home' | 'history' | typeof choices[number]['key'];
 
 export default function MobileApp() {
   const f = useFinance();
-  const { user, logout } = useAuth();
-  const [screen, setScreen] = useState<'conversation' | 'choose' | 'list'>('conversation');
-  const [sheet, setSheet] = useState<'menu' | 'months'>();
-  const [anchor, setAnchor] = useState(f.currentMonth);
-  const [text, setText] = useState('');
-  const [searchText,setSearchText]=useState(''), [search,setSearch]=useState(''), [author,setAuthor]=useState('');
-  const chat=useHouseholdChat(search,author);
-  const {messages}=chat;
-  const [correction, setCorrection] = useState<ChatMessage>();
-  const [guided, setGuided] = useState<GuidedDraft>();
-  const [error, setError] = useState('');
-  const [pending, setPending] = useState('');
-  const lock = useRef(false);
-  const lastId = messages.at(-1)?.id;
-  const tail = guided ? `${lastId ?? ''}:${guided.id}:${guided.turns.length}` : lastId;
-  const end = useChatScroll(tail, messages[0]?.id, chat.ready, screen === 'conversation', chat.busy);
-  const guidedInput = guided && guidedTextValue(guided) !== undefined;
+  const { logout } = useAuth();
+  const [screen, setScreen] = useState<Screen>('home');
+  const [menu, setMenu] = useState(false);
+  const [settings, setSettings] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [notice, setNotice] = useState('');
+  const heading = useRef<HTMLHeadingElement>(null);
+  const active = choices.find(choice => choice.key === screen);
+  const TitleIcon = active?.icon ?? History;
+
   useEffect(() => {
-    if (guided && messages.some(message => message.id === guided.id && message.saved)) setGuided(undefined);
-  }, [guided, messages]);
-  useEffect(() => {
-    if (screen !== 'conversation') return;
-    const root = document.documentElement, body = document.body;
-    const properties = ['overflow', 'overscroll-behavior', 'position', 'width', 'height'] as const;
-    const previous = [root, body].map(element => properties.map(property => ({
-      property, value: element.style.getPropertyValue(property), priority: element.style.getPropertyPriority(property),
-    })));
-    const scrollY = window.scrollY;
-    root.style.overflow = 'hidden'; root.style.overscrollBehavior = 'none'; root.style.height = '100%';
-    body.style.overflow = 'hidden'; body.style.overscrollBehavior = 'none';
-    body.style.position = 'fixed'; body.style.width = '100%'; body.style.height = '100%';
-    const stream = end.current?.parentElement;
-    if (stream) stream.style.overscrollBehavior = 'none';
-    // Also contain edge drags on iOS versions that do not support overscroll-behavior.
-    let touchY = 0;
-    const start = (event: TouchEvent) => { touchY = event.touches[0]?.clientY ?? 0; };
-    const move = (event: TouchEvent) => {
-      if (event.touches.length !== 1 || !(event.target instanceof Element)) return;
-      if (event.target.closest('.mobile-sheet')) return;
-      const area = event.target.closest<HTMLElement>('.chat-stream');
-      const currentY = event.touches[0].clientY, delta = currentY - touchY;
-      touchY = currentY;
-      if (!area || area.scrollHeight <= area.clientHeight ||
-        (delta > 0 && area.scrollTop <= 0) ||
-        (delta < 0 && area.scrollTop + area.clientHeight >= area.scrollHeight - 1)) {
-        if (event.cancelable) event.preventDefault();
-      }
-    };
-    document.addEventListener('touchstart', start, { passive: true });
-    document.addEventListener('touchmove', move, { passive: false });
-    return () => {
-      document.removeEventListener('touchstart', start); document.removeEventListener('touchmove', move);
-      [root, body].forEach((element, index) => previous[index].forEach(({ property, value, priority }) => {
-        if (value) element.style.setProperty(property, value, priority); else element.style.removeProperty(property);
-      }));
-      window.scrollTo(0, scrollY);
-    };
+    window.scrollTo(0, 0);
+    if (screen !== 'home') heading.current?.focus({ preventScroll: true });
   }, [screen]);
-  useEffect(() => {
-    const v = window.visualViewport;
-    const update = () => { document.documentElement.style.setProperty('--chat-height', `${v?.height ?? window.innerHeight}px`); document.documentElement.style.setProperty('--chat-top', `${v?.offsetTop ?? 0}px`); };
-    update(); v?.addEventListener('resize', update); v?.addEventListener('scroll', update);
-    return () => { v?.removeEventListener('resize', update); v?.removeEventListener('scroll', update); };
-  }, []);
-  function updateGuided(next?: GuidedDraft) {
-    setGuided(next);
-    setText(next ? guidedTextValue(next) ?? '' : '');
-    setError('');
+
+  function go(next: Screen) {
+    setNotice('');
+    f.clearOperationError();
+    if (next === 'payment' || next === 'history') f.refresh();
+    setScreen(next);
   }
-  async function send(e: React.FormEvent) {
-    e.preventDefault();
-    const answer = text.trim();
-    if (!answer || chat.busy || !chat.ready) return;
-    if (guided) {
-      const next = answerGuidedText(guided, answer);
-      if (next) updateGuided(next);
-      else if (guided.step === 'amount') setError('Informe um valor maior que zero, com até duas casas decimais.');
-    } else if (startsGuidedExpense(answer)) {
-      updateGuided(startGuidedExpense(answer, f.currentMonth));
-    } else if (await chat.send(answer, f.currentMonth)) {
-      setText('');
-      setError('');
-    }
+
+  function saved(message: string) {
+    setNotice(message);
+    setScreen('home');
   }
-  async function confirm(m: ChatMessage) {
-    if (!m.preview || lock.current || m.saved || f.busy || chat.busy) return;
-    if (!f.ready || !f.submitFinancialCommand) { setError(f.apiErrorStatus === 403 ? ACCESS_MESSAGE : 'Não foi possível conectar. Atualize os dados e tente novamente.'); return; }
-    lock.current = true; setPending(m.id); setError('');
-    try { if(await chat.confirm(m, m.preview.requiresCard ? cardCategoryPreview(m.preview, f.categories) : undefined))f.refresh(); }
-    finally { lock.current = false; setPending(''); }
-  }
-  async function confirmGuided(draft: GuidedDraft) {
-    if (lock.current || f.busy || chat.busy) return;
-    if (!f.ready || !f.submitFinancialCommand) {
-      setError(f.apiErrorStatus === 403 ? ACCESS_MESSAGE : 'Não foi possível conectar. Atualize os dados e tente novamente.');
-      return;
-    }
-    if (draft.expense.paymentMethod === 'Crédito' && !f.creditCards.length) {
-      setError('Cadastre um cartão pelo computador para adicionar esta compra.');
-      return;
-    }
-    lock.current = true;
-    setPending(draft.id);
-    setError('');
-    try {
-      if (await chat.confirmGuided(draft.id, draft.expense)) {
-        updateGuided();
-        f.refresh();
-      }
-    } finally {
-      lock.current = false;
-      setPending('');
-    }
-  }
-  if (screen !== 'conversation') return <MobileManual initialScreen={screen} onBack={() => setScreen('conversation')} />;
-  const p = correction?.preview;
-  const kind: EntryKind = p?.count && p.count > 1 ? 'installment' : p?.cardId ? 'card' : 'account';
-  return <div className="mobile-app chat-app" data-testid="mobile-app">
-    <header className="chat-header"><span className="chat-brand">Contas Tatu</span><button aria-label="Menu" className="mobile-icon-button" onClick={() => setSheet('menu')}><Menu size={20} /></button></header>
+
+  if (screen === 'general') return <MobileManual initialScreen="choose" onBack={() => go('home')} />;
+
+  return <div className="mobile-app mobile-dashboard" data-testid="mobile-app">
+    <header className="chat-header">
+      <span className="chat-brand">Contas Tatu</span>
+      <button type="button" aria-label="Menu" className="mobile-icon-button" disabled={saving || f.busy} onClick={() => setMenu(true)}><Menu size={20} /></button>
+    </header>
     <section className="chat-hero" aria-label="Boas-vindas"><h1>Oi casal ❤️</h1><p>Aqui é o espaço financeiro de vocês.</p></section>
-    <main className="chat-stream" role="log" aria-label="Conversa da casa" aria-live="polite">
-      {!chat.ready && <p role="status">Carregando conversa…</p>}
-      {chat.nextBefore && <button className="mobile-secondary" onClick={()=>void chat.refresh(chat.nextBefore!)}>Mensagens anteriores</button>}
-      {chat.ready && !messages.length && <ChatBubble role="assistant" name="Contas Tatu"><p>Oi, casal! Me conte uma conta ou compra. Eu organizo, vocês conferem antes de adicionar.</p></ChatBubble>}
-      {messages.map(m => <React.Fragment key={m.id}><ChatBubble role={m.role} name={m.authorName} createdAt={m.createdAt}>
-        <p>{m.text}</p>
-        {m.interactionAuthor && <div className="chat-interaction-author"><ChatParticipant name={m.interactionAuthor.name} /></div>}
-        {m.preview?.guided ? <div className="chat-preview">
-          <GuidedExpenseSummary expense={m.preview} />
-          <p className="chat-saved"><Check size={16} /> Adicionada</p>
-        </div> : m.preview && <div className="chat-preview"><h2>{m.preview.name}</h2>
-          {m.preview.location && <p>{m.preview.location}</p>}
-          <p className="chat-confirmation-copy">{formatBRL(m.preview.amount)}{m.preview.count > 1 ? ` · ${m.preview.count} parcelas` : ''}</p>
-          <p className="chat-preview-meta">{formatMonthYear(m.preview.month)}{m.preview.stage === 'ready' || !m.preview.stage ? m.preview.paid ? ` · Pagamento: ${m.preview.categoryName ?? 'Paga'}` : ' · Status: Pendente' : ''}</p>
-          {(m.preview.categoryName || m.preview.categoryId) && <span className="chat-category">Categoria: {m.preview.categoryName ?? f.categories.find(c => c.id === m.preview?.categoryId)?.name}</span>}
-          {m.saved ? <p className="chat-saved"><Check size={16} /> Adicionada</p> : m.preview.stage === 'answered' ? <p>Respondida</p> : m.preview.stage === 'payment-status' || m.preview.stage === 'payment-method' ? <div className="chat-actions">{(m.preview.stage === 'payment-status' ? ['Sim','Não'] : ['Dinheiro','Cartão']).map(answer => <button key={answer} disabled={chat.busy || !chat.ready || m.interactionAuthor?.id !== user.id} onClick={() => void chat.send(answer,m.preview!.month,m.id)}>{answer}</button>)}</div> : <div className="chat-actions"><button className="mobile-primary" disabled={!!pending || f.busy || chat.busy || !chat.ready} onClick={() => void confirm(m)}>{pending === m.id ? 'Salvando…' : '✓ Sim, adicionar'}</button><button disabled={!!pending || f.busy || chat.busy || !chat.ready} onClick={() => setCorrection(m.preview?.requiresCard ? { ...m, preview: cardCategoryPreview(m.preview, f.categories) } : m)}>✎ Editar detalhes</button></div>}</div>}
-        {!m.preview && m.text.startsWith('Não consegui') && <button className="mobile-secondary" onClick={() => setScreen('choose')}>Ir para Geral</button>}
-      </ChatBubble></React.Fragment>)}
-      {guided && <GuidedExpenseFlow draft={guided} author={user.name} onChange={updateGuided} onSave={() => void confirmGuided(guided)} busy={!!pending || f.busy || chat.busy || !chat.ready} saving={pending === guided.id} />}
-      <div ref={end} />
-    </main>
-    <footer className="chat-footer">
-      {(chat.error || error || f.operationError) && <div className="chat-error" role="alert">{chat.error || error || (f.apiErrorStatus === 403 ? ACCESS_MESSAGE : f.operationError)}<button onClick={()=>{f.refresh();void chat.refresh();}}>Atualizar dados</button></div>}
-      {guided ? <button type="button" className="chat-guided-cancel" disabled={pending === guided.id} onClick={() => updateGuided()}>Cancelar lançamento</button>
-        : <nav className="chat-shortcuts" aria-label="Atalhos da conversa">
-          <button className="chat-chip-general" disabled={!chat.ready || chat.busy} onClick={() => updateGuided(startGuidedExpense('Compra', f.currentMonth))}>Compra</button>
-          <button className="chat-chip-general" onClick={() => setScreen('choose')}>Geral</button>
-          <button className="chat-chip-accounts" onClick={() => setScreen('list')}>Contas</button>
-          <button className="chat-chip-market" onClick={() => { setText(value => value || 'Mercado '); document.querySelector<HTMLInputElement>('.chat-composer input')?.focus(); }}>Mercado</button>
-          <button className="chat-chip-home" onClick={() => { setText(value => value || 'Casa '); document.querySelector<HTMLInputElement>('.chat-composer input')?.focus(); }}>Casa</button>
-        </nav>}
-      {(!guided || guidedInput) && <form className="chat-composer" onSubmit={send}>
-        <button type="button" className="chat-add" aria-label="Mais opções" onClick={() => setSheet('menu')}><Plus size={22} /></button>
-        <div className="chat-compose-field">
-          <input aria-label={guided ? guidedPrompts[guided.step] : 'Digite sua conta'} placeholder={guided?.step === 'amount' ? 'R$ 0,00' : 'Escreva uma mensagem...'} inputMode={guided?.step === 'amount' ? 'decimal' : undefined} maxLength={guided ? 160 : 300} value={text} onChange={e => setText(e.target.value)} enterKeyHint="send" />
-          <button type="button" className="chat-audio" aria-label="Áudio indisponível" title="Áudio ainda não disponível" disabled><Mic size={22} /></button>
+    <main className="mobile-dashboard-panel">
+      {screen === 'home' ? <>
+        {notice && <p role="status" className="mobile-dashboard-notice"><Check size={18} />{notice}</p>}
+        <h2>O que você quer lançar?</h2>
+        <nav className="mobile-dashboard-actions" aria-label="Lançamentos">
+          {choices.map(({ key, title, description, icon: Icon }) => <button key={key} type="button" onClick={() => go(key)}>
+            <Icon className="mobile-dashboard-action-icon" size={34} />
+            <span><strong>{title}</strong><small>{description}</small></span>
+            <ChevronRight size={20} />
+          </button>)}
+        </nav>
+      </> : <>
+        <div className="mobile-flow-heading">
+          <TitleIcon size={27} />
+          <h2 ref={heading} tabIndex={-1}>{active?.title ?? 'Histórico'}</h2>
+          <button type="button" className="mobile-icon-button" aria-label="Voltar para o início" disabled={saving || f.busy} onClick={() => go('home')}><ArrowLeft size={20} /></button>
         </div>
-        <button type="submit" aria-label="Enviar" disabled={!text.trim() || chat.busy || !chat.ready}><Send size={21} /></button>
-      </form>}
-    </footer>
-    {sheet && <MobileSheet title={sheet === 'menu' ? 'Seu Contas Tatu' : 'Selecionar mês'} onClose={() => setSheet(undefined)}>{sheet === 'menu' ? <><div className="chat-tools"><span className="chat-current-participant"><ChatParticipant name={user.name} /><span>·</span><button onClick={() => void logout()}>Sair</button></span></div><form className="chat-history-search" onSubmit={e=>{e.preventDefault();setSearch(searchText.trim());}}>
-      <input aria-label="Buscar no histórico" placeholder="Buscar conta, compra ou mensagem" maxLength={160} value={searchText} onChange={e=>setSearchText(e.target.value)} />
-      <select aria-label="Filtrar por autor" value={author} onChange={e=>setAuthor(e.target.value)}><option value="">Todos</option>{chat.participants.map(p=><option key={p.id} value={p.id}>{p.name}</option>)}</select><button type="submit">Buscar</button>
-    </form><div className="mobile-sheet-actions"><ClearConversation disabled={chat.busy || f.busy} onCleared={()=>{setCorrection(undefined);updateGuided();setSheet(undefined);}} />{(['Conversa', 'Geral', 'Contas deste mês', 'Selecionar mês'] as const).map((label, i) => <button key={label} onClick={() => { if (i === 3) { setAnchor(f.currentMonth); setSheet('months'); } else { setScreen(i === 1 ? 'choose' : i === 2 ? 'list' : 'conversation'); setSheet(undefined); } }}>{label}</button>)}</div></> : <div className="mobile-month-list">{Array.from({ length: 12 }, (_, i) => addMonths(anchor, -i)).map(month => <button key={month} onClick={() => { f.setCurrentMonth(month); setSheet(undefined); }}>{formatMonthYear(month)}{month === f.currentMonth && <Check size={18} />}</button>)}<button onClick={() => setAnchor(addMonths(anchor, -12))}>Meses anteriores</button></div>}</MobileSheet>}
-    {correction && p && <MobileSheet title="Corrigir lançamento" onClose={() => { if (!f.busy) setCorrection(undefined); }}><div className="chat-interaction-author"><ChatParticipant name={correction.interactionAuthor?.name ?? user.name} /></div><MobileEntryForm kind={kind} initial={p} onConfirm={async preview=>{const ok=await chat.confirm(correction,preview);if(ok)f.refresh();return ok;}} onSuccess={() => setCorrection(undefined)} /></MobileSheet>}
+        {screen === 'purchase' && <GuidedExpenseFlow onSaving={setSaving} onSuccess={() => saved('Compra adicionada.')} />}
+        {screen === 'payment' && <MobilePaymentFlow onSuccess={() => saved('Pagamento registrado.')} />}
+        {screen === 'history' && <MobileHistory />}
+      </>}
+    </main>
+    {menu && <MobileSheet title="Seu Contas Tatu" onClose={() => setMenu(false)}>
+      <div className="mobile-sheet-actions mobile-dashboard-menu">
+        <button type="button" onClick={() => { setMenu(false); go('history'); }}><History size={20} />Histórico</button>
+        <button type="button" onClick={() => { setMenu(false); setSettings(true); }}><Settings size={20} />Configurações</button>
+        <button type="button" onClick={() => void logout()}><LogOut size={20} />Sair</button>
+      </div>
+    </MobileSheet>}
+    {settings && <SettingsModal isOpen onClose={() => setSettings(false)} />}
   </div>;
 }

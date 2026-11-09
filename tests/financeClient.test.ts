@@ -82,6 +82,7 @@ test('confirmed write with failed refresh does not invite resubmission and block
 test('client/API projection with isolated SQL: CRUD, recurring, cards, partial chain, installments, closure, history and categories', async t => {
   const pg = new PGlite(); t.after(() => pg.close());
   await pg.exec(readFileSync(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
+  await pg.exec(readFileSync(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
   const transport: Transport = { batch: (queries, ro) => pg.transaction(async tx => {
     if (ro) await tx.exec('SET TRANSACTION READ ONLY'); const results = [];
     for (const query of queries) results.push((await tx.query(query.text, query.values)).rows); return results;

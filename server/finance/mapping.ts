@@ -15,6 +15,10 @@ export const mappings = {
 const versionMap = { revision: 'revision', operation: 'operation', effectiveFromMonth: 'effective_from_month', description: 'description', totalAmount: 'total_amount', installmentsCount: 'installments_count', baseInstallmentNumber: 'base_installment_number', creditCardId: 'credit_card_id', categoryId: 'category_id', roundingRule: 'rounding_rule', payoffAmount: 'payoff_amount', reason: 'reason', recordedAt: 'occurred_at' };
 const snapshotMap = { currentInstallment: 'current_installment', totalInstallments: 'total_installments', remainingInstallments: 'remaining_installments', installmentAmount: 'installment_amount', endMonth: 'end_month', description: 'description', categoryId: 'category_id_snapshot', totalAmount: 'total_amount', creditCardId: 'card_id_snapshot', cardAssignmentKnown: 'card_assignment_known', categoryAssignmentKnown: 'category_assignment_known' };
 const monthFields = new Set(['month', 'startMonth', 'effectiveFromMonth', 'endMonth']);
+monthFields.add('targetMonth');
+export const mobilePaymentMap = { id: 'id', actorId: 'actor_user_id', accountId: 'account_id', accountType: 'account_type',
+  month: 'month', name: 'name', categoryName: 'category_name', location: 'location', paidAmount: 'paid_amount',
+  remainingAmount: 'remaining_amount', targetMonth: 'target_month', targetId: 'target_id', targetType: 'target_type', createdAt: 'created_at' };
 export function decode(row: SqlRow, map: Record<string, string>): SqlRow {
   return Object.fromEntries(Object.entries(map).filter(([, column]) => row[column] != null).map(([field, column]) =>
     [field, monthFields.has(field) ? String(row[column]).slice(0, 7) : row[column]]));
@@ -30,6 +34,9 @@ export function decodeState(tables: Record<string, SqlRow[]>): FinanceDataStore 
   const s = { closedMonths: {}, closedMonthHistory: {}, categories: tables.categories.filter(r => !r.archived_at).map(r => decode(r, { id: 'id', name: 'name', color: 'color', description: 'description' })) } as unknown as FinanceDataStore;
   for (const [key, [table, map]] of Object.entries(mappings)) {
     (s as any)[key] = tables[table].filter(r => !r.archived_at).map(r => decode(r, map));
+  }
+  if (tables.mobile_payments?.length) {
+    s.mobilePayments = tables.mobile_payments.map(r => decode(r, mobilePaymentMap)) as FinanceDataStore['mobilePayments'];
   }
   s.installmentPurchases = s.installmentPurchases.map(base => {
     const versions = tables.installment_versions.filter(v => v.purchase_id === base.id).map(v => ({ ...decode(v, versionMap), recordedAt: v.occurred_at ?? '' })) as InstallmentVersion[];
