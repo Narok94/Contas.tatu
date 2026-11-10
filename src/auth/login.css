@@ -28,3 +28,32 @@
   .login-page[data-compact=true] .login-subtitle{margin-bottom:10px}
   .login-page[data-compact=true] .login-field{margin-top:10px}
 }
+
+/* Fit the complete desktop login to the viewport without changing browser zoom. */
+@media (min-width:768px) {
+  .login-page { min-height:100dvh; padding:16px 24px; align-items:center; }
+  .login-composition { max-width:400px; }
+  .login-logo { width:clamp(160px,26vh,240px); margin-bottom:4px; transform:none; }
+  .login-card-wrap { padding-top:clamp(72px,12vh,110px); }
+  .login-tatu { width:clamp(200px,34vh,290px); height:clamp(134px,22.7vh,194px); top:-28px; }
+  .login-card { padding:clamp(28px,5vh,44px) 32px 24px; border-radius:28px; }
+  .login-card h1 { font-size:28px; }
+  .login-subtitle { font-size:14px; margin:6px 0 12px; }
+  .login-field { margin-top:10px; }
+  .login-field > span { min-height:44px; margin-top:6px; }
+  .login-field input { height:44px; }
+  .login-remember { margin:6px 0; min-height:36px; }
+  .login-submit { min-height:46px; font-size:16px; }
+  .login-footer { margin-top:10px; font-size:12px; }
+}
+@media (min-width:768px) and (max-height:540px) {
+  .login-page { align-items:flex-start; padding-block:12px; }
+  .login-logo { width:120px; }
+  .login-card-wrap { padding-top:24px; }
+  .login-tatu { width:120px; height:80px; top:-26px; }
+  .login-card { padding-top:20px; padding-bottom:16px; }
+  .login-card h1 { font-size:24px; }
+  .login-field { margin-top:8px; }
+  .login-subtitle { margin-bottom:6px; }
+  .login-footer { margin-top:10px; }
+}
