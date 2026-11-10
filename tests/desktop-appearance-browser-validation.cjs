@@ -35,7 +35,7 @@ const os = require('node:os');
     await page.locator('#tab-accounts').click(); await page.locator('.accounts-page').waitFor();
     await page.locator('#tab-history').click(); await page.locator('.history-page').waitFor();
     await page.locator('#tab-reports').click(); await page.locator('.desk-insights').waitFor();
-    assert.equal(await page.evaluate(() => document.activeElement.id), 'desktop-reports');
+    await page.waitForFunction(() => document.activeElement.id === 'desktop-reports');
     await page.locator('#btn-settings-header').click(); await page.locator('#settings-modal-box').waitFor();
     await page.getByRole('button', { name: 'Fechar configurações' }).click();
     await page.locator('#btn-header-new-account').click(); await page.locator('.tatu-dialog').waitFor();

@@ -1,4 +1,4 @@
-/* Only the separately mounted desktop application receives this visual theme. */
+/* Desktop dimensions use a compact ~72% scale; browser zoom and mobile remain independent. */
 @media (min-width: 768px) {
   .app-shell {
     color-scheme: light;
@@ -8,111 +8,111 @@
     --color-success: #345f25; --color-success-soft: #e8efdd; --color-expense: #c84f30; --color-expense-soft: #fce5db;
     --color-stone-400: #898579; --color-stone-500: #666357; --color-stone-600: #48473e;
     --color-stone-700: #34362b; --color-stone-800: #20271b; --color-stone-900: #161b13;
-    --sidebar-width: clamp(200px, 16.4vw, 275px); --shell-gutter: clamp(22px, 1.9vw, 36px);
+    --sidebar-width: clamp(160px, 13.4vw, 198px); --shell-gutter: clamp(15.84px, 1.37vw, 25.92px);
     background: radial-gradient(ellipse at 55% 35%, #fffdfa88, transparent 70%), #faf7f0;
-    padding: 0 0 90px var(--sidebar-width); position: relative; isolation: isolate;
+    padding: 0 0 20px var(--sidebar-width); position: relative; isolation: isolate;
   }
-  .app-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); z-index: 35; padding: 38px 22px; background: #f3f1e7dd; border-right: 1px solid #eae5d9; }
-  .app-shell .app-brand { display: flex; height: 82px; justify-content: center; margin-bottom: 40px; }
-  .app-brand img { width: 100%; max-width: 230px; object-fit: contain; }
-  #desktop-navigation { display: grid; gap: 14px; }
-  #desktop-navigation button { display: flex; align-items: center; gap: 18px; padding: 16px 20px; border-radius: 18px; cursor: pointer; text-align: left; font-size: 16px; color: #171b12; }
-  #desktop-navigation svg { width: 26px; height: 26px; flex-shrink: 0; stroke-width: 1.8; }
+  .app-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); z-index: 35; padding: 27.36px 15.84px; background: #f3f1e7dd; border-right: 1px solid #eae5d9; }
+  .app-shell .app-brand { display: flex; height: 59.04px; justify-content: center; margin-bottom: 28.8px; }
+  .app-brand img { width: 100%; max-width: 165.6px; object-fit: contain; }
+  #desktop-navigation { display: grid; gap: 10.08px; }
+  #desktop-navigation button { display: flex; align-items: center; gap: 12.96px; padding: 11.52px 14.4px; border-radius: 12.96px; cursor: pointer; text-align: left; font-size: 11.52px; color: #171b12; }
+  #desktop-navigation svg { width: 18.72px; height: 18.72px; flex-shrink: 0; stroke-width: 1.8; }
   #desktop-navigation button:hover { background: #e9ecd8; }
   #desktop-navigation button[aria-current=page] { background: #dfe6bf; font-weight: 700; }
-  .app-shell .app-toolbar { height: auto; min-height: 150px; padding: 34px var(--shell-gutter); gap: 18px; background: transparent; grid-template-columns: minmax(150px, 1fr) auto auto auto; }
-  .desk-greeting h2 { font-size: clamp(24px, 2.15vw, 36px); letter-spacing: -1px; line-height: 1.3; }
-  .desk-greeting p { font-size: 17px; margin-top: 8px; text-transform: capitalize; }
-  .app-shell .new-account-button { font-size: 17px; border-radius: 15px; padding: 15px 24px; background: #426e2c; box-shadow: 0 3px 8px #5a512214; }
-  .new-account-button svg { width: 23px; }
-  .toolbar-account { gap: 16px; font-size: 14px; margin-left: 12px; }
-  .toolbar-account button { border-left: 1px solid #bbb5a7; padding: 0 0 0 16px; color: #34362b; }
-  .app-month #btn-month-picker-toggle { min-width: 170px; padding-block: 9px; }
-  .app-month #btn-month-picker-toggle span { font-size: 16px; font-weight: 500; }
+  .app-shell .app-toolbar { height: auto; min-height: 108px; padding: 24.48px var(--shell-gutter); gap: 12.96px; background: transparent; grid-template-columns: minmax(108px, 1fr) auto auto auto; }
+  .desk-greeting h2 { font-size: clamp(17.28px, 1.55vw, 25.92px); letter-spacing: -1px; line-height: 1.3; }
+  .desk-greeting p { font-size: 12.24px; margin-top: 5.76px; text-transform: capitalize; }
+  .app-shell .new-account-button { font-size: 12.24px; border-radius: 10.8px; padding: 10.8px 17.28px; background: #426e2c; box-shadow: 0 3px 5.76px #5a512214; }
+  .new-account-button svg { width: 16.56px; }
+  .toolbar-account { gap: 11.52px; font-size: 10.08px; margin-left: 8.64px; }
+  .toolbar-account button { border-left: 1px solid #bbb5a7; padding: 0 0 0 11.52px; color: #34362b; }
+  .app-month #btn-month-picker-toggle { min-width: 122.4px; padding-block: 6.48px; }
+  .app-month #btn-month-picker-toggle span { font-size: 11.52px; font-weight: 500; }
   .app-month > div { flex-wrap: wrap; }
-  .app-month > div > div:first-child { background: #fff9; border: 2px solid #e5dfd5; border-radius: 15px; }
-  .app-shell .app-main { padding: 10px var(--shell-gutter) 24px; }
-  .app-shell .app-main > .desktop-dashboard { max-width: 1600px; padding: 0; gap: 28px; }
-  .desk-metrics { gap: 24px; }
-  .app-shell .desk-metric { min-height: 126px; padding: 23px 25px; grid-template-columns: 76px minmax(0, 1fr); column-gap: 23px; border: 1px solid #eff0e3; border-radius: 24px; box-shadow: none; background: #f0f2e3; }
+  .app-month > div > div:first-child { background: #fff9; border: 2px solid #e5dfd5; border-radius: 10.8px; }
+  .app-shell .app-main { padding: 7.2px var(--shell-gutter) 17.28px; }
+  .app-shell .app-main > .desktop-dashboard { max-width: 1600px; padding: 0; gap: 20.16px; }
+  .desk-metrics { gap: 17.28px; }
+  .app-shell .desk-metric { min-height: 90.72px; padding: 16.56px 18px; grid-template-columns: 54.72px minmax(0, 1fr); column-gap: 16.56px; border: 1px solid #eff0e3; border-radius: 17.28px; box-shadow: none; background: #f0f2e3; }
   .app-shell .metric-pending { background: #fff0e9; border-color: #f9e4db; }
   .app-shell .metric-paid { background: #f1f4e8; }
-  .desk-metric-icon { width: 76px; height: 76px; border-radius: 28px; }
+  .desk-metric-icon { width: 54.72px; height: 54.72px; border-radius: 20.16px; }
   .metric-total .desk-metric-icon { background: #dfe8be; color: #315722; }
   .metric-paid .desk-metric-icon { background: #dfebc9; }
-  .desk-metric-icon svg { width: 38px; height: 38px; stroke-width: 1.9; }
-  .desk-metric h3 { font-size: 17px; font-weight: 500; color: #171b12; align-self: end; }
-  .desk-metric > strong { font-size: clamp(25px, 2.15vw, 38px); margin-top: 4px; letter-spacing: -1px; }
-  .desk-workspace { grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); gap: 24px; }
-  .desk-panel { padding: 24px; border: 2px solid #eee8df; border-radius: 25px; background: #ffffff85; box-shadow: 0 5px 14px #63552e08; }
-  .desk-panel > header { margin-bottom: 22px; }
-  .desk-panel h3 { display: flex; align-items: center; gap: 15px; font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
-  .desk-panel h3 > svg { width: 29px; height: 29px; color: #426e2c; flex-shrink: 0; }
-  .desk-link { font-size: 15px; gap: 10px; }
-  .desk-link svg { width: 22px; height: 22px; }
-  .desk-account-row { grid-template-columns: 58px minmax(0,1fr) auto auto; gap: 14px; padding: 14px 0; }
-  .desk-account-icon { width: 58px; height: 58px; border-radius: 20px; background: #f0f4e5; color: #426e2c; }
-  .desk-account-icon svg { width: 30px; height: 30px; }
-  .desk-account-name h4, .desk-account-row > strong { font-size: 17px; }
-  .desk-account-name p { font-size: 14px; color: #48473e; }
-  .desk-pay { padding: 9px 17px; font-size: 16px; border-radius: 12px; background: #668f3d; color: white; }
+  .desk-metric-icon svg { width: 27.36px; height: 27.36px; stroke-width: 1.9; }
+  .desk-metric h3 { font-size: 12.24px; font-weight: 500; color: #171b12; align-self: end; }
+  .desk-metric > strong { font-size: clamp(18px, 1.55vw, 27.36px); margin-top: 2.88px; letter-spacing: -1px; }
+  .desk-workspace { grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); gap: 17.28px; }
+  .desk-panel { padding: 17.28px; border: 2px solid #eee8df; border-radius: 18px; background: #ffffff85; box-shadow: 0 3.6px 10.08px #63552e08; }
+  .desk-panel > header { margin-bottom: 15.84px; }
+  .desk-panel h3 { display: flex; align-items: center; gap: 10.8px; font-size: 16.56px; font-weight: 700; letter-spacing: -.5.04px; }
+  .desk-panel h3 > svg { width: 20.88px; height: 20.88px; color: #426e2c; flex-shrink: 0; }
+  .desk-link { font-size: 10.8px; gap: 7.2px; }
+  .desk-link svg { width: 15.84px; height: 15.84px; }
+  .desk-account-row { grid-template-columns: 41.76px minmax(0,1fr) auto auto; gap: 10.08px; padding: 10.08px 0; }
+  .desk-account-icon { width: 41.76px; height: 41.76px; border-radius: 14.4px; background: #f0f4e5; color: #426e2c; }
+  .desk-account-icon svg { width: 21.6px; height: 21.6px; }
+  .desk-account-name h4, .desk-account-row > strong { font-size: 12.24px; }
+  .desk-account-name p { font-size: 10.08px; color: #48473e; }
+  .desk-pay { padding: 6.48px 12.24px; font-size: 11.52px; border-radius: 8.64px; background: #668f3d; color: white; }
   .desk-pay:hover { background: #426e2c; }
   .desk-categories { grid-column: 2; grid-row: 1 / span 2; }
-  .desk-category-list { gap: 30px; padding: 12px 2px 8px; }
-  .desk-category-list li > div:first-child { font-size: 17px; align-items: center; }
-  .desk-category-label { display: inline-flex; align-items: center; gap: 18px; }
-  .desk-category-label svg { width: 30px; height: 30px; color: #426e2c; flex-shrink: 0; }
-  .desk-category-list strong { font-size: 16px; color: #171b12; }
-  .desk-category-caption { display: flex; align-items: center; gap: 18px; padding-left: 48px; }
-  .desk-category-track { flex: 1; height: 11px; margin-top: 0; background: #e1e1df; }
+  .desk-category-list { gap: 21.6px; padding: 8.64px 2px 5.76px; }
+  .desk-category-list li > div:first-child { font-size: 12.24px; align-items: center; }
+  .desk-category-label { display: inline-flex; align-items: center; gap: 12.96px; }
+  .desk-category-label svg { width: 21.6px; height: 21.6px; color: #426e2c; flex-shrink: 0; }
+  .desk-category-list strong { font-size: 11.52px; color: #171b12; }
+  .desk-category-caption { display: flex; align-items: center; gap: 12.96px; padding-left: 34.56px; }
+  .desk-category-track { flex: 1; height: 7.92px; margin-top: 0; background: #e1e1df; }
   .desk-category-track > span { background: #759e46; }
   .desk-category-list li:first-child .desk-category-track > span { background: #3d642c; }
-  .desk-category-caption small { min-width: 38px; text-align: right; font-size: 14px; color: #48473e; }
+  .desk-category-caption small { min-width: 27.36px; text-align: right; font-size: 10.08px; color: #48473e; }
   .desk-insights { position: relative; overflow: hidden; grid-column: 1; }
-  .desk-panel h3 > .insight-sparkle { color: #efb33c; width: 24px; }
-  .insight-list { display: grid; gap: 10px; position: relative; z-index: 1; padding-right: 95px; }
-  .insight-row { display: flex; align-items: center; gap: 16px; background: linear-gradient(100deg,#f3f5e9,#fbf2eadd); border-radius: 24px; padding: 10px 14px; min-height: 70px; }
+  .desk-panel h3 > .insight-sparkle { color: #efb33c; width: 17.28px; }
+  .insight-list { display: grid; gap: 7.2px; position: relative; z-index: 1; padding-right: 68.4px; }
+  .insight-row { display: flex; align-items: center; gap: 11.52px; background: linear-gradient(100deg,#f3f5e9,#fbf2eadd); border-radius: 17.28px; padding: 7.2px 10.08px; min-height: 50.4px; }
   .insight-row > span { color: #5b8538; flex-shrink: 0; }
-  .insight-row svg { width: 32px; height: 32px; }
+  .insight-row svg { width: 23.04px; height: 23.04px; }
   .insight-row:last-child > span { color: #cf5630; }
-  .insight-row p { font-size: 15px; line-height: 1.5; }
-  .insight-row strong { font-size: 17px; letter-spacing: -.4px; }
-  .insight-mascot { position: absolute; right: -18px; bottom: 32px; width: 155px; mix-blend-mode: multiply; }
-  .insight-note { font-size: 11px; color: #706c5f; margin-top: 16px; position: relative; z-index: 1; }
-  .desktop-landscape { position: fixed; bottom: 0; left: 0; width: 100%; height: 140px; z-index: -1; pointer-events: none; }
-  .desktop-leaves { position: fixed; bottom: 0; left: 0; width: 145px; height: 200px; z-index: 36; pointer-events: none; opacity: .65; }
+  .insight-row p { font-size: 10.8px; line-height: 1.5; }
+  .insight-row strong { font-size: 12.24px; letter-spacing: -.2.88px; }
+  .insight-mascot { position: absolute; right: -12.96px; bottom: 23.04px; width: 111.6px; mix-blend-mode: multiply; }
+  .insight-note { font-size: 7.92px; color: #706c5f; margin-top: 11.52px; position: relative; z-index: 1; }
+  .desktop-landscape { position: fixed; bottom: 0; left: 0; width: 100%; height: 100.8px; z-index: -1; pointer-events: none; }
+  .desktop-leaves { position: fixed; bottom: 0; left: 0; width: 104.4px; height: 144px; z-index: 36; pointer-events: none; opacity: .65; }
   .app-shell .app-footer { display: none; }
-  .desk-empty { font-size: 15px; }
-  @media (max-width: 1350px) {
-    .app-shell .app-toolbar { grid-template-columns: 1fr auto auto; gap: 14px; }
+  .desk-empty { font-size: 10.8px; }
+  @media (max-width: 1000px) {
+    .app-shell .app-toolbar { grid-template-columns: 1fr auto auto; gap: 10.08px; }
     .toolbar-account { grid-column: 2 / 4; justify-self: end; }
-    .app-shell .desk-metric { grid-template-columns: 52px minmax(0,1fr); gap: 14px; padding: 20px 16px; }
-    .desk-metric-icon { width: 52px; height: 60px; border-radius: 20px; }
-    .desk-metric h3 { font-size: 14px; }
-    .desk-panel { padding: 20px; }
-    .desk-panel h3 { font-size: 19px; gap: 10px; }
-    .desk-account-row { grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; }
-    .desk-account-icon { width: 42px; height: 48px; }
+    .app-shell .desk-metric { grid-template-columns: 37.44px minmax(0,1fr); gap: 10.08px; padding: 14.4px 11.52px; }
+    .desk-metric-icon { width: 37.44px; height: 43.2px; border-radius: 14.4px; }
+    .desk-metric h3 { font-size: 10.08px; }
+    .desk-panel { padding: 14.4px; }
+    .desk-panel h3 { font-size: 13.68px; gap: 7.2px; }
+    .desk-account-row { grid-template-columns: 30.24px minmax(0,1fr) auto; gap: 7.2px; }
+    .desk-account-icon { width: 30.24px; height: 34.56px; }
     .desk-account-row .payment-actions { grid-column: 2 / 4; justify-self: end; }
-    .desk-category-list strong, .desk-category-list li > div:first-child { font-size: 14px; }
+    .desk-category-list strong, .desk-category-list li > div:first-child { font-size: 10.08px; }
     .insight-list { padding-right: 0; }
     .insight-mascot { display: none; }
   }
-  @media (max-width: 1050px) {
+  @media (max-width: 800px) {
 
-    .app-shell { --sidebar-width: 190px; --shell-gutter: 20px; }
-    .app-sidebar { padding-inline: 12px; }
-    #desktop-navigation button { padding: 14px 10px; font-size: 14px; gap: 12px; }
+    .app-shell { --sidebar-width: 136.8px; --shell-gutter: 14.4px; }
+    .app-sidebar { padding-inline: 8.64px; }
+    #desktop-navigation button { padding: 10.08px 7.2px; font-size: 10.08px; gap: 8.64px; }
     .app-shell .app-toolbar { grid-template-columns: 1fr auto; }
     .app-month { grid-column: 1; grid-row: 2; }
     .toolbar-account { grid-column: 2; grid-row: 2; }
-    .desk-metrics { gap: 12px; }
-    .app-shell .desk-metric { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; }
+    .desk-metrics { gap: 8.64px; }
+    .app-shell .desk-metric { display: flex; flex-direction: column; align-items: flex-start; gap: 5.76px; padding: 11.52px; }
     .desk-metric h3 { align-self: auto; }
-    .desk-metric > strong { font-size: 24px; }
+    .desk-metric > strong { font-size: 17.28px; }
     .desk-workspace { grid-template-columns: minmax(0,1fr); }
     .desk-categories { grid-column: 1; grid-row: 3; }
-    .desk-account-row { grid-template-columns: 42px minmax(0,1fr) auto auto; }
+    .desk-account-row { grid-template-columns: 30.24px minmax(0,1fr) auto auto; }
     .desk-account-row .payment-actions { grid-column: auto; }
   }
 }
