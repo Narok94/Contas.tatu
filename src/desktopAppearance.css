@@ -1,140 +1,118 @@
-/* Authenticated desktop only: the existing texture is shared by every internal view. */
+/* Only the separately mounted desktop application receives this visual theme. */
 @media (min-width: 768px) {
   .app-shell {
-    color-scheme: dark;
-    --desktop-texture: url('./assets/tatu/textura.png');
-    --color-brand: #83d6bc;
-    --color-brand-strong: #b0ead5;
-    --color-brand-bright: #a3f0d5;
-    --color-canvas: #10292e;
-    --color-line: #adcac21f;
-    --color-line-strong: #b2d9cf40;
-    --color-surface-soft: #203b40;
-    --color-surface-muted: #29474b;
-    --color-teal-soft: #72d4b923;
-    --color-info: #9ec7ed;
-    --color-info-soft: #83bbee20;
-    --color-success: #95dfb9;
-    --color-success-soft: #88d7ab1c;
-    --color-expense: #efb09e;
-    --color-expense-soft: #eaa58f1f;
-    --color-warning: #e5ce92;
-    --color-warning-soft: #dfbc701f;
-    --color-lilac: #c5b5e7;
-    --color-lilac-soft: #baa2e520;
-    --color-stone-50: #193338;
-    --color-stone-100: #203b40;
-    --color-stone-200: #345056;
-    --color-stone-300: #75938f;
-    --color-stone-400: #a0b8b4;
-    --color-stone-500: #a9bfbc;
-    --color-stone-600: #b6cbc7;
-    --color-stone-700: #cbdbd7;
-    --color-stone-800: #e1ebe6;
-    --color-stone-900: #f0f5ef;
-    --shadow-xs: 0 4px 18px rgb(3 18 23 / .12);
-    --shadow-sm: 0 8px 26px rgb(3 18 23 / .2);
-    --desktop-panel: rgb(24 46 51 / .86);
-    background-color: #10292e;
-    background-image: var(--desktop-texture);
-    background-size: cover;
-    background-position: center;
-    background-repeat: no-repeat;
-    background-attachment: fixed;
+    color-scheme: light;
+    --color-brand: #426e2c; --color-brand-strong: #315722; --color-brand-bright: #7d9e51;
+    --color-canvas: #faf7f0; --color-line: #ece6dc; --color-line-strong: #d9d1c3;
+    --color-surface-soft: #f3f4e9; --color-surface-muted: #e4e9d3; --color-teal-soft: #e2e9c8;
+    --color-success: #345f25; --color-success-soft: #e8efdd; --color-expense: #c84f30; --color-expense-soft: #fce5db;
+    --color-stone-400: #898579; --color-stone-500: #666357; --color-stone-600: #48473e;
+    --color-stone-700: #34362b; --color-stone-800: #20271b; --color-stone-900: #161b13;
+    --sidebar-width: clamp(200px, 16.4vw, 275px); --shell-gutter: clamp(22px, 1.9vw, 36px);
+    background: radial-gradient(ellipse at 55% 35%, #fffdfa88, transparent 70%), #faf7f0;
+    padding: 0 0 90px var(--sidebar-width); position: relative; isolation: isolate;
   }
+  .app-sidebar { position: fixed; inset: 0 auto 0 0; width: var(--sidebar-width); z-index: 35; padding: 38px 22px; background: #f3f1e7dd; border-right: 1px solid #eae5d9; }
+  .app-shell .app-brand { display: flex; height: 82px; justify-content: center; margin-bottom: 40px; }
+  .app-brand img { width: 100%; max-width: 230px; object-fit: contain; }
+  #desktop-navigation { display: grid; gap: 14px; }
+  #desktop-navigation button { display: flex; align-items: center; gap: 18px; padding: 16px 20px; border-radius: 18px; cursor: pointer; text-align: left; font-size: 16px; color: #171b12; }
+  #desktop-navigation svg { width: 26px; height: 26px; flex-shrink: 0; stroke-width: 1.8; }
+  #desktop-navigation button:hover { background: #e9ecd8; }
+  #desktop-navigation button[aria-current=page] { background: #dfe6bf; font-weight: 700; }
+  .app-shell .app-toolbar { height: auto; min-height: 150px; padding: 34px var(--shell-gutter); gap: 18px; background: transparent; grid-template-columns: minmax(150px, 1fr) auto auto auto; }
+  .desk-greeting h2 { font-size: clamp(24px, 2.15vw, 36px); letter-spacing: -1px; line-height: 1.3; }
+  .desk-greeting p { font-size: 17px; margin-top: 8px; text-transform: capitalize; }
+  .app-shell .new-account-button { font-size: 17px; border-radius: 15px; padding: 15px 24px; background: #426e2c; box-shadow: 0 3px 8px #5a512214; }
+  .new-account-button svg { width: 23px; }
+  .toolbar-account { gap: 16px; font-size: 14px; margin-left: 12px; }
+  .toolbar-account button { border-left: 1px solid #bbb5a7; padding: 0 0 0 16px; color: #34362b; }
+  .app-month #btn-month-picker-toggle { min-width: 170px; padding-block: 9px; }
+  .app-month #btn-month-picker-toggle span { font-size: 16px; font-weight: 500; }
+  .app-month > div { flex-wrap: wrap; }
+  .app-month > div > div:first-child { background: #fff9; border: 2px solid #e5dfd5; border-radius: 15px; }
+  .app-shell .app-main { padding: 10px var(--shell-gutter) 24px; }
+  .app-shell .app-main > .desktop-dashboard { max-width: 1600px; padding: 0; gap: 28px; }
+  .desk-metrics { gap: 24px; }
+  .app-shell .desk-metric { min-height: 126px; padding: 23px 25px; grid-template-columns: 76px minmax(0, 1fr); column-gap: 23px; border: 1px solid #eff0e3; border-radius: 24px; box-shadow: none; background: #f0f2e3; }
+  .app-shell .metric-pending { background: #fff0e9; border-color: #f9e4db; }
+  .app-shell .metric-paid { background: #f1f4e8; }
+  .desk-metric-icon { width: 76px; height: 76px; border-radius: 28px; }
+  .metric-total .desk-metric-icon { background: #dfe8be; color: #315722; }
+  .metric-paid .desk-metric-icon { background: #dfebc9; }
+  .desk-metric-icon svg { width: 38px; height: 38px; stroke-width: 1.9; }
+  .desk-metric h3 { font-size: 17px; font-weight: 500; color: #171b12; align-self: end; }
+  .desk-metric > strong { font-size: clamp(25px, 2.15vw, 38px); margin-top: 4px; letter-spacing: -1px; }
+  .desk-workspace { grid-template-columns: minmax(0, 1.38fr) minmax(0, 1fr); gap: 24px; }
+  .desk-panel { padding: 24px; border: 2px solid #eee8df; border-radius: 25px; background: #ffffff85; box-shadow: 0 5px 14px #63552e08; }
+  .desk-panel > header { margin-bottom: 22px; }
+  .desk-panel h3 { display: flex; align-items: center; gap: 15px; font-size: 23px; font-weight: 700; letter-spacing: -.7px; }
+  .desk-panel h3 > svg { width: 29px; height: 29px; color: #426e2c; flex-shrink: 0; }
+  .desk-link { font-size: 15px; gap: 10px; }
+  .desk-link svg { width: 22px; height: 22px; }
+  .desk-account-row { grid-template-columns: 58px minmax(0,1fr) auto auto; gap: 14px; padding: 14px 0; }
+  .desk-account-icon { width: 58px; height: 58px; border-radius: 20px; background: #f0f4e5; color: #426e2c; }
+  .desk-account-icon svg { width: 30px; height: 30px; }
+  .desk-account-name h4, .desk-account-row > strong { font-size: 17px; }
+  .desk-account-name p { font-size: 14px; color: #48473e; }
+  .desk-pay { padding: 9px 17px; font-size: 16px; border-radius: 12px; background: #668f3d; color: white; }
+  .desk-pay:hover { background: #426e2c; }
+  .desk-categories { grid-column: 2; grid-row: 1 / span 2; }
+  .desk-category-list { gap: 30px; padding: 12px 2px 8px; }
+  .desk-category-list li > div:first-child { font-size: 17px; align-items: center; }
+  .desk-category-label { display: inline-flex; align-items: center; gap: 18px; }
+  .desk-category-label svg { width: 30px; height: 30px; color: #426e2c; flex-shrink: 0; }
+  .desk-category-list strong { font-size: 16px; color: #171b12; }
+  .desk-category-caption { display: flex; align-items: center; gap: 18px; padding-left: 48px; }
+  .desk-category-track { flex: 1; height: 11px; margin-top: 0; background: #e1e1df; }
+  .desk-category-track > span { background: #759e46; }
+  .desk-category-list li:first-child .desk-category-track > span { background: #3d642c; }
+  .desk-category-caption small { min-width: 38px; text-align: right; font-size: 14px; color: #48473e; }
+  .desk-insights { position: relative; overflow: hidden; grid-column: 1; }
+  .desk-panel h3 > .insight-sparkle { color: #efb33c; width: 24px; }
+  .insight-list { display: grid; gap: 10px; position: relative; z-index: 1; padding-right: 95px; }
+  .insight-row { display: flex; align-items: center; gap: 16px; background: linear-gradient(100deg,#f3f5e9,#fbf2eadd); border-radius: 24px; padding: 10px 14px; min-height: 70px; }
+  .insight-row > span { color: #5b8538; flex-shrink: 0; }
+  .insight-row svg { width: 32px; height: 32px; }
+  .insight-row:last-child > span { color: #cf5630; }
+  .insight-row p { font-size: 15px; line-height: 1.5; }
+  .insight-row strong { font-size: 17px; letter-spacing: -.4px; }
+  .insight-mascot { position: absolute; right: -18px; bottom: 32px; width: 155px; mix-blend-mode: multiply; }
+  .insight-note { font-size: 11px; color: #706c5f; margin-top: 16px; position: relative; z-index: 1; }
+  .desktop-landscape { position: fixed; bottom: 0; left: 0; width: 100%; height: 140px; z-index: -1; pointer-events: none; }
+  .desktop-leaves { position: fixed; bottom: 0; left: 0; width: 145px; height: 200px; z-index: 36; pointer-events: none; opacity: .65; }
+  .app-shell .app-footer { display: none; }
+  .desk-empty { font-size: 15px; }
+  @media (max-width: 1350px) {
+    .app-shell .app-toolbar { grid-template-columns: 1fr auto auto; gap: 14px; }
+    .toolbar-account { grid-column: 2 / 4; justify-self: end; }
+    .app-shell .desk-metric { grid-template-columns: 52px minmax(0,1fr); gap: 14px; padding: 20px 16px; }
+    .desk-metric-icon { width: 52px; height: 60px; border-radius: 20px; }
+    .desk-metric h3 { font-size: 14px; }
+    .desk-panel { padding: 20px; }
+    .desk-panel h3 { font-size: 19px; gap: 10px; }
+    .desk-account-row { grid-template-columns: 42px minmax(0,1fr) auto; gap: 10px; }
+    .desk-account-icon { width: 42px; height: 48px; }
+    .desk-account-row .payment-actions { grid-column: 2 / 4; justify-self: end; }
+    .desk-category-list strong, .desk-category-list li > div:first-child { font-size: 14px; }
+    .insight-list { padding-right: 0; }
+    .insight-mascot { display: none; }
+  }
+  @media (max-width: 1050px) {
 
-  .app-shell .app-toolbar, .app-shell .app-footer { background: transparent; }
-  .app-shell .app-footer { border-color: var(--color-line); }
-  .app-shell .new-account-button {
-    color: #e6fff4;
-    background: linear-gradient(135deg, #347e70, #28665f);
-    border: 1px solid #98e3c839;
-    box-shadow: inset 0 1px 0 #c8ffe71c, 0 4px 16px #071e2240;
+    .app-shell { --sidebar-width: 190px; --shell-gutter: 20px; }
+    .app-sidebar { padding-inline: 12px; }
+    #desktop-navigation button { padding: 14px 10px; font-size: 14px; gap: 12px; }
+    .app-shell .app-toolbar { grid-template-columns: 1fr auto; }
+    .app-month { grid-column: 1; grid-row: 2; }
+    .toolbar-account { grid-column: 2; grid-row: 2; }
+    .desk-metrics { gap: 12px; }
+    .app-shell .desk-metric { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; padding: 16px; }
+    .desk-metric h3 { align-self: auto; }
+    .desk-metric > strong { font-size: 24px; }
+    .desk-workspace { grid-template-columns: minmax(0,1fr); }
+    .desk-categories { grid-column: 1; grid-row: 3; }
+    .desk-account-row { grid-template-columns: 42px minmax(0,1fr) auto auto; }
+    .desk-account-row .payment-actions { grid-column: auto; }
   }
-  .app-shell .new-account-button:hover { background: #398575; }
-
-  /* Keep existing utility markup and compact geometry, with desktop palette overrides. */
-  .app-shell :is(.bg-white, [class~="bg-white/90"], [class~="bg-white/95"]) { background-color: var(--desktop-panel); }
-  .app-shell :is(.desk-metric, .desk-panel, .account-tile, .accounts-summary > div, .accounts-filters, .history-panel, .card-statement-table, .tatu-dialog, .finance-dialog) {
-    background: var(--desktop-panel);
-    border: 1px solid var(--color-line);
-    box-shadow: inset 0 1px 0 rgb(215 247 233 / .025), var(--shadow-xs);
-    -webkit-backdrop-filter: blur(10px);
-    backdrop-filter: blur(10px);
-  }
-  .app-shell .desk-metric { border-radius: 16px; }
-  .app-shell .desk-metric-icon { box-shadow: inset 0 1px 0 #ffffff08; }
-  .app-shell .desk-metric h3 { color: var(--color-stone-600); }
-  .app-shell .category-chip {
-    background: color-mix(in srgb, var(--category-color) 18%, #193338);
-    color: color-mix(in srgb, var(--category-color) 60%, #e4f5ef);
-  }
-  .app-shell .desk-category-label { display: inline-flex; align-items: center; gap: 7px; min-width: 0; }
-  .app-shell .desk-category-label svg { flex-shrink: 0; color: var(--category-color); }
-  .app-shell .desk-category-caption { display: flex; align-items: baseline; justify-content: space-between; gap: 12px; }
-  .app-shell .desk-category-caption small { font-size: 10px; color: var(--color-stone-500); margin-top: 5px; }
-  .app-shell .desk-category-caption .desk-category-track { flex: 1; }
-  .app-shell .desk-category-track { background: #a5c8bd15; }
-  .app-shell .desk-category-track > span { background: var(--category-color); }
-  .app-shell .desk-pay { color: #b0ead5; background: #72d4b91f; border: 1px solid #99d4be1f; }
-  .app-shell .desk-pay:hover { background: #72d4b936; }
-
-  .app-shell .account-tile { border-left-width: 2px; }
-  .app-shell .account-tile:not(.bg-success-soft) { border-left-color: #e9af9670; }
-  .app-shell .account-tile.bg-success-soft { background: rgb(25 52 49 / .88); border-left-color: #95dfb970; }
-  .app-shell .account-tile:hover { box-shadow: var(--shadow-sm); }
-  .app-shell .account-footer { background: rgb(14 34 39 / .3); }
-  .app-shell .account-footer button.bg-brand { background: var(--color-teal-soft); color: var(--color-brand-strong); box-shadow: none; }
-  .app-shell .account-footer button.bg-brand:hover { background: #72d4b936; }
-  .app-shell .history-heading h1 { font-size: 23px; }
-  .app-shell .history-panel { border-radius: 16px; }
-  .app-shell .history-totals > div { background: #193338a6; border: 1px solid var(--color-line); border-radius: 12px; padding: 12px 14px; }
-  .app-shell .history-totals strong { font-size: 23px; }
-  .app-shell .history-totals > div:nth-child(2) strong { color: var(--color-success); }
-  .app-shell .history-totals > div:nth-child(3) strong { color: var(--color-expense); }
-  .app-shell .history-view button[aria-pressed="true"] { background: var(--color-surface-muted); }
-  .app-shell :is(.card-statement-search, .payment-options > button, .dock-tooltip) { background: #1c373c; border-color: var(--color-line-strong); }
-  .app-shell .card-statement-table th { background: #203b40; }
-  .app-shell :is(input:not([type=color]), select, textarea) { color: var(--color-stone-900); background-color: #193338; border-color: var(--color-line-strong); }
-  .app-shell input::placeholder, .app-shell textarea::placeholder { color: var(--color-stone-400); }
-  .app-shell .card-statement-search input { background: transparent; }
-  .app-shell :is(.finance-primary, .tatu-dialog .bg-brand) { background: #307768; color: #effff6; }
-  .app-shell :is(.finance-primary, .tatu-dialog .bg-brand):hover { background: #3a8776; }
-  .app-shell :is(#settings-modal-overlay, .finance-overlay, [class~="bg-brand/40"]) { background: rgb(5 22 28 / .48); backdrop-filter: blur(4px); }
-  .app-shell #settings-modal-box { background: rgb(24 46 51 / .96); border-radius: 20px; box-shadow: 0 12px 40px #03121766; }
-  .app-shell .tatu-dialog > div:first-child { background: #203e42; }
-
-  /* Existing semantic status chips keep their meaning with readable dark surfaces. */
-  .app-shell :is(.bg-amber-50, [class~="bg-amber-100/80"]) { background-color: var(--color-warning-soft); color: var(--color-warning); }
-  .app-shell :is(.bg-emerald-50, [class~="bg-emerald-50/40"], [class~="bg-emerald-100/80"]) { background-color: var(--color-success-soft); color: var(--color-success); }
-  .app-shell .bg-rose-50 { background-color: var(--color-expense-soft); color: var(--color-expense); }
-  .app-shell [class~="bg-blue-50/90"] { background-color: var(--color-info-soft); color: var(--color-info); }
-  .app-shell :is([class~="bg-purple-50/90"], [class~="bg-purple-50/70"]) { background-color: var(--color-lilac-soft); color: var(--color-lilac); }
-  .app-shell :is(.text-amber-800, .text-amber-700, .text-amber-600, [class~="text-amber-700/80"]) { color: var(--color-warning); }
-  .app-shell :is(.text-emerald-700, .text-emerald-600) { color: var(--color-success); }
-  .app-shell :is(.text-rose-600, .text-rose-700) { color: var(--color-expense); }
-  .app-shell :is(.text-blue-700, .text-blue-600) { color: var(--color-info); }
-  .app-shell :is(.text-purple-700, .text-purple-600) { color: var(--color-lilac); }
-  .app-shell :is([class~="hover:bg-rose-50"], [class~="hover:bg-emerald-50"], [class~="hover:bg-stone-50/50"]):hover { background-color: var(--color-surface-muted); }
-
-  .app-shell .desktop-dock {
-    background: rgb(20 44 49 / .94);
-    border-color: #c8e9dc26;
-    box-shadow: inset 0 1px 0 #d9ffed0d, 0 10px 30px #03121740;
-  }
-  .app-shell .desktop-dock::before { background: linear-gradient(180deg, #d2fff009, transparent); }
-  .app-shell .desktop-dock > button { color: #c1d6cf; }
-  .app-shell .desktop-dock > button:hover { background: #c8efdc12; }
-  .app-shell .desktop-dock > button[aria-current=page] { background: #83d6bc29; color: #a7f0d0; box-shadow: inset 0 1px 0 #c8ffe71c, 0 3px 10px #03121720; }
-  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
-    .app-shell .desktop-dock { background: rgb(20 44 49 / .7); -webkit-backdrop-filter: blur(20px) saturate(1.2); backdrop-filter: blur(20px) saturate(1.2); }
-  }
-  @media (prefers-reduced-transparency: reduce) {
-    .app-shell { --desktop-panel: #182e33; }
-    .app-shell .desktop-dock { background: #142c31; -webkit-backdrop-filter: none; backdrop-filter: none; }
-    .app-shell .desktop-dock > button[aria-current=page] { background: #2e574f; -webkit-backdrop-filter: none; backdrop-filter: none; }
-  }
-}
-@media (min-width: 1024px) {
-  .app-shell .app-main > .desktop-dashboard { max-width: 1440px; margin-inline: auto; padding-top: 4px; }
 }
