@@ -7,4 +7,15 @@
 .expense-entry .mobile-flow-summary { display:grid; gap:12px; overflow-wrap:anywhere; }
 .expense-entry .mobile-flow-summary dt { font-size:12px; opacity:.7; }
 .expense-entry .mobile-flow-summary dd { font-weight:600; }
-.expense-entry>.mobile-secondary { margin-top:16px; }
+.expense-entry>.mobile-secondary {
+  margin-top:16px;
+  min-height:48px;
+  border:1px solid #a9c4b7;
+  background:#edf5f0;
+  box-shadow:0 1px 2px #18374614;
+  cursor:pointer;
+  transition:background-color .15s, border-color .15s;
+}
+.expense-entry>.mobile-secondary:hover:not(:disabled) { background:#dfeee5; border-color:#6c9b85; }
+.expense-entry>.mobile-secondary:focus-visible { outline:2px solid var(--color-brand); outline-offset:3px; }
+.expense-entry>.mobile-secondary:disabled { opacity:.55; cursor:wait; }
