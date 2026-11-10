@@ -207,6 +207,19 @@ test('persistent household chat with both authenticated users and atomic financi
     assert.equal(purchases[0].installmentsCount, 3);
     assert.equal(purchases[0].totalAmount, 120.30);
     assert.equal((await chat.list(j.user)).messages.filter(message => message.id === id && message.saved).length, 1);
+    for (const count of [1, 3]) {
+      const name = 'Crédito legado ' + count;
+      const draft = (await chat.send(h.user, { id: randomUUID(), text: name + ', Loja, 90, ' + count + 'x', month })).messages[1];
+      const view = await finance.read(month);
+      await chat.confirm(h.user, { id: draft.id, expectedRevision: view.revision });
+      await chat.confirm(h.user, { id: draft.id, expectedRevision: view.revision });
+      const saved = await finance.read(month);
+      assert.equal(saved.state.simpleAccounts.some(account => account.name === name), false);
+      const card = saved.accounts.find(account => account.type === 'credit_card')!;
+      assert.equal(card.cardInfo!.items.filter(item => item.description === name).length, 1);
+      assert.equal(card.cardInfo!.items.find(item => item.description === name)!.amount, count === 1 ? 90 : 30);
+      assert.deepEqual(saved.state.simpleAccounts, after.state.simpleAccounts);
+    }
   });
 
 });

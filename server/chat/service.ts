@@ -133,7 +133,7 @@ export function createChatService(db: Transport = neonTransport) {
       // Use one snapshot for category resolution and the existing revision guard.
       // Missing payment categories are created only in the confirmed transaction.
       const loaded=await createRepository(db).load();
-      if (preview.paymentMethod === 'Crédito') {
+      if (preview.paymentMethod === 'Crédito' || (preview.categoryName === 'Cartão' && loaded.store.creditCards.length === 1)) {
         const [card] = loaded.store.creditCards;
         if (!card) throw new FoundationError(422, 'Cadastre um cartão pelo computador para adicionar esta compra.');
         preview.cardId = card.id;

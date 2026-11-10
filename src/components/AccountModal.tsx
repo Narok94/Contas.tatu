@@ -1,4 +1,7 @@
 import { InstallmentLifecycle } from './InstallmentLifecycle';
+import { GuidedExpenseFlow } from '../mobile/GuidedExpenseFlow';
+import '../mobile/mobile.css';
+import './expenseEntry.css';
 import React, { useState, useEffect } from 'react';
 import { X, Layers, Repeat, CreditCard as CardIcon, DollarSign, Tag, Calendar, Info } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -31,6 +34,8 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   } = useFinance();
 
   const [activeType, setActiveType] = useState<AccountType>('simple');
+  const [advanced, setAdvanced] = useState(false);
+  const [savingPurchase, setSavingPurchase] = useState(false);
 
   // Campos comuns
   const [name, setName] = useState('');
@@ -48,6 +53,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
   // Inicializa quando abre para editar ou criar
   useEffect(() => {
     setOperation('change'); setReason('');
+    setAdvanced(false);
     if (editingAccount) {
       setName(editingAccount.name);
       setCategoryId(editingAccount.categoryId || '');
@@ -201,7 +207,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           </div>
           <button
             type="button"
-            onClick={onClose}
+            disabled={savingPurchase || busy} onClick={onClose}
             className="text-stone-400 hover:text-stone-600 p-1 rounded-md transition-colors cursor-pointer"
           >
             <X className="w-5 h-5" />
@@ -209,7 +215,10 @@ export const AccountModal: React.FC<AccountModalProps> = ({
         </div>
 
         {/* Form Body */}
-        <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
+        {!editingAccount && !advanced ? <div className="expense-entry p-6 overflow-y-auto flex-1">
+          <GuidedExpenseFlow onSuccess={onClose} onSaving={setSavingPurchase} />
+          <button type="button" className="mobile-secondary" disabled={savingPurchase} onClick={() => setAdvanced(true)}>Cadastro avançado · fixa, carnê ou novo cartão</button>
+        </div> : <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-4 flex-1">
           {/* Seletor de Tipo de Conta (apenas na criação) */}
           {!editingAccount && (
             <div>
@@ -426,7 +435,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
           <div className="flex items-center justify-end gap-3 pt-4 border-t border-stone-200">
             <button
               type="button"
-              onClick={onClose}
+              disabled={savingPurchase || busy} onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-stone-700 hover:bg-stone-100 rounded-lg transition-colors cursor-pointer"
             >
               Cancelar
@@ -439,7 +448,7 @@ export const AccountModal: React.FC<AccountModalProps> = ({
               {editingAccount ? 'Salvar Alterações' : 'Cadastrar Conta'}
             </button>
           </div>
-        </form>
+        </form>}
       </div>
     </div>
   );

@@ -1,0 +1,10 @@
+.expense-entry .mobile-flow-form { display:grid; gap:16px; min-width:0; }
+.expense-entry .mobile-flow-choices { min-width:0; }
+.expense-entry .mobile-flow-choices legend { margin-bottom:8px; font-weight:600; }
+.expense-entry .mobile-flow-choices>div { display:flex; flex-wrap:wrap; gap:8px; }
+.expense-entry .mobile-flow-choices button { min-height:44px; padding:10px 16px; border:1px solid var(--color-line); border-radius:12px; }
+.expense-entry .mobile-flow-choices button[aria-pressed=true] { background:var(--color-brand); color:white; }
+.expense-entry .mobile-flow-summary { display:grid; gap:12px; overflow-wrap:anywhere; }
+.expense-entry .mobile-flow-summary dt { font-size:12px; opacity:.7; }
+.expense-entry .mobile-flow-summary dd { font-weight:600; }
+.expense-entry>.mobile-secondary { margin-top:16px; }
