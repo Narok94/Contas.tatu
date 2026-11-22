@@ -171,3 +171,31 @@ test('SQL: invalid money, references, dates and household injection never change
   assert.equal((await f.repository.load()).revision, before.revision);
   assert.equal((await f.repository.load()).store.simpleAccounts.length, 0);
 });
+
+
+test('SQL: paid card routes new purchases and installments to next year without changing history', async t => {
+  const f = await fixture(t);
+  const cardId = (await f.run('card.create', '2026-12', { name: 'Cartão' })).state.creditCards[0].id;
+  const expense = { cardId, description: 'Compra', amount: 100 };
+  await f.run('expense.create', '2026-12', expense);
+  await f.run('payment', '2026-12', { id: cardId, type: 'credit_card', status: 'parcial', amount: 50 });
+  let result = await f.run('expense.create', '2026-12', expense);
+  assert.equal(result.state.cardExpenses[1].month, '2026-12');
+  await f.run('payment', '2026-12', { id: cardId, type: 'credit_card', status: 'pago' });
+  const original = (await f.view('2026-12')).accounts;
+  result = await f.run('expense.create', '2026-12', expense);
+  assert.equal(result.state.cardExpenses[2].month, '2027-01');
+  result = await f.run('installment.create', '2026-12', {
+    description: 'Parcelada', totalAmount: 300, installmentsCount: 3, creditCardId: cardId,
+  });
+  assert.equal(result.state.installmentPurchases[0].startMonth, '2027-01');
+  assert.equal(result.state.installmentPurchases[0].versions?.[0].effectiveFromMonth, '2027-01');
+  assert.deepEqual((await f.view('2026-12')).accounts, original);
+  assert.equal((await f.view('2027-01')).accounts[0].amount, 200);
+  assert.equal((await f.view('2027-02')).accounts[0].cardInfo?.currentMonthAmount, 100);
+  assert.equal(result.state.cardExpenses.length, 3);
+  await f.run('expense.edit', '2026-12', { ...expense, id: result.state.cardExpenses[0].id, description: 'Corrigida' });
+  assert.equal((await f.repository.load()).store.cardExpenses[0].month, '2026-12');
+  result = await f.run('installment.create', '2026-12', { description: 'Carnê', totalAmount: 60, installmentsCount: 2 });
+  assert.equal(result.state.installmentPurchases[1].startMonth, '2026-12');
+});

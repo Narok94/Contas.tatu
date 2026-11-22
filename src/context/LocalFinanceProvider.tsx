@@ -1,3 +1,4 @@
+import { cardPurchaseMonth } from '../domain/cardBilling';
 import { FinanceContext } from './financeContextState';
 import { assertMonthOpen, assertFinancialMutation, closeMonth, reopenMonth, recordPayment } from '../domain/monthOperations';
 import React, { useState, useMemo, useRef } from 'react';
@@ -357,6 +358,7 @@ export const LocalFinanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     creditCardId?: string;
     categoryId?: string;
   }) => {
+    startMonth = cardPurchaseMonth(storeRef.current, creditCardId, startMonth);
     if (storeRef.current.closedMonths?.[startMonth]) { setOperationError('O mês de destino está fechado.'); return; }
     const newPurchase: InstallmentPurchase = {
       id: `inst_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,
@@ -392,6 +394,7 @@ export const LocalFinanceProvider: React.FC<{ children: React.ReactNode }> = ({ 
     month?: string;
     categoryId?: string;
   }) => {
+    month = cardPurchaseMonth(storeRef.current, cardId, month);
     if (storeRef.current.closedMonths?.[month]) { setOperationError('O mês de destino está fechado.'); return; }
     const newExpense: CardSimpleExpense = {
       id: `cexp_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`,

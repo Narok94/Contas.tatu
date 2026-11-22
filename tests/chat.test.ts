@@ -222,4 +222,30 @@ test('persistent household chat with both authenticated users and atomic financi
     }
   });
 
+  await t.test('mobile card payment routes guided purchases and receipts to the next invoice exactly once', async () => {
+    const month = '2030-12';
+    let view = await finance.read(month);
+    const cardId = view.state.creditCards[0].id;
+    await finance.execute({ action: 'expense.create', month, expectedRevision: view.revision,
+      data: { cardId, description: 'Fatura final', amount: 100 } }, h.user.id);
+    view = await finance.read(month);
+    const amount = view.accounts.find(account => account.id === cardId)!.cardInfo!.totalOpenAmount;
+    await finance.execute({ action: 'payment.mobile', month, expectedRevision: view.revision,
+      data: { requestId: randomUUID(), id: cardId, type: 'credit_card', amount, expectedOpen: amount, transfer: false } }, h.user.id);
+    const paid = (await finance.read(month)).accounts;
+    assert.equal(paid.find(account => account.id === cardId)!.status, 'pago');
+    for (const count of [1, 3]) {
+      view = await finance.read(month);
+      const body = { id: randomUUID(), expectedRevision: view.revision,
+        guidedExpense: { name: 'Nova compra ' + count, location: 'Loja', amount: 90, month, count, paymentMethod: 'Crédito' } };
+      const result = await chat.confirm(h.user, body);
+      assert.equal(result.message.preview?.month, '2031-01');
+      assert.equal((await chat.confirm(h.user, body)).alreadySaved, true);
+    }
+    assert.deepEqual((await finance.read(month)).accounts, paid);
+    const next = (await finance.read('2031-01')).accounts.find(account => account.id === cardId)!;
+    assert.equal(next.cardInfo!.items.filter(item => item.description.startsWith('Nova compra')).length, 2);
+    assert.equal(next.cardInfo!.currentMonthAmount, 120);
+  });
+
 });

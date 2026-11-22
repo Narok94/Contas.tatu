@@ -1,3 +1,4 @@
+import { cardPurchaseMonth } from '../domain/cardBilling';
 import { useRef, useState, type FormEvent } from 'react';
 import { Check } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -59,7 +60,8 @@ export function GuidedExpenseFlow({ onSuccess, onSaving }: { onSuccess: () => vo
       return;
     }
     setError('');
-    setPreview({ name: name.trim(), location: location.trim(), month, amount,
+    setPreview({ name: name.trim(), location: location.trim(),
+      month: card ? cardPurchaseMonth(f.store, f.creditCards[0]?.id, month) : month, amount,
       count: card && credit === 'Parcelado' ? count : 1, paymentMethod: paid === 'Sim' ? method : undefined });
   }
 

@@ -1,3 +1,4 @@
+import { cardPurchaseMonth } from '../../src/domain/cardBilling.js';
 import { randomUUID } from 'node:crypto';
 import type { FinanceDataStore } from '../../src/domain/financeRules.js';
 import { assertMonthOpen } from '../../src/domain/monthOperations.js';
@@ -21,8 +22,10 @@ export function cardCommand(s: FinanceDataStore, action: string, m: string, d: R
     const old = action.endsWith('edit') ? find(s.cardExpenses, d.id) : undefined;
     if (old) assertMonthOpen(s, old.month);
     const cardId = old?.cardId ?? find(s.creditCards, d.cardId).id;
+    const targetMonth = old?.month ?? cardPurchaseMonth(s, cardId, m);
+    assertMonthOpen(s, targetMonth);
     const row = { id: old?.id ?? randomUUID(), cardId, description: text(d.description)!, amount: money(d.amount),
-      categoryId: ref(d.categoryId, s.categories), month: old?.month ?? m, createdAt: old?.createdAt ?? new Date().toISOString() };
+      categoryId: ref(d.categoryId, s.categories), month: targetMonth, createdAt: old?.createdAt ?? new Date().toISOString() };
     s.cardExpenses = old ? s.cardExpenses.map(e => e.id === row.id ? row : e) : [...s.cardExpenses, row];
   } else if (action === 'expense.archive') {
     keys(d, ['id']); const row = find(s.cardExpenses, d.id); assertMonthOpen(s, row.month);

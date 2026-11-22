@@ -1,3 +1,5 @@
+import { cardPurchaseMonth } from '../../src/domain/cardBilling.js';
+import { assertMonthOpen } from '../../src/domain/monthOperations.js';
 import { randomUUID } from 'node:crypto';
 import type { FinanceDataStore } from '../../src/domain/financeRules.js';
 import { initialInstallmentVersion, getInstallmentStatusForMonth } from '../../src/domain/installmentTimeline.js';
@@ -7,10 +9,13 @@ import { find, integer, keys, money, ref, text } from './validation.js';
 export function installmentCommand(s: FinanceDataStore, action: string, m: string, d: Record<string, unknown>): FinanceDataStore | undefined {
   if (action === 'installment.create') {
     keys(d, ['description', 'totalAmount', 'installmentsCount', 'categoryId', 'creditCardId', 'notes']);
+    const creditCardId = ref(d.creditCardId, s.creditCards);
+    const startMonth = cardPurchaseMonth(s, creditCardId, m);
+    assertMonthOpen(s, startMonth);
     const p = { id: randomUUID(), description: text(d.description)!, totalAmount: money(d.totalAmount),
-      installmentsCount: integer(d.installmentsCount), startMonth: m, creditCardId: ref(d.creditCardId, s.creditCards),
+      installmentsCount: integer(d.installmentsCount), startMonth, creditCardId,
       categoryId: ref(d.categoryId, s.categories), notes: text(d.notes, true), createdAt: new Date().toISOString() };
-    if (!getInstallmentStatusForMonth(p, m).endMonth) throw new Error('Schedule outside supported date range');
+    if (!getInstallmentStatusForMonth(p, startMonth).endMonth) throw new Error('Schedule outside supported date range');
     s.installmentPurchases.push({ ...p, versions: [{ ...initialInstallmentVersion(p), recordedAt: p.createdAt, reason: 'Criação do parcelamento' }] });
     return s;
   }

@@ -1,3 +1,4 @@
+import { cardPurchaseMonth } from '../../src/domain/cardBilling.js';
 import { randomUUID } from 'node:crypto';
 import type { Identity } from '../auth/service.js';
 import { FoundationError } from '../foundation.js';
@@ -138,6 +139,7 @@ export function createChatService(db: Transport = neonTransport) {
         if (!card) throw new FoundationError(422, 'Cadastre um cartão pelo computador para adicionar esta compra.');
         preview.cardId = card.id;
       }
+      preview.month = cardPurchaseMonth(loaded.store, preview.cardId, preview.month);
       let categoryRow: Row | undefined;
       if(preview.categoryName) {
         const normalized=(name:string)=>name.normalize('NFD').replace(/[\u0300-\u036f]/g,'').toLowerCase();
