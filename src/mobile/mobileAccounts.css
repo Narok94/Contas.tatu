@@ -1,0 +1,61 @@
+/* Scoped to the mobile account view: shared desktop behavior, touch-sized layout. */
+.mobile-accounts { min-width: 0; display: grid; gap: 16px; }
+.mobile-accounts-month { display: grid; grid-template-columns: 44px minmax(0, 1fr) 44px; align-items: end; gap: 8px; }
+.mobile-accounts-month .mobile-field { min-width: 0; font-size: 14px; }
+.mobile-accounts-month input { min-height: 44px; padding: 8px; }
+.mobile-accounts-status { color: #4a5e51; font-size: 14px; }
+.mobile-accounts .accounts-page, .mobile-accounts .card-details-page { padding: 0; width: 100%; min-width: 0; }
+.mobile-accounts .accounts-heading { display: none; }
+.mobile-accounts .accounts-grid, .mobile-accounts .accounts-summary { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+.mobile-accounts .accounts-summary > div { grid-template-columns: minmax(0, 1fr) auto; padding: 14px; border-radius: 16px; }
+.mobile-accounts .accounts-summary > div > span { font-size: 14px; }
+.mobile-accounts .accounts-summary strong { font-size: 20px; white-space: normal; overflow-wrap: anywhere; }
+.mobile-accounts .accounts-summary small { font-size: 13px; }
+.mobile-accounts .accounts-list-toolbar, .mobile-accounts .accounts-filter-group label,
+.mobile-accounts .accounts-filter-group > span, .mobile-accounts .accounts-filter-group button,
+.mobile-accounts .accounts-clear-filters { font-size: 14px; }
+.mobile-accounts .accounts-filters { padding: 12px; gap: 16px; background: #f6f8f3; }
+.mobile-accounts .accounts-filter-group { width: 100%; min-width: 0; }
+.mobile-accounts .accounts-filter-group select { width: 100%; max-width: none; min-height: 44px; font-size: 16px; }
+.mobile-accounts .accounts-filter-group button { padding: 8px 10px; }
+.mobile-accounts .account-body { padding: 14px; }
+.mobile-accounts .account-header { flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+.mobile-accounts .account-header > div:first-child { flex-wrap: wrap; }
+.mobile-accounts .account-name { white-space: normal; overflow-wrap: anywhere; font-size: 18px; }
+.mobile-accounts .account-footer { padding: 8px; gap: 8px; }
+.mobile-accounts .account-footer button, .mobile-accounts .account-footer summary,
+.mobile-accounts .card-purchase-actions button { min-height: 44px; min-width: 44px; }
+.mobile-accounts .account-footer button { font-size: 14px; padding-inline: 10px; }
+.mobile-accounts .account-footer > div:last-child { margin-left: auto; }
+.mobile-accounts .account-footer svg { width: 18px; height: 18px; }
+.mobile-accounts .card-invoice-caption, .mobile-accounts .card-invoice-breakdown,
+.mobile-accounts .card-payment-summary { font-size: 14px; }
+.mobile-accounts .card-statement-heading, .mobile-accounts .card-statement-toolbar { gap: 12px; }
+.mobile-accounts .card-statement-toolbar { flex-wrap: wrap; }
+.mobile-accounts .card-statement-search { width: 100%; min-height: 44px; }
+.mobile-accounts .card-statement-search input { font-size: 16px; }
+.mobile-accounts .card-statement-summary, .mobile-accounts .card-statement-back,
+.mobile-accounts .card-statement-heading p { font-size: 14px; }
+/* A statement row becomes a readable purchase card, retaining all five columns. */
+.mobile-accounts .card-statement-table { display: block; border: 0; background: transparent; }
+.mobile-accounts .card-statement-table thead { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip-path: inset(50%); white-space: nowrap; }
+.mobile-accounts .card-statement-table tbody { display: grid; gap: 12px; }
+.mobile-accounts .card-statement-entry { display: grid; grid-template-columns: minmax(0, 1fr) auto; padding: 12px; border: 1px solid var(--color-line); border-radius: 16px; background: white; }
+.mobile-accounts .card-statement-entry td { border: 0; padding: 4px; font-size: 14px; }
+.mobile-accounts .card-statement-entry td:nth-child(1) { grid-column: 1 / -1; }
+.mobile-accounts .card-statement-entry td:nth-child(2) { grid-column: 1 / -1; font-size: 16px; font-weight: 650; }
+.mobile-accounts .card-statement-entry td:nth-child(3)::before { content: 'Parcela: '; font-weight: 400; }
+.mobile-accounts .card-statement-entry td:nth-child(5) { grid-column: 1 / -1; }
+.mobile-accounts .card-statement-category { margin-left: 0; margin-top: 4px; display: table; font-size: 13px; }
+.mobile-accounts .card-statement-actions button { width: auto; min-width: 44px; min-height: 44px; font-size: 14px; }
+.mobile-accounts .card-statement-actions button span { display: inline; }
+.mobile-accounts .tatu-dialog, .mobile-accounts .finance-dialog { max-height: calc(100dvh - 32px); overflow-y: auto; overscroll-behavior: contain; }
+.mobile-accounts .tatu-dialog input, .mobile-accounts .tatu-dialog select, .mobile-accounts .tatu-dialog textarea { font-size: 16px; }
+.mobile-accounts .finance-dialog { padding: 20px; }
+.mobile-accounts .finance-actions { flex-wrap: wrap; }
+.mobile-accounts .mobile-accounts-error { position: sticky; top: 8px; z-index: 70; box-shadow: 0 4px 16px #254f3220; }
+.mobile-accounts-error button { padding: 8px; font-weight: 650; }
+.mobile-accounts :is(button, summary, input, select):focus-visible { outline: 2px solid #187940; outline-offset: 3px; }
+@media (max-width: 359px) {
+  .mobile-accounts .accounts-summary > div { grid-template-columns: 1fr; }
+}

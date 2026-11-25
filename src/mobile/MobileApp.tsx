@@ -1,5 +1,5 @@
-import { useEffect, useRef, useState } from 'react';
-import { ArrowLeft, Check, ChevronRight, CreditCard, History, List, LogOut, Menu, Settings, ShoppingCart } from 'lucide-react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { ArrowLeft, Check, ChevronRight, CreditCard, History, List, LogOut, Menu, ReceiptText, Settings, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
 import { SettingsModal } from '../components/SettingsModal';
 import { useFinance } from '../context/FinanceContext';
@@ -11,9 +11,12 @@ import { MobileSheet } from './MobileSheet';
 import './mobile.css';
 import './conversation.css';
 
+const MobileAccounts = lazy(() => import('./MobileAccounts'));
+
 const choices = [
   { key: 'purchase', title: 'Compra', description: 'Gasto, compra do dia, mercado e mais.', icon: ShoppingCart },
   { key: 'payment', title: 'Pagamento', description: 'Pagar uma conta, total ou parcialmente.', icon: CreditCard },
+  { key: 'accounts', title: 'Contas', description: 'Confira as contas, faturas e pagamentos do mês.', icon: ReceiptText },
   { key: 'general', title: 'Geral', description: 'Lançamento manual com todos os campos.', icon: List },
 ] as const;
 type Screen = 'home' | 'history' | typeof choices[number]['key'];
@@ -38,7 +41,7 @@ export default function MobileApp() {
   function go(next: Screen) {
     setNotice('');
     f.clearOperationError();
-    if (next === 'payment' || next === 'history') f.refresh();
+    if (next === 'payment' || next === 'history' || next === 'accounts') f.refresh();
     setScreen(next);
   }
 
@@ -75,6 +78,7 @@ export default function MobileApp() {
         {screen === 'purchase' && <GuidedExpenseFlow onSaving={setSaving} onSuccess={() => saved('Compra adicionada.')} />}
         {screen === 'payment' && <MobilePaymentFlow onSuccess={() => saved('Pagamento registrado.')} />}
         {screen === 'history' && <MobileHistory />}
+        {screen === 'accounts' && <Suspense fallback={<p role="status">Carregando contas.</p>}><MobileAccounts /></Suspense>}
       </>}
     </main>
     {menu && <MobileSheet title="Seu Contas Tatu" onClose={() => setMenu(false)}>
