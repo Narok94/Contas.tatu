@@ -34,6 +34,7 @@ test('mobile paid account create/edit uses one revision, atomic SQL and existing
   const pg = new PGlite(); t.after(() => pg.close());
   await pg.exec(readFileSync(new URL('../database/migrations/001_finance_v2.sql', import.meta.url), 'utf8'));
   await pg.exec(readFileSync(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
+  await pg.exec(readFileSync(new URL('../database/migrations/005_entry_origins.sql', import.meta.url), 'utf8'));
   const transport: Transport = { batch: (queries, ro) => pg.transaction(async tx => {
     if (ro) await tx.exec('SET TRANSACTION READ ONLY'); const rows = [];
     for (const q of queries) rows.push((await tx.query(q.text, q.values)).rows); return rows as any;
@@ -58,7 +59,7 @@ test('mobile paid account create/edit uses one revision, atomic SQL and existing
 
 test('mobile payments persist actual amounts, settle balances and transfer exactly once', async t => {
   const pg = new PGlite(); t.after(() => pg.close());
-  for (const migration of ['001_finance_v2', '004_mobile_payments']) {
+  for (const migration of ['001_finance_v2', '004_mobile_payments', '005_entry_origins']) {
     await pg.exec(readFileSync(`database/migrations/${migration}.sql`, 'utf8'));
   }
   const transport: Transport = { batch: (queries, readOnly) => pg.transaction(async tx => {

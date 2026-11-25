@@ -1,3 +1,4 @@
+import { EntryDetails } from './EntryDetails';
 import { categoryDisplayColor } from '../utils/categoryPalette';
 import React from 'react';
 import { PaymentOptions } from './PaymentOptions';
@@ -113,12 +114,7 @@ export const AccountCard: React.FC<AccountCardProps> = ({
         </div>
 
         {/* Centro: Nome da Conta */}
-        <h3
-          title={account.name}
-          className="account-name text-sm font-bold tracking-tight text-stone-900 leading-snug"
-        >
-          {account.name}
-        </h3>
+        <EntryDetails type={account.type} id={account.recurringInfo?.definitionId ?? account.installmentInfo?.purchaseId ?? account.cardInfo?.cardId ?? account.id} name={account.name} nameAsTrigger />
 
         {/* Centro: Valor Principal */}
         <div className="mt-1.5">

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict';
 import { test } from 'node:test';
 import type { FinanceDataStore } from '../src/domain/financeRules.js';
 import type { CardInternalItem, UnifiedMonthlyAccount } from '../src/types/finance.js';
-import { cardStatementRows, formatPurchaseDate } from '../src/utils/cardStatement.js';
+import { cardStatementRows, formatPurchaseDate, filterStatementRows } from '../src/utils/cardStatement.js';
 
 const fixture = () => {
   const store: FinanceDataStore = { categories: [], creditCards: [], simpleAccounts: [], recurringDefinitions: [],
@@ -19,6 +19,24 @@ const fixture = () => {
   };
   return {store,account,simple};
 };
+
+test('statement filters combine author, type, category and search, sorting registration independently of purchase dates', () => {
+  const { store, account, simple } = fixture();
+  simple('old', 'Uber', 11.42, '2026-10-22T15:00:00.000Z');
+  simple('new', 'Café novo', 30, '2026-11-25T15:00:00Z').categoryId = 'food';
+  simple('unknown', 'Sem data', 90, '');
+  store.entryOrigins = [{ entryType: 'simple_expense', entryId: 'new', actorId: 'j', actorName: 'Jéssica', createdAt: '2026-11-25T15:00:00Z' }];
+  const defaults = { search: '', author: 'all', category: 'all', type: 'all', sort: 'default' as const };
+  const before = JSON.stringify({ store, account });
+  const ids = (filters = {}) => filterStatementRows(account, store, { ...defaults, ...filters }).map(row => row.item.id);
+  assert.deepEqual(ids({ sort: 'newest' }), ['new', 'old', 'unknown']);
+  assert.deepEqual(ids({ sort: 'oldest' }), ['old', 'new', 'unknown']);
+  assert.deepEqual(ids({ sort: 'highest' }), ['unknown', 'new', 'old']);
+  assert.deepEqual(ids({ search: 'cafe', author: 'j', category: 'food', type: 'simple_expense' }), ['new']);
+  assert.deepEqual(ids({ author: 'unknown' }), ['old', 'unknown']);
+  assert.deepEqual(ids({ author: 'j', type: 'installment' }), []);
+  assert.equal(JSON.stringify({ store, account }), before);
+});
 
 test('only confirmed October import records recover simple purchase dates; creation dates alone are not purchase dates',()=>{
   const {store,account,simple}=fixture();

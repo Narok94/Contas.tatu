@@ -3,6 +3,7 @@ import type { InstallmentPurchase, InstallmentVersion, ClosedMonthSnapshot } fro
 
 // SQL identifiers below are fixed mappings, never request input.
 export type SqlRow = Record<string, any>;
+export const entryOriginMap = { entryType: 'entry_type', entryId: 'entry_id', actorId: 'actor_user_id', actorName: 'actor_name', createdAt: 'created_at' };
 export const mappings = {
   creditCards: ['credit_cards', { id: 'id', name: 'name', brand: 'brand', color: 'color', createdAt: 'created_at' }],
   simpleAccounts: ['simple_accounts', { id: 'id', name: 'name', value: 'amount', month: 'month', categoryId: 'category_id', status: 'status', notes: 'notes', createdAt: 'created_at' }],
@@ -35,6 +36,7 @@ export function decodeState(tables: Record<string, SqlRow[]>): FinanceDataStore 
   for (const [key, [table, map]] of Object.entries(mappings)) {
     (s as any)[key] = tables[table].filter(r => !r.archived_at).map(r => decode(r, map));
   }
+  if (tables.entry_origins?.length) s.entryOrigins = tables.entry_origins.map(row => decode(row, entryOriginMap)) as FinanceDataStore['entryOrigins'];
   if (tables.mobile_payments?.length) {
     s.mobilePayments = tables.mobile_payments.map(r => decode(r, mobilePaymentMap)) as FinanceDataStore['mobilePayments'];
   }

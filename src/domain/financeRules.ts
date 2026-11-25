@@ -1,5 +1,6 @@
 import {
   AccountType,
+  EntryOrigin,
   ClosedMonthSnapshot,
   CardInternalItem,
   CardPendingPreviousInvoice,
@@ -20,6 +21,7 @@ import { addMonths, compareMonths, getMonthDifference } from '../utils/formatter
 import { paymentBalances } from './paymentBalances.js';
 
 export interface FinanceDataStore {
+  entryOrigins?: EntryOrigin[];
   mobilePayments?: MobilePayment[];
   closedMonths?: Record<string, ClosedMonthSnapshot>;
   closedMonthHistory?: Record<string, ClosedMonthSnapshot[]>;

@@ -2,7 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { getNeonClient } from '../neon.js';
 import { DEFAULT_HOUSEHOLD_ID as household, FoundationError } from '../foundation.js';
 import type { FinanceDataStore } from '../../src/domain/financeRules.js';
-import { mappings, decodeState, encode, encodeVersion, mobilePaymentMap, type SqlRow } from './mapping.js';
+import { mappings, decodeState, encode, encodeVersion, mobilePaymentMap, entryOriginMap, type SqlRow } from './mapping.js';
 
 export interface Query { text: string; values: unknown[] }
 export interface Transport { batch(queries: Query[], readOnly: boolean): Promise<SqlRow[][]> }
@@ -19,6 +19,7 @@ const tableOrders: Record<string, string> = {
   installment_month_snapshots: 'purchase_id,month', financial_months: 'month',
   month_closures: 'month,revision', month_reopenings: 'month,recorded_at,closure_id',
   mobile_payments: 'created_at,id',
+  entry_origins: 'created_at,entry_type,entry_id',
 };
 export interface Loaded { revision: string; store: FinanceDataStore; tables: Record<string, SqlRow[]> }
 const equal = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
@@ -34,6 +35,7 @@ export function createRepository(transport: Transport = neonTransport) {
     async load(): Promise<Loaded> {
       // One SELECT: household revision and every table share exactly one MVCC snapshot.
       const parts = Object.entries(tableOrders).map(([table, order]) => `'${table}',(SELECT COALESCE(jsonb_agg(to_jsonb(r) ORDER BY ${order}), '[]'::jsonb) FROM finance_v2.${table} r WHERE household_id=$1)`);
+      parts.push(`'entry_authors',(SELECT COALESCE(jsonb_agg(jsonb_build_object('id',u.id,'name',u.display_name)), '[]'::jsonb) FROM finance_v2.app_users u JOIN finance_v2.household_memberships m ON m.user_id=u.id WHERE m.household_id=$1)`);
       const [rows] = await transport.batch([q(`SELECT revision::text, jsonb_build_object(${parts.join(',')}) AS tables FROM finance_v2.households WHERE id=$1`, [household])], true);
       if (!rows.length) throw new FoundationError(409, 'Household has not been initialized');
       const tables = rows[0].tables as Record<string, SqlRow[]>;
@@ -41,6 +43,18 @@ export function createRepository(transport: Transport = neonTransport) {
     },
     async save(before: Loaded, next: FinanceDataStore, actorId?: string): Promise<string> {
       const writes: Query[] = [];
+      const actor = before.tables.entry_authors?.find(row => row.id === actorId);
+      if (actorId && !actor) throw new FoundationError(403, 'Author is not a household member');
+      const entryTypes = { simpleAccounts: 'simple', recurringDefinitions: 'recurring', installmentPurchases: 'installment', creditCards: 'credit_card', cardExpenses: 'simple_expense' } as const;
+      if (actor) for (const [key, entryType] of Object.entries(entryTypes)) {
+        const collection = key as keyof typeof entryTypes;
+        for (const row of next[collection]) {
+          if (before.store[collection].some(previous => previous.id === row.id)) continue;
+          const origin = { entryType, entryId: row.id, actorId: actor.id as string, actorName: actor.name as string, createdAt: row.createdAt };
+          writes.push(insert('entry_origins', encode(origin, entryOriginMap)));
+          (next.entryOrigins ??= []).push(origin);
+        }
+      }
       for (const payment of next.mobilePayments ?? []) {
         if (!before.store.mobilePayments?.some(row => row.id === payment.id)) {
           writes.push(insert('mobile_payments', encode(payment, mobilePaymentMap)));

@@ -3,14 +3,16 @@ import { ArrowLeft, Search, Pencil, Trash2 } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
 import { categoryDisplayColor } from '../utils/categoryPalette';
-import { cardStatementRows, formatPurchaseDate } from '../utils/cardStatement';
+import { filterStatementRows, formatPurchaseDate, type StatementSort } from '../utils/cardStatement';
 import { CardPurchaseModal } from '../components/CardPurchaseModal';
 import { ConfirmDialog } from '../components/ConfirmDialog';
 import type { CardInternalItem } from '../types/finance';
 import '../cardDetails.css';
+import { EntryDetails } from '../components/EntryDetails';
+import { entryAuthors } from '../utils/entryOrigins';
 
 export function CardDetailsPage({ cardId, onBack }: { cardId: string; onBack: () => void }) {
-  const { monthlyAccounts, currentMonth, store, deleteCardItem, busy, loading, mode, hasCurrentView } = useFinance();
+  const { monthlyAccounts, currentMonth, store, categories, deleteCardItem, busy, loading, mode, hasCurrentView } = useFinance();
   const [editingItem, setEditingItem] = useState<CardInternalItem | null>(null);
   const [deletingItem, setDeletingItem] = useState<CardInternalItem | null>(null);
   const deleting = useRef(false);
@@ -26,10 +28,15 @@ export function CardDetailsPage({ cardId, onBack }: { cardId: string; onBack: ()
   const account = monthlyAccounts.find(item => item.type === 'credit_card' && item.id === cardId);
   const items = account?.cardInfo?.items ?? [];
   const [search, setSearch] = useState('');
+  const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [category, setCategory] = useState('all');
+  const [author, setAuthor] = useState('all');
+  const [type, setType] = useState('all');
+  const [sort, setSort] = useState<StatementSort>('default');
+  const authors = entryAuthors(store);
+  const activeFilters = Number(category !== 'all') + Number(author !== 'all') + Number(type !== 'all');
   const heading = useRef<HTMLHeadingElement>(null);
-  const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLocaleLowerCase('pt-BR');
-  const query = normalize(search.trim());
-  const visibleRows = account ? cardStatementRows(account, store).filter(({ item }) => normalize(item.description).includes(query)) : [];
+  const visibleRows = account ? filterStatementRows(account, store, { search, category, author, type, sort }) : [];
 
   useEffect(() => {
     window.scrollTo(0, 0);
@@ -44,6 +51,7 @@ export function CardDetailsPage({ cardId, onBack }: { cardId: string; onBack: ()
       <div>
         <h2 id="card-statement-title" ref={heading} tabIndex={-1}>{account?.name ?? 'Cartão'}</h2>
         <p>{formatMonthYear(currentMonth)}</p>
+        {account && <EntryDetails type="credit_card" id={account.cardInfo?.cardId ?? account.id} name={account.name} />}
       </div>
       {account && <div className="card-statement-summary">
         <span>Total da fatura: <strong>{formatBRL(account.amount)}</strong></span>
@@ -57,7 +65,24 @@ export function CardDetailsPage({ cardId, onBack }: { cardId: string; onBack: ()
           <input type="search" aria-label="Buscar por descrição" placeholder="Buscar por descrição..."
             value={search} onChange={event => setSearch(event.target.value)} />
         </label>
-        {query && <span role="status" aria-live="polite">{visibleRows.length} {visibleRows.length === 1 ? 'resultado' : 'resultados'}</span>}
+        <span role="status" aria-live="polite">{visibleRows.length} de {items.length} lançamentos</span>
+        <button type="button" className="card-statement-filter-toggle" aria-expanded={filtersExpanded} aria-controls="statement-filters" onClick={() => setFiltersExpanded(value => !value)}>Filtrar e ordenar{activeFilters > 0 ? ` (${activeFilters})` : ''}{sort !== 'default' ? ' · Ordenação ativa' : ''}</button>
+      </div>
+      <div id="statement-filters" className="card-statement-filters" hidden={!filtersExpanded}>
+        <label>Organizar por<select value={sort} onChange={event => setSort(event.target.value as StatementSort)}>
+          <option value="default">Data da compra (padrão)</option><option value="newest">Mais recentes primeiro</option><option value="oldest">Mais antigos primeiro</option><option value="highest">Maior valor</option><option value="lowest">Menor valor</option><option value="name">Nome A–Z</option>
+        </select></label>
+        <label>Adicionado por<select value={author} onChange={event => setAuthor(event.target.value)}>
+          <option value="all">Todas as pessoas</option>{authors.map(([id, name]) => <option key={id} value={id}>{name}</option>)}<option value="unknown">Autor não registrado</option>
+        </select></label>
+        <label>Categoria<select value={category} onChange={event => setCategory(event.target.value)}>
+          <option value="all">Todas as categorias</option>{categories.map(item => <option key={item.id} value={item.id}>{item.name}</option>)}<option value="unknown">Sem categoria</option>
+        </select></label>
+        <label>Tipo de compra<select value={type} onChange={event => setType(event.target.value)}>
+          <option value="all">Todos os tipos</option><option value="simple_expense">À vista</option><option value="installment">Parceladas</option>
+        </select></label>
+        <p>Mais recentes e mais antigos usam a data do cadastro, não a data da compra.</p>
+        {(activeFilters > 0 || sort !== 'default' || search) && <button type="button" onClick={() => { setSearch(''); setCategory('all'); setAuthor('all'); setType('all'); setSort('default'); }}>Limpar filtros</button>}
       </div>
       <table className="card-statement-table">
         <caption className="sr-only">Lançamentos de {account.name} · {formatMonthYear(currentMonth)}</caption>
@@ -67,7 +92,7 @@ export function CardDetailsPage({ cardId, onBack }: { cardId: string; onBack: ()
         <tbody>
           {visibleRows.map(({ item, purchaseDate }) => <tr key={item.id} className="card-statement-entry">
             <td className="card-statement-date">{formatPurchaseDate(purchaseDate)}</td>
-            <td><span className="card-statement-description">{item.description}</span>
+            <td><EntryDetails type={item.sourceType} id={item.sourceId} name={item.description} nameAsTrigger />
               {item.category && <span className="category-chip card-statement-category" style={{
                 '--category-color': categoryDisplayColor(item.category.color),
               } as React.CSSProperties}>{item.category.name}</span>}

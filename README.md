@@ -78,3 +78,26 @@ O rollback de localStorage exige `VITE_FINANCE_MODE=local` em desenvolvimento;
 não existe fallback automático nem provider legado no bundle de produção.
 
 Referência: https://vercel.com/docs/functions/runtimes/node-js
+
+## Autoria e ordenação dos lançamentos
+
+Antes de publicar a versão que exibe autores, aplique
+`database/migrations/005_entry_origins.sql` ao banco já provisionado.
+Essa migração é aditiva e idempotente; não altera valores nem pagamentos.
+O ambiente `dev:isolated` e os testes SQL já a aplicam ao banco em memória.
+
+Aplicada em 25/11/2026 ao `neondb` da branch de produção
+`br-purple-tree-b7rcasev` (projeto `ContasTatu`), após validação em branch
+temporária. Foram recuperadas 23 autorias de parcelamentos; as contagens de
+contas, compras, parcelamentos e pagamentos permaneceram inalteradas.
+
+Novas contas e compras guardam o autor autenticado na mesma transação financeira,
+independentemente de serem adicionadas pelo desktop, cadastro manual ou fluxo de
+compra mobile. Edições, pagamentos e limpeza da conversa preservam o autor original.
+A migração recupera autores antigos somente das versões iniciais de parcelamentos;
+registros sem vínculo confiável mostram “Autor não registrado”.
+
+Clique no nome de uma conta ou compra da fatura para consultar autor e data de
+cadastro. Ambas as telas oferecem ordenação por cadastro mais recente ou mais
+antigo e filtro por autor. A fatura também combina descrição, categoria, tipo e
+valor; a data do cadastro não substitui a data da compra.

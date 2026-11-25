@@ -1,5 +1,13 @@
 export type AccountType = 'simple' | 'recurring' | 'installment' | 'credit_card';
 
+export interface EntryOrigin {
+  entryType: AccountType | 'simple_expense';
+  entryId: string;
+  actorId: string;
+  actorName: string;
+  createdAt: string;
+}
+
 export type PaymentStatus = 'pendente' | 'parcial' | 'pago';
 
 export interface MobilePayment {

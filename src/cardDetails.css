@@ -38,3 +38,16 @@
 .card-statement-actions button:disabled { opacity:.45; cursor:not-allowed; }
 .card-statement-readonly { margin-top:12px; font-size:12px; color:var(--color-stone-600); }
 @media (max-width:1000px) { .card-statement-actions button span { display:none; } .card-statement-actions button { width:32px; } .card-statement-entry td, .card-statement-table th { padding-inline:8px; } }
+
+.card-statement-toolbar { flex-wrap: wrap; }
+.card-statement-filter-toggle { min-height: 44px; padding: 8px 12px; border: 1px solid var(--color-line); border-radius: 10px; cursor: pointer; color: var(--color-brand-strong); }
+.card-statement-filters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 12px; padding: 16px; margin-bottom: 16px; border: 1px solid var(--color-line); border-radius: 14px; background: var(--color-surface-soft); }
+.card-statement-filters[hidden] { display: none; }
+.card-statement-filters label { display: grid; gap: 6px; font-size: 14px; min-width: 0; }
+.card-statement-filters select { width: 100%; min-width: 0; min-height: 44px; padding: 8px; border: 1px solid var(--color-line); border-radius: 8px; background: white; font-size: 14px; }
+.card-statement-filters p { grid-column: 1 / -1; font-size: 13px; color: var(--color-stone-600); }
+.card-statement-filters > button { justify-self: start; font-size: 14px; font-weight: 600; color: var(--color-brand-strong); min-height: 44px; cursor: pointer; }
+@media (max-width: 767px) {
+  .card-statement-filters { grid-template-columns: minmax(0, 1fr); }
+  .card-statement-filters select { font-size: 16px; }
+}

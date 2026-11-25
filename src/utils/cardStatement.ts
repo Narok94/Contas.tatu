@@ -1,6 +1,7 @@
 import type { FinanceDataStore } from '../domain/financeRules';
 import type { CardInternalItem, UnifiedMonthlyAccount } from '../types/finance';
 import { purchases } from '../data/october2026CardPurchases';
+import { entryMetadata, compareCreatedAt } from './entryOrigins';
 
 const normalize = (value: string) => value.normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLocaleLowerCase('pt-BR');
 const validDate = (value: string | undefined) => {
@@ -40,4 +41,26 @@ export function cardStatementRows(account: UnifiedMonthlyAccount, store: Finance
 
 export function formatPurchaseDate(date: string | undefined) {
   return date ? date.split('-').reverse().join('/') : 'Data não informada';
+}
+
+export type StatementSort = 'default' | 'newest' | 'oldest' | 'highest' | 'lowest' | 'name';
+export function filterStatementRows(account: UnifiedMonthlyAccount, store: FinanceDataStore, filters: {
+  search: string; category: string; author: string; type: string; sort: StatementSort;
+}) {
+  const query = normalize(filters.search);
+  return cardStatementRows(account, store).filter(({ item }) => {
+    const meta = entryMetadata(store, item.sourceType, item.sourceId);
+    return normalize(item.description).includes(query)
+      && (filters.category === 'all' || (item.categoryId ?? 'unknown') === filters.category)
+      && (filters.author === 'all' || (meta.authorId ?? 'unknown') === filters.author)
+      && (filters.type === 'all' || (item.isInstallment ? 'installment' : 'simple_expense') === filters.type);
+  }).sort((a, b) => {
+    if (filters.sort === 'newest' || filters.sort === 'oldest') return compareCreatedAt(
+      entryMetadata(store, a.item.sourceType, a.item.sourceId).createdAt,
+      entryMetadata(store, b.item.sourceType, b.item.sourceId).createdAt, filters.sort);
+    if (filters.sort === 'highest') return b.item.amount - a.item.amount;
+    if (filters.sort === 'lowest') return a.item.amount - b.item.amount;
+    if (filters.sort === 'name') return a.item.description.localeCompare(b.item.description, 'pt-BR');
+    return 0;
+  });
 }

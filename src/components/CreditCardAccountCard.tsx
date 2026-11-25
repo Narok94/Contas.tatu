@@ -1,3 +1,4 @@
+import { EntryDetails } from './EntryDetails';
 import React from 'react';
 import {
   CreditCard as CardIcon,
@@ -89,12 +90,7 @@ export const CreditCardAccountCard: React.FC<CreditCardAccountCardProps> = ({
         </div>
 
         {/* Nome do Cartão */}
-        <h3
-          title={account.name}
-          className="text-sm font-bold tracking-tight text-stone-900 account-name"
-        >
-          {account.name}
-        </h3>
+        <EntryDetails type={account.type} id={account.recurringInfo?.definitionId ?? account.installmentInfo?.purchaseId ?? account.cardInfo?.cardId ?? account.id} name={account.name} nameAsTrigger />
 
         <div className="card-invoice-values">
           <strong className="card-invoice-total">{formatBRL(account.amount)}</strong>

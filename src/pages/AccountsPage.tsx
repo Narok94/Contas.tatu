@@ -1,4 +1,5 @@
 import '../accounts.css';
+import { accountMetadata, compareCreatedAt, entryAuthors } from '../utils/entryOrigins';
 import React, { useState, useMemo } from 'react';
 import {
   CheckCircle2,
@@ -18,12 +19,13 @@ import { CardPurchaseModal } from '../components/CardPurchaseModal';
 import { formatBRL, formatMonthYear } from '../utils/formatters';
 
 type StatusFilterType = 'all' | 'pendente' | 'pago' | 'parcial';
-type SortOrder = 'default' | 'highest' | 'lowest' | 'category' | 'name';
+type SortOrder = 'default' | 'highest' | 'lowest' | 'category' | 'name' | 'newest' | 'oldest';
 type AccountTypeFilter = 'all' | 'simple' | 'recurring' | 'installment' | 'credit_card';
 
 export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidden?: boolean }> = ({ onViewCard, hidden }) => {
   const {
     mode,
+    store,
     currentMonth,
     categories,
     monthlyAccounts,
@@ -40,9 +42,11 @@ export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidd
   // Bloco 2 - Filtro de Tipo de Conta
   const [typeFilter, setTypeFilter] = useState<AccountTypeFilter>('all');
   const [filtersExpanded, setFiltersExpanded] = useState(false);
+  const [authorFilter, setAuthorFilter] = useState('all');
+  const authors = entryAuthors(store);
   const [categoryFilter, setCategoryFilter] = useState('all');
   const [sortOrder, setSortOrder] = useState<SortOrder>('default');
-  const activeFilters = Number(statusFilter !== 'all') + Number(typeFilter !== 'all') + Number(categoryFilter !== 'all');
+  const activeFilters = Number(statusFilter !== 'all') + Number(typeFilter !== 'all') + Number(categoryFilter !== 'all') + Number(authorFilter !== 'all');
   const hasConfiguration = activeFilters > 0 || sortOrder !== 'default';
 
   // Modal para adicionar ou editar compra interna no cartão
@@ -62,7 +66,9 @@ export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidd
 
   // Filter creates a new array; stable sorting changes presentation only.
   const filteredAccounts = useMemo(() => {
+    const metadata = new Map<string, ReturnType<typeof accountMetadata>>(monthlyAccounts.map(account => [`${account.type}:${account.id}`, accountMetadata(store, account)]));
     return monthlyAccounts.filter((acc) => {
+      if (authorFilter !== 'all' && (metadata.get(`${acc.type}:${acc.id}`)?.authorId ?? 'unknown') !== authorFilter) return false;
       // Bloco 1: Status
       if ((statusFilter === 'pago' && acc.status !== 'pago') || (statusFilter === 'pendente' && acc.status === 'pago')) {
         return false;
@@ -76,6 +82,8 @@ export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidd
       return true;
     }).sort((a, b) => Number(a.status === 'pago') - Number(b.status === 'pago')).sort((a, b) => {
       switch (sortOrder) {
+        case 'newest':
+        case 'oldest': return compareCreatedAt(metadata.get(`${a.type}:${a.id}`)?.createdAt, metadata.get(`${b.type}:${b.id}`)?.createdAt, sortOrder);
         case 'highest': return b.amount - a.amount;
         case 'lowest': return a.amount - b.amount;
         case 'category': return (a.category?.name ?? '').localeCompare(b.category?.name ?? '', 'pt-BR');
@@ -83,7 +91,7 @@ export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidd
         default: return 0;
       }
     });
-  }, [monthlyAccounts, statusFilter, typeFilter, categoryFilter, sortOrder]);
+  }, [monthlyAccounts, statusFilter, typeFilter, categoryFilter, authorFilter, sortOrder, store]);
 
   // Contadores para o resumo e badges
   const paidCount = monthlyAccounts.filter((a) => a.status === 'pago').length;
@@ -286,16 +294,26 @@ export const AccountsPage: React.FC<{ onViewCard: (cardId: string) => void; hidd
           </select>
         </div>
         <div className="accounts-filter-group">
+          <label htmlFor="account-author">Adicionado por</label>
+          <select id="account-author" value={authorFilter} onChange={event => setAuthorFilter(event.target.value)}>
+            <option value="all">Todas as pessoas</option>
+            {authors.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+            <option value="unknown">Autor não registrado</option>
+          </select>
+        </div>
+        <div className="accounts-filter-group">
           <label htmlFor="account-sort">Organizar por</label>
           <select id="account-sort" value={sortOrder} onChange={event => setSortOrder(event.target.value as SortOrder)}>
             <option value="default">Padrão</option>
+            <option value="newest">Mais recentes primeiro</option>
+            <option value="oldest">Mais antigos primeiro</option>
             <option value="highest">Maior valor</option>
             <option value="lowest">Menor valor</option>
             <option value="category">Categoria</option>
             <option value="name">Nome A–Z</option>
           </select>
         </div>
-        {hasConfiguration && <button type="button" className="accounts-clear-filters" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setCategoryFilter('all'); setSortOrder('default'); }}>Limpar filtros</button>}
+        {hasConfiguration && <button type="button" className="accounts-clear-filters" onClick={() => { setStatusFilter('all'); setTypeFilter('all'); setCategoryFilter('all'); setAuthorFilter('all'); setSortOrder('default'); }}>Limpar filtros</button>}
       </div>
 
       {/* Grid of Accounts (up to 4 cards per row according to available width, independent height) */}
