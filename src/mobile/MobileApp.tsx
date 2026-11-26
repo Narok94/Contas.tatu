@@ -1,3 +1,5 @@
+import SevenPage from '../seven/SevenPage';
+import { canAccessSeven } from '../seven/model';
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ArrowLeft, Check, ChevronRight, CreditCard, History, List, LogOut, Menu, ReceiptText, Settings, ShoppingCart } from 'lucide-react';
 import { useAuth } from '../auth/AuthContext';
@@ -19,11 +21,11 @@ const choices = [
   { key: 'accounts', title: 'Contas', description: 'Confira as contas, faturas e pagamentos do mês.', icon: ReceiptText },
   { key: 'general', title: 'Geral', description: 'Lançamento manual com todos os campos.', icon: List },
 ] as const;
-type Screen = 'home' | 'history' | typeof choices[number]['key'];
+type Screen = 'seven' | 'home' | 'history' | typeof choices[number]['key'];
 
 export default function MobileApp() {
   const f = useFinance();
-  const { logout } = useAuth();
+  const { user, logout } = useAuth();
   const [screen, setScreen] = useState<Screen>('home');
   const [menu, setMenu] = useState(false);
   const [settings, setSettings] = useState(false);
@@ -72,17 +74,19 @@ export default function MobileApp() {
       </> : <>
         <div className="mobile-flow-heading">
           <TitleIcon size={27} />
-          <h2 ref={heading} tabIndex={-1}>{active?.title ?? 'Histórico'}</h2>
+          <h2 ref={heading} tabIndex={-1}>{screen === 'seven' ? 'Comprovante Seven' : active?.title ?? 'Histórico'}</h2>
           <button type="button" className="mobile-icon-button" aria-label="Voltar para o início" disabled={saving || f.busy} onClick={() => go('home')}><ArrowLeft size={20} /></button>
         </div>
         {screen === 'purchase' && <GuidedExpenseFlow onSaving={setSaving} onSuccess={() => saved('Compra adicionada.')} />}
         {screen === 'payment' && <MobilePaymentFlow onSuccess={() => saved('Pagamento registrado.')} />}
+        {screen === 'seven' && canAccessSeven(user) && <SevenPage />}
         {screen === 'history' && <MobileHistory />}
         {screen === 'accounts' && <Suspense fallback={<p role="status">Carregando contas.</p>}><MobileAccounts /></Suspense>}
       </>}
     </main>
     {menu && <MobileSheet title="Seu Contas Tatu" onClose={() => setMenu(false)}>
       <div className="mobile-sheet-actions mobile-dashboard-menu">
+        {canAccessSeven(user) && <button type="button" onClick={() => { setMenu(false); go('seven'); }}><ReceiptText size={20} />Comprovante Seven</button>}
         <button type="button" onClick={() => { setMenu(false); go('history'); }}><History size={20} />Histórico</button>
         <button type="button" onClick={() => { setMenu(false); setSettings(true); }}><Settings size={20} />Configurações</button>
         <button type="button" onClick={() => void logout()}><LogOut size={20} />Sair</button>

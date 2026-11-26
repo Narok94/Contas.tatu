@@ -14,8 +14,8 @@ export interface FinanceContextType {
   installmentAction?: (id: string, action: 'cancel' | 'payoff', reason: string) => Promise<boolean>;
   currentMonth: string;
   setCurrentMonth: (month: string) => void;
-  activeTab: 'dashboard' | 'accounts' | 'history';
-  setActiveTab: (tab: 'dashboard' | 'accounts' | 'history') => void;
+  activeTab: 'dashboard' | 'accounts' | 'history' | 'seven';
+  setActiveTab: (tab: 'dashboard' | 'accounts' | 'history' | 'seven') => void;
   isSettingsOpen: boolean;
   setIsSettingsOpen: (open: boolean) => void;
 

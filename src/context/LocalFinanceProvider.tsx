@@ -29,7 +29,7 @@ import { getCurrentMonth } from '../utils/formatters';
 
 export const LocalFinanceProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [currentMonth, setCurrentMonth] = useState<string>(() => getCurrentMonth());
-  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'history'>('dashboard');
+  const [activeTab, setActiveTab] = useState<'dashboard' | 'accounts' | 'history' | 'seven'>('dashboard');
   const [isSettingsOpen, setIsSettingsOpen] = useState<boolean>(false);
   const [isAccountModalOpen, setIsAccountModalOpen] = useState<boolean>(false);
   const [editingAccount, setEditingAccount] = useState<UnifiedMonthlyAccount | null>(null);

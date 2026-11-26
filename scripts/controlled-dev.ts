@@ -1,3 +1,5 @@
+import { sevenHandler } from '../server/seven/api.js';
+import { createSevenService } from '../server/seven/service.js';
 import { createServer as httpServer, type IncomingMessage } from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { parseEnv } from 'node:util';
@@ -33,6 +35,7 @@ async function main() {
     await pg.exec(await readFile(new URL('../database/migrations/003_household_chat.sql', import.meta.url), 'utf8'));
     await pg.exec(await readFile(new URL('../database/migrations/004_mobile_payments.sql', import.meta.url), 'utf8'));
     await pg.exec(await readFile(new URL('../database/migrations/005_entry_origins.sql', import.meta.url), 'utf8'));
+    await pg.exec(await readFile(new URL('../database/migrations/006_seven_receipts.sql', import.meta.url), 'utf8'));
     transport = { batch: (queries, readOnly) => pg.transaction(async tx => {
       if (readOnly) await tx.exec('SET TRANSACTION READ ONLY');
       const results = [];
@@ -48,6 +51,7 @@ async function main() {
   const foundation = createFoundation(transport ? { transaction: (qs, ro = false) => transport!.batch(qs, ro) } : undefined);
   if (isolated) await foundation.initialize();
   if (isolated && process.env.CONTAS_TATU_TEST_PASSWORD) await provisionUsers(transport!,process.env.CONTAS_TATU_TEST_PASSWORD);
+  const seven=sevenHandler(createSevenService(transport ?? neonTransport),createAuthService(transport ?? neonTransport));
   const auth = createAuthService(transport ?? neonTransport);
   const login=authHandler('login',auth), logout=authHandler('logout',auth), session=authHandler('session',auth);
   const finance = createFinanceService(createRepository(transport));
@@ -68,6 +72,7 @@ async function main() {
       if (url.pathname === '/api/auth/login') return await login(request,res);
       if (url.pathname === '/api/auth/logout') return await logout(request,res);
       if (url.pathname === '/api/auth/session') return await session(request,res);
+      if (url.pathname === '/api/seven') return await seven(request,res);
       if (url.pathname === '/api/finance') return await read(request, res);
       if (url.pathname === '/api/chat') return await chat(request,res);
       if (url.pathname === '/api/chat/confirm') return await chatConfirm(request,res);

@@ -18,8 +18,8 @@ não informa versões, configuração ou detalhes internos. Não verifica o Neon
 
 - `api/`: pontos de entrada HTTP para `/api/health` e `/api/db-health`.
   O diagnóstico do banco aceita GET/HEAD e consulta somente metadados em uma
-  transação read-only. Confirma `neondb`, `finance_v2` e 22 tabelas (18 financeiras,
-  três de autenticação e uma de chat); falhas
+  transação read-only. Confirma `neondb`, `finance_v2` e 25 tabelas (18 financeiras,
+  três de autenticação, uma de chat, pagamentos mobile, autorias e comprovantes Seven); falhas
   retornam HTTP 500 com mensagem genérica, sem detalhes de conexão.
 - `server/neon.ts`: fonte única do cliente HTTP Neon server-side. `getNeonClient()`
   valida a configuração e cria/reutiliza o cliente por instância do runtime.
@@ -101,3 +101,37 @@ Clique no nome de uma conta ou compra da fatura para consultar autor e data de
 cadastro. Ambas as telas oferecem ordenação por cadastro mais recente ou mais
 antigo e filtro por autor. A fatura também combina descrição, categoria, tipo e
 valor; a data do cadastro não substitui a data da compra.
+
+
+## Comprovante Seven
+
+Área privada de Henrique no menu mobile e na navegação desktop. A API valida
+sessão, origem, ID fixo do usuário e casa; nomes enviados pelo cliente não
+concedem acesso. Jéssica não vê o menu e recebe 403 em todas as operações Seven.
+
+A migração aditiva `database/migrations/006_seven_receipts.sql` cria uma tabela
+independente, sem modificar saldos, pagamentos, revisões ou lançamentos existentes.
+Aplicada em 26/11/2026 ao `neondb` de produção `br-purple-tree-b7rcasev`, após teste
+na branch `codex/seven-validation-20261126` (`br-plain-wave-b7ow5ro2`), mantida para
+revisão. As contagens permaneceram: 4 contas avulsas, 48 compras de cartão,
+49 parcelamentos e 3 pagamentos mobile. A área começa vazia.
+
+Cada registro exige descrição, cliente/local, data, valor positivo e 1–10 prints
+PNG/JPEG/WebP, com até 1 MB por imagem e 3 MB de dados codificados no conjunto.
+Os anexos ficam incorporados ao registro privado no banco, salvos/substituídos/
+excluídos atomicamente. A listagem retorna apenas metadados; os prints são lidos
+sob demanda por uma API autenticada, sem URLs públicas. Não há novas dependências.
+
+É possível vincular uma conta avulsa do mês. O vínculo preenche descrição e valor
+como referência e não cria outra conta financeira; alterações posteriores na
+conta não mudam o registro de trabalho. Uma conta só pode ter um registro Seven.
+Duplicatas de data/descrição/local/valor são rejeitadas, assim como gravações com
+versão desatualizada. Exclusão de Seven preserva a conta vinculada.
+
+O relatório mensal baixa um HTML com detalhes, total em centavos e todas as
+imagens incorporadas. Pode ser aberto offline e impresso/salvo como PDF pelo
+navegador. O arquivo contém os comprovantes privados de Henrique.
+
+Validação: `npm run lint`, `npm test`, `npm run build` e
+`node tests/seven-browser.cjs <caminho-do-playwright>` (Playwright externo já
+instalado, Edge headless, banco PGlite isolado, credenciais transitórias).

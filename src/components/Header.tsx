@@ -1,3 +1,4 @@
+import { canAccessSeven } from '../seven/model';
 import React from 'react';
 import { Settings, House, WalletCards, Plus, History, ChartNoAxesColumnIncreasing } from 'lucide-react';
 import { useFinance } from '../context/FinanceContext';
@@ -20,6 +21,7 @@ export const Header: React.FC<{ onAccounts?: () => void }> = ({ onAccounts }) =>
         <button id="tab-dashboard" aria-current={!isSettingsOpen && activeTab === 'dashboard' ? 'page' : undefined} onClick={() => setActiveTab('dashboard')}><House /><span>Dashboard</span></button>
         <button id="tab-accounts" aria-current={!isSettingsOpen && activeTab === 'accounts' ? 'page' : undefined} onClick={() => { onAccounts?.(); setActiveTab('accounts'); }}><WalletCards /><span>Contas</span></button>
         <button id="tab-history" aria-current={!isSettingsOpen && activeTab === 'history' ? 'page' : undefined} onClick={() => setActiveTab('history')}><History /><span>Histórico</span></button>
+        {canAccessSeven(user) && <button id="tab-seven" aria-current={activeTab === 'seven' ? 'page' : undefined} onClick={() => setActiveTab('seven')}><WalletCards /><span>Comprovante Seven</span></button>}
         <button id="tab-reports" onClick={reports}><ChartNoAxesColumnIncreasing /><span>Relatórios</span></button>
         <button id="btn-settings-header" aria-haspopup="dialog" aria-expanded={isSettingsOpen} aria-current={isSettingsOpen ? 'page' : undefined} onClick={() => setIsSettingsOpen(true)}><Settings /><span>Configurações</span></button>
       </nav>

@@ -1,3 +1,4 @@
+import SevenPage from './seven/SevenPage';
 import React, { useEffect, useRef, useState } from 'react';
 import { useFinance } from './context/FinanceContext';
 import { Header } from './components/Header';
@@ -50,7 +51,7 @@ const AppContent: React.FC = () => {
 
       {/* Main Content Area */}
       <main className="app-main flex-1 pb-10">
-        {mode === 'neon' && !hasCurrentView ? <div className="p-6 text-sm">{loading ? 'Aguarde o carregamento do mês.' : <><p>Não foi possível carregar os dados.</p><button onClick={refresh}>Tentar novamente</button></>}</div> : activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <>
+        {activeTab === 'seven' ? <SevenPage /> : mode === 'neon' && !hasCurrentView ? <div className="p-6 text-sm">{loading ? 'Aguarde o carregamento do mês.' : <><p>Não foi possível carregar os dados.</p><button onClick={refresh}>Tentar novamente</button></>}</div> : activeTab === 'dashboard' ? <DashboardPage /> : activeTab === 'accounts' ? <>
           <AccountsPage hidden={Boolean(selectedCardId)} onViewCard={openCardDetails} />
           {selectedCardId && <CardDetailsPage cardId={selectedCardId} onBack={backToAccounts} />}
         </> : <HistoryPage />}

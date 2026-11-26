@@ -16,7 +16,7 @@ export function localAccess(request: Request) {
     (!request.headers['sec-fetch-site'] || request.headers['sec-fetch-site'] === 'same-origin' || request.headers['sec-fetch-site'] === 'none') &&
     /^(localhost|127\.0\.0\.1|\[::1\])(?::\d+)?$/.test(request.headers.host ?? '');
 }
-export async function readBody(request: Request) {
+export async function readBody(request: Request, maxBytes = 8192) {
   const contentType = request.headers['content-type']?.split(';')[0].trim().toLowerCase();
   if (contentType !== 'application/json') throw new FoundationError(415, 'JSON body required');
   let body = request.body;
@@ -26,12 +26,12 @@ export async function readBody(request: Request) {
     for await (const chunk of request) {
       const buffer = Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk);
       size += buffer.length;
-      if (size > 8192) throw new FoundationError(413, 'Request too large');
+      if (size > maxBytes) throw new FoundationError(413, 'Request too large');
       chunks.push(buffer);
     }
     body = Buffer.concat(chunks).toString('utf8');
   }
-  if (Buffer.byteLength(typeof body === 'string' ? body : JSON.stringify(body)) > 8192) throw new FoundationError(413, 'Request too large');
+  if (Buffer.byteLength(typeof body === 'string' ? body : JSON.stringify(body)) > maxBytes) throw new FoundationError(413, 'Request too large');
   if (typeof body === 'string') {
     try { return JSON.parse(body); } catch { throw new FoundationError(400, 'Invalid JSON'); }
   }
