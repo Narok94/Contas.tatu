@@ -16,7 +16,17 @@ const path=require('node:path');
   const context=await browser.newContext({viewport:{width:393,height:852},locale:'pt-BR',timezoneId:'America/Sao_Paulo'});
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
   async function login(name){await page.goto(base);await page.getByLabel('Usuário',{exact:true}).fill(name);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByLabel('Lembrar login').check();await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.getByRole('button',{name:'Menu',exact:true}).waitFor();}
-  await login('Henrique');await page.getByRole('button',{name:'Menu',exact:true}).click();await page.getByRole('button',{name:'Comprovante Seven',exact:true}).click();
+  await login('Henrique');
+  const homeSeven=page.getByRole('navigation',{name:'Lançamentos'}).getByRole('button',{name:/Comprovante Seven/});
+  await homeSeven.waitFor();
+  for(const width of [360,393]) {
+   await page.setViewportSize({width,height:852});
+   await homeSeven.scrollIntoViewIfNeeded();
+   assert.equal(await homeSeven.isVisible(),true);
+   assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);
+   await page.screenshot({path:path.join(out,`seven-home-${width}.png`),fullPage:true});
+  }
+  await homeSeven.click();
   const area=page.getByRole('region',{name:'Comprovante Seven'});
   await area.getByText('Nenhuma despesa neste mês.').waitFor();
   await area.getByRole('button',{name:'Nova despesa',exact:true}).click();
@@ -46,7 +56,9 @@ const path=require('node:path');
   }
   page.once('dialog',d=>d.accept());await area.getByRole('button',{name:'Excluir',exact:true}).click();await area.getByText('Nenhuma despesa neste mês.').waitFor();
   await page.getByRole('button',{name:'Sair',exact:true}).click();await page.setViewportSize({width:393,height:852});
-  await login('Jessica');await page.getByRole('button',{name:'Menu',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Comprovante Seven',exact:true}).count(),0);
+  await login('Jessica');
+  assert.equal(await page.getByRole('navigation',{name:'Lançamentos'}).getByRole('button',{name:/Comprovante Seven/}).count(),0);
+  await page.getByRole('button',{name:'Menu',exact:true}).click();assert.equal(await page.getByRole('button',{name:'Comprovante Seven',exact:true}).count(),0);
   assert.equal((await context.request.get(base+'/api/seven?month=2026-11')).status(),403);
   await page.keyboard.press('Escape');await page.setViewportSize({width:1440,height:900});await page.locator('#tab-dashboard').waitFor();assert.equal(await page.locator('#tab-seven').count(),0);
   assert.deepEqual(errors,[]);console.log('PASS: mobile/desktop CRUD, uploads, image rendering, monthly filter/total, downloaded report, Henrique-only UI/API. Screenshots: '+out);

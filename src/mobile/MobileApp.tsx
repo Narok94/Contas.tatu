@@ -20,6 +20,7 @@ const choices = [
   { key: 'payment', title: 'Pagamento', description: 'Pagar uma conta, total ou parcialmente.', icon: CreditCard },
   { key: 'accounts', title: 'Contas', description: 'Confira as contas, faturas e pagamentos do mês.', icon: ReceiptText },
   { key: 'general', title: 'Geral', description: 'Lançamento manual com todos os campos.', icon: List },
+  { key: 'seven', title: 'Comprovante Seven', description: 'Despesas de trabalho, prints e relatório mensal.', icon: ReceiptText },
 ] as const;
 type Screen = 'seven' | 'home' | 'history' | typeof choices[number]['key'];
 
@@ -65,7 +66,7 @@ export default function MobileApp() {
         {notice && <p role="status" className="mobile-dashboard-notice"><Check size={18} />{notice}</p>}
         <h2>O que você quer lançar?</h2>
         <nav className="mobile-dashboard-actions" aria-label="Lançamentos">
-          {choices.map(({ key, title, description, icon: Icon }) => <button key={key} type="button" onClick={() => go(key)}>
+          {choices.filter(choice => choice.key !== 'seven' || canAccessSeven(user)).map(({ key, title, description, icon: Icon }) => <button key={key} type="button" onClick={() => go(key)}>
             <Icon className="mobile-dashboard-action-icon" size={34} />
             <span><strong>{title}</strong><small>{description}</small></span>
             <ChevronRight size={20} />
