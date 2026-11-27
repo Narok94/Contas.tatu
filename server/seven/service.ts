@@ -19,6 +19,7 @@ export function validateExpense(value: unknown): SevenExpense {
   let bytes = 0;
   for (const img of v.images) {
     if (!img || typeof img.name !== 'string' || !img.name.trim() || img.name.length > 200 || typeof img.data !== 'string') return fail();
+    if (img.title !== undefined && (typeof img.title !== 'string' || img.title.length > 200)) return fail('Título do comprovante inválido (máximo de 200 caracteres).');
     const match = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/]+={0,2})$/.exec(img.data);
     if (!match) return fail('Use imagens PNG, JPEG ou WebP.');
     const data = Buffer.from(match[2], 'base64');
@@ -28,7 +29,7 @@ export function validateExpense(value: unknown): SevenExpense {
     bytes += img.data.length;
   }
   if (bytes > 3*1024*1024) return fail('Os anexos juntos devem ocupar até 3 MB.');
-  return { ...v, description:v.description.trim(), location:v.location.trim(), notes:v.notes.trim(), images:v.images.map(i => ({name:i.name,data:i.data})) };
+  return { ...v, description:v.description.trim(), location:v.location.trim(), notes:v.notes.trim(), images:v.images.map(i => ({name:i.name,data:i.data,...(i.title?.trim() ? {title:i.title.trim()} : {})})) };
 }
 export function createSevenService(db: Transport = neonTransport) {
   function authorize(user: Identity) {

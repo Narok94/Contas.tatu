@@ -87,13 +87,13 @@ function SevenContent() {
             setDraft({...draft,images});
           });
         }} /></label><small>De 1 a 10 imagens; até 1 MB cada e 3 MB no conjunto.</small>
-        <div className="seven-images">{draft.images.map((i,index)=><figure key={index}><img src={i.data} alt={i.name} /><figcaption>{i.name}</figcaption><button type="button" onClick={()=>setDraft({...draft,images:draft.images.filter((_,n)=>n!==index)})}>Remover imagem {index+1}</button></figure>)}</div>
+        <div className="seven-images">{draft.images.map((i,index)=><figure key={index}><img src={i.data} alt={i.title || i.name} /><figcaption>{i.name}</figcaption><label>Título do comprovante {index+1} (cliente)<input maxLength={200} placeholder="Ex.: Cliente X — Uber" value={i.title ?? ''} onChange={e=>setDraft({...draft,images:draft.images.map((image,n)=>n===index ? {...image,title:e.target.value} : image)})} /></label><button type="button" onClick={()=>setDraft({...draft,images:draft.images.filter((_,n)=>n!==index)})}>Remover imagem {index+1}</button></figure>)}</div>
         <div className="seven-actions"><button type="submit" disabled={!draft.images.length}>Salvar despesa</button><button type="button" onClick={()=>setDraft(undefined)}>Cancelar</button></div>
       </fieldset>
     </form>}
     {view && <article className="seven-card"><h2>{view.description}</h2><p>{view.date.split('-').reverse().join('/')} · {view.location} · {money(view.cents)}</p><p>{view.notes}</p>{view.accountId && <p>Vinculada a uma conta existente.</p>}
       <div className="seven-actions"><button disabled={busy} onClick={()=>edit(view)}>Editar despesa</button><button onClick={()=>setView(undefined)}>Fechar comprovantes</button></div>
-      <div className="seven-images seven-full">{view.images.map((i,n)=><figure key={n}><img src={i.data} alt={`Comprovante ${n+1}: ${i.name}`} /><figcaption><a href={i.data} download={i.name}>Baixar {i.name}</a></figcaption></figure>)}</div></article>}
+      <div className="seven-images seven-full">{view.images.map((i,n)=><figure key={n}><img src={i.data} alt={`Comprovante ${n+1}: ${i.title || i.name}`} /><figcaption>{i.title && <strong>{i.title}</strong>}<a href={i.data} download={i.name}>Baixar {i.name}</a></figcaption></figure>)}</div></article>}
     {!data && !error && <p role="status">Carregando despesas…</p>}
     {data?.expenses.length===0 && <p>Nenhuma despesa neste mês.</p>}
     <div className="seven-list">{data?.expenses.map(e=><article className="seven-card" key={e.id}><h2>{e.description}</h2><p>{e.location}</p><p>{e.date.split('-').reverse().join('/')} · <strong>{money(e.cents)}</strong> · {e.imageCount} print(s)</p>

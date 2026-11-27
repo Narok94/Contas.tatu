@@ -60,15 +60,16 @@ test('Seven persists private receipts without modifying household finance',async
     assert.equal((await invoke(h.token,'GET',undefined,{month:'2026-12'})).result.totalCents,0);
   });
   await t.test('edit replaces prints, persists after reconnect and rejects stale updates/deletes',async()=>{
-    assert.equal((await invoke(h.token,'POST',{...draft,version:1,cents:3000,images:[image]})).status,200);
+    assert.equal((await invoke(h.token,'POST',{...draft,version:1,cents:3000,images:[{...image,title:' Cliente X — Uber '}] })).status,200);
     assert.equal((await invoke(h.token,'POST',{...draft,version:1})).status,409);
     assert.equal((await invoke(h.token,'DELETE',{id:draft.id,version:1})).status,409);
     const detail=await createSevenService(db).read(h.user,{id:draft.id});
-    assert.equal(detail.cents,3000);assert.equal((detail.images as unknown[]).length,1);
+    assert.equal((detail.images as any[])[0].title,'Cliente X — Uber');assert.equal(detail.cents,3000);assert.equal((detail.images as unknown[]).length,1);
   });
   await t.test('validates dates, amounts, required fields, image signatures, formats and size',async()=>{
     for(const change of [{date:'2026-02-30'},{cents:0},{cents:1.5},{description:''},{images:[]},{images:[{name:'evil.svg',data:'data:image/svg+xml;base64,PHN2Zz4='}]},{images:[{...image,data:'data:image/png;base64,YWJj'}]},{images:Array(11).fill(image)},{ownerId:j.user.id},{images:[{...image,data:image.data+'A'.repeat(3300000)}]}])
       assert.throws(()=>validateExpense({...draft,...change}));
+    for(const title of [42, null, 'x'.repeat(201)]) assert.throws(()=>validateExpense({...draft,images:[{...image,title}]}));
     assert.equal((await invoke(h.token,'POST',{...draft,notes:'x'.repeat(3300000)})).status,413);
     assert.equal((await invoke(h.token,'GET',undefined,{month:'2026-13'})).status,400);
   });
@@ -86,9 +87,9 @@ test('Seven persists private receipts without modifying household finance',async
     assert.deepEqual(await createRepository(db).load(),financial);
   });
   await t.test('report embeds linked prints, exact total and escapes user content',()=>{
-    const html=monthlyReport('2026-11',[{...draft,description:'<script>alert(1)</script>'},{...draft,cents:1010}]);
+    const html=monthlyReport('2026-11',[{...draft,description:'<script>alert(1)</script>',images:[{...image,title:'Cliente <Seven>'}]},{...draft,cents:1010}]);
     assert.ok(html.includes('37,60'));assert.ok(html.includes('26/11/2026'));assert.ok(html.includes('Cliente X'));
-    assert.ok(html.includes(image.data));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));
+    assert.ok(html.includes('Cliente &lt;Seven&gt;'));assert.ok(html.includes(image.data));assert.ok(html.includes('&lt;script&gt;'));assert.ok(!html.includes('<script>'));
   });
   await t.test('delete removes the expense and its embedded prints',async()=>{
     assert.equal((await invoke(h.token,'DELETE',{id:draft.id,version:2})).status,200);
