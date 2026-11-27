@@ -6,7 +6,7 @@
   "scripts": {
     "test": "tsx --test tests/*.test.ts",
     "dev": "vite --port=3000 --host=0.0.0.0",
-    "build": "vite build",
+    "build": "tsx scripts/check-api-limit.ts && vite build",
     "preview": "vite preview",
     "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "lint": "tsc --noEmit && tsc -p tsconfig.server.json",

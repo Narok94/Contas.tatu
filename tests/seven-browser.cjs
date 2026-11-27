@@ -2,11 +2,11 @@
 const {chromium}=require(process.argv[2] || 'playwright');
 const assert=require('node:assert/strict');
 const {spawn}=require('node:child_process');
-const {randomBytes}=require('node:crypto');
+const {randomBytes,randomInt}=require('node:crypto');
 const fs=require('node:fs');
 const path=require('node:path');
 (async()=>{
- const password=randomBytes(20).toString('base64url'),port='3118',base=`http://127.0.0.1:${port}`;
+ const password=randomBytes(20).toString('base64url'),port=String(randomInt(20000,60000)),base=`http://127.0.0.1:${port}`;
  const out=path.join(require('node:os').tmpdir(),'contas-seven-validation');fs.mkdirSync(out,{recursive:true});
  const app=spawn(process.execPath,['node_modules/tsx/dist/cli.mjs','scripts/controlled-dev.ts','--isolated'],{env:{...process.env,CONTAS_TATU_TEST_PASSWORD:password,CONTAS_TATU_LOCAL_PORT:port},stdio:['ignore','pipe','pipe'],windowsHide:true});
  let browser;let stderr='';app.stderr.on('data',d=>stderr+=d);
@@ -15,7 +15,7 @@ const path=require('node:path');
   browser=await chromium.launch({channel:'msedge',headless:true});
   const context=await browser.newContext({viewport:{width:393,height:852},locale:'pt-BR',timezoneId:'America/Sao_Paulo'});
   const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
-  async function login(name){await page.goto(base);await page.getByLabel('Usuário',{exact:true}).fill(name);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByLabel('Lembrar login').check();await page.getByRole('button',{name:'Entrar',exact:true}).click();await page.getByRole('button',{name:'Menu',exact:true}).waitFor();}
+  async function login(name){await page.goto(base);await page.getByLabel('Usuário',{exact:true}).fill(name);await page.getByLabel('Senha',{exact:true}).fill(password);await page.getByLabel('Lembrar login').check();const response=page.waitForResponse(r=>r.url().endsWith('/api/auth/login')&&r.request().method()==='POST');await page.getByRole('button',{name:'Entrar',exact:true}).click();assert.equal((await response).status(),200,'Login must succeed before testing Seven');await page.getByRole('button',{name:'Menu',exact:true}).waitFor();}
   await login('Henrique');
   const homeSeven=page.getByRole('navigation',{name:'Lançamentos'}).getByRole('button',{name:/Comprovante Seven/});
   await homeSeven.waitFor();

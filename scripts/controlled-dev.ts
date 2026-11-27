@@ -10,6 +10,7 @@ import { createFinanceService } from '../server/finance/service.js';
 import { financeHandler } from '../server/finance/api.js';
 import { categoryHandler } from '../server/category-api.js';
 import { authHandler } from '../server/auth/api.js';
+import { authMutationHandler } from '../server/auth/router.js';
 import { createAuthService } from '../server/auth/service.js';
 import { provisionUsers } from '../server/auth/provision.js';
 import { neonTransport } from '../server/finance/repository.js';
@@ -53,7 +54,7 @@ async function main() {
   if (isolated && process.env.CONTAS_TATU_TEST_PASSWORD) await provisionUsers(transport!,process.env.CONTAS_TATU_TEST_PASSWORD);
   const seven=sevenHandler(createSevenService(transport ?? neonTransport),createAuthService(transport ?? neonTransport));
   const auth = createAuthService(transport ?? neonTransport);
-  const login=authHandler('login',auth), logout=authHandler('logout',auth), session=authHandler('session',auth);
+  const authMutation=authMutationHandler(auth), session=authHandler('session',auth);
   const finance = createFinanceService(createRepository(transport));
   const read = financeHandler(false, finance, auth), write = financeHandler(true, finance, auth);
   const categories = categoryHandler(false, foundation, auth), category = categoryHandler(true, foundation, auth);
@@ -69,8 +70,7 @@ async function main() {
       const request = req as IncomingMessage & { query: Record<string, string | string[]> };
       request.query = {};
       for (const key of url.searchParams.keys()) { const values = url.searchParams.getAll(key); request.query[key] = values.length === 1 ? values[0] : values; }
-      if (url.pathname === '/api/auth/login') return await login(request,res);
-      if (url.pathname === '/api/auth/logout') return await logout(request,res);
+      if (url.pathname === '/api/auth/login' || url.pathname === '/api/auth/logout') return await authMutation(request,res);
       if (url.pathname === '/api/auth/session') return await session(request,res);
       if (url.pathname === '/api/seven') return await seven(request,res);
       if (url.pathname === '/api/finance') return await read(request, res);

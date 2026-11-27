@@ -135,3 +135,17 @@ navegador. O arquivo contém os comprovantes privados de Henrique.
 Validação: `npm run lint`, `npm test`, `npm run build` e
 `node tests/seven-browser.cjs <caminho-do-playwright>` (Playwright externo já
 instalado, Edge headless, banco PGlite isolado, credenciais transitórias).
+
+## Limite de funções na Vercel
+
+O projeto mantém 12 funções em `api/`, sem mudança de plano. A função dinâmica
+`api/auth/[action].ts` atende os endereços existentes `/api/auth/login` e
+`/api/auth/logout`; `/api/auth/session` continua separado. O roteador aceita
+somente esses dois caminhos e reaproveita os handlers de autenticação com as
+mesmas validações de método, origem e cookies. Parâmetros de consulta não mudam
+a ação executada. O ambiente isolado usa esse mesmo roteador.
+
+`npm run build` verifica a quantidade de funções antes de compilar o frontend e
+falha se houver mais de 12. Novas rotas devem ser agrupadas em funções existentes
+quando necessário. O sucesso do build local não confirma a publicação: o deploy
+na Vercel precisa terminar em `Ready`.
